@@ -187,6 +187,7 @@ struct iOSRemoteFileTabsBar: View {
     let onClose: (RemoteFileTab) -> Void
 
     private let minTabWidth: CGFloat = 120
+    private let searchAlignedOuterHorizontalPadding: CGFloat = 24
 
     var body: some View {
         GeometryReader { proxy in
@@ -252,7 +253,7 @@ struct iOSRemoteFileTabsBar: View {
                 )
         )
         .clipShape(Capsule(style: .continuous))
-        .padding(.horizontal, ServerViewTopTabBarMetrics.outerHorizontalPadding)
+        .padding(.horizontal, searchAlignedOuterHorizontalPadding)
         .padding(.vertical, 6)
     }
 }
