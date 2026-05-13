@@ -85,6 +85,43 @@ struct TerminalKeyboardFocusPolicy {
     }
 }
 
+struct TerminalFindNavigatorLifecycle {
+    private(set) var isActive = false
+    private(set) var suppressedGhosttySearchEndCount = 0
+    private var restoreTerminalFocusAfterEnd = false
+
+    mutating func begin(restoreTerminalFocus: Bool) {
+        if isActive {
+            restoreTerminalFocusAfterEnd = restoreTerminalFocusAfterEnd || restoreTerminalFocus
+        } else {
+            restoreTerminalFocusAfterEnd = restoreTerminalFocus
+        }
+        isActive = true
+    }
+
+    mutating func end() -> Bool {
+        isActive = false
+        let shouldRestoreFocus = restoreTerminalFocusAfterEnd
+        restoreTerminalFocusAfterEnd = false
+        return shouldRestoreFocus
+    }
+
+    mutating func suppressNextGhosttySearchEnd() {
+        suppressedGhosttySearchEndCount += 1
+    }
+
+    mutating func cancelSuppressedGhosttySearchEnd() {
+        guard suppressedGhosttySearchEndCount > 0 else { return }
+        suppressedGhosttySearchEndCount -= 1
+    }
+
+    mutating func consumeSuppressedGhosttySearchEnd() -> Bool {
+        guard suppressedGhosttySearchEndCount > 0 else { return false }
+        suppressedGhosttySearchEndCount -= 1
+        return true
+    }
+}
+
 @MainActor
 private final class TerminalIMEProxyTextView: UITextView {
     weak var terminalOwner: GhosttyTerminalView?
@@ -875,7 +912,7 @@ class GhosttyTerminalView: UIView {
     }
 
     fileprivate var imeProxyCanBecomeFirstResponder: Bool {
-        isTextInputSessionEligible
+        isTextInputSessionEligible && !isFindNavigatorActive
     }
 
     fileprivate var imeProxyCanResignFirstResponder: Bool {
@@ -886,7 +923,7 @@ class GhosttyTerminalView: UIView {
     }
 
     fileprivate var currentTextInputContextIdentifier: String? {
-        isTextInputSessionEligible ? Self.textInputContextID : nil
+        isTextInputSessionEligible && !isFindNavigatorActive ? Self.textInputContextID : nil
     }
 
     fileprivate var resolvedKeyboardAppearance: UIKeyboardAppearance {
@@ -1119,14 +1156,14 @@ class GhosttyTerminalView: UIView {
     private var suppressDirectTouchKeyboardFocusUntil = Date.distantPast
     var onKeyboardBrowseModeChange: ((Bool) -> Void)?
     var onFindNavigatorVisibilityChange: ((Bool) -> Void)?
-    private var isEndingGhosttySearchFromNavigatorDismissal = false
+    private var findNavigatorLifecycle = TerminalFindNavigatorLifecycle()
 
     var shouldRestoreKeyboardFocusOnReconnect: Bool {
         keyboardFocusPolicy.shouldRestoreOnReconnect
     }
 
     var allowsAutomaticKeyboardFocus: Bool {
-        keyboardFocusPolicy.allowsAutomaticFocus
+        keyboardFocusPolicy.allowsAutomaticFocus && !isFindNavigatorActive
     }
 
     var isKeyboardInBrowseMode: Bool {
@@ -1134,10 +1171,17 @@ class GhosttyTerminalView: UIView {
     }
 
     var isFindNavigatorVisible: Bool {
-        if #available(iOS 16.0, *) {
-            return nativeFindInteraction?.isFindNavigatorVisible == true
-        }
-        return false
+        isFindNavigatorActive
+    }
+
+    private var isFindNavigatorActive: Bool {
+        guard #available(iOS 16.0, *) else { return false }
+        return findNavigatorLifecycle.isActive
+            || nativeFindInteraction?.isFindNavigatorVisible == true
+    }
+
+    private var canRouteTerminalInput: Bool {
+        acceptsTerminalInput && !isFindNavigatorActive
     }
 
     func markKeyboardFocusForReconnect() {
@@ -1150,6 +1194,7 @@ class GhosttyTerminalView: UIView {
 
     @discardableResult
     func requestKeyboardFocus(for reason: TerminalKeyboardFocusReason) -> Bool {
+        guard !isFindNavigatorActive else { return false }
         guard keyboardFocusPolicy.requestFocus(for: reason) else { return false }
         prefersNativeSelectionFirstResponder = false
         if usesNativeTouchSelection, nativeSelectedRange != nil {
@@ -1182,6 +1227,7 @@ class GhosttyTerminalView: UIView {
     }
 
     func shouldAutoFocusKeyboard(for touches: Set<UITouch>) -> Bool {
+        guard !isFindNavigatorActive else { return false }
         guard keyboardFocusPolicy.allowsAutomaticFocus else { return false }
         guard touches.contains(where: { $0.type == .direct }) else { return true }
         return Date() >= suppressDirectTouchKeyboardFocusUntil
@@ -1649,14 +1695,46 @@ class GhosttyTerminalView: UIView {
     }
 
     @available(iOS 16.0, *)
+    private func beginFindNavigatorPresentation(restoreTerminalFocus: Bool) {
+        findNavigatorLifecycle.begin(restoreTerminalFocus: restoreTerminalFocus)
+        notifyFindNavigatorVisibilityChange()
+        stopKeyRepeat()
+
+        if imeProxyTextView.isFirstResponder {
+            let previous = allowIMEProxyProgrammaticResign
+            allowIMEProxyProgrammaticResign = true
+            _ = imeProxyTextView.resignFirstResponder()
+            allowIMEProxyProgrammaticResign = previous
+        }
+
+        if !super.isFirstResponder {
+            _ = super.becomeFirstResponder()
+        }
+
+        if let surface = surface?.unsafeCValue {
+            ghostty_surface_set_focus(surface, false)
+        }
+    }
+
+    private func endFindNavigatorLifecycle() -> Bool {
+        let shouldRestoreTerminalFocus = findNavigatorLifecycle.end()
+        if !shouldRestoreTerminalFocus, super.isFirstResponder {
+            _ = super.resignFirstResponder()
+        }
+        return shouldRestoreTerminalFocus
+    }
+
+    @available(iOS 16.0, *)
     private func presentFindNavigator(prefillingSelectedText: Bool = false) {
+        guard let nativeFindInteraction else { return }
+        beginFindNavigatorPresentation(restoreTerminalFocus: imeProxyTextView.isFirstResponder)
         refreshNativeSelectionSnapshot()
         if prefillingSelectedText, let selectionText = normalizedSelectionMenuText() {
-            nativeFindInteraction?.searchText = selectionText
+            nativeFindInteraction.searchText = selectionText
             nativeFindSession?.applyExternalQuery(selectionText)
             performGhosttyFindQuery(selectionText)
         }
-        nativeFindInteraction?.presentFindNavigator(showingReplace: false)
+        nativeFindInteraction.presentFindNavigator(showingReplace: false)
     }
 
     func showFindNavigator(prefillingSelectedText: Bool = false) {
@@ -1672,16 +1750,29 @@ class GhosttyTerminalView: UIView {
     }
 
     @MainActor
-    private func performGhosttyFindQuery(_ query: String) {
-        guard let surface else { return }
+    @discardableResult
+    private func performGhosttyFindQuery(
+        _ query: String,
+        keepNavigatorVisibleOnSearchEnd: Bool = false
+    ) -> Bool {
+        guard let surface else { return false }
         ghosttyFindReportedTotal = 0
         ghosttyFindReportedSelectedIndex = nil
         let action = "search:\(query)"
-        guard surface.perform(action: action) else { return }
+        if keepNavigatorVisibleOnSearchEnd {
+            findNavigatorLifecycle.suppressNextGhosttySearchEnd()
+        }
+        guard surface.perform(action: action) else {
+            if keepNavigatorVisibleOnSearchEnd {
+                findNavigatorLifecycle.cancelSuppressedGhosttySearchEnd()
+            }
+            return false
+        }
         if query.isEmpty {
             nativeFindSession?.resetReportedResults()
             nativeFindInteraction?.updateResultCount()
         }
+        return true
     }
 
     @MainActor
@@ -1696,13 +1787,15 @@ class GhosttyTerminalView: UIView {
         guard let surface else { return }
         ghosttyFindReportedTotal = 0
         ghosttyFindReportedSelectedIndex = nil
-        isEndingGhosttySearchFromNavigatorDismissal = true
-        _ = surface.perform(action: "end_search")
+        findNavigatorLifecycle.suppressNextGhosttySearchEnd()
+        if !surface.perform(action: "end_search") {
+            findNavigatorLifecycle.cancelSuppressedGhosttySearchEnd()
+        }
     }
 
     @MainActor
     private func invalidateGhosttyFindWithoutClosingNavigator() {
-        performGhosttyFindQuery("")
+        performGhosttyFindQuery("", keepNavigatorVisibleOnSearchEnd: true)
     }
 
     @MainActor
@@ -1725,6 +1818,7 @@ class GhosttyTerminalView: UIView {
             nativeFindSession?.applyExternalQuery(needle)
             applyStoredGhosttyFindResultsToNativeSession()
             if nativeFindInteraction?.isFindNavigatorVisible != true {
+                beginFindNavigatorPresentation(restoreTerminalFocus: imeProxyTextView.isFirstResponder)
                 nativeFindInteraction?.presentFindNavigator(showingReplace: false)
             }
         }
@@ -1737,10 +1831,13 @@ class GhosttyTerminalView: UIView {
         if #available(iOS 16.0, *) {
             nativeFindSession?.resetReportedResults()
             nativeFindInteraction?.updateResultCount()
-            if isEndingGhosttySearchFromNavigatorDismissal {
-                isEndingGhosttySearchFromNavigatorDismissal = false
+            if findNavigatorLifecycle.consumeSuppressedGhosttySearchEnd() {
+                return
             } else if nativeFindInteraction?.isFindNavigatorVisible == true {
                 nativeFindInteraction?.dismissFindNavigator()
+            } else if findNavigatorLifecycle.isActive {
+                _ = endFindNavigatorLifecycle()
+                notifyFindNavigatorVisibilityChange()
             }
         }
     }
@@ -2302,10 +2399,7 @@ class GhosttyTerminalView: UIView {
             }
             return usesAppOwnedTouchSelection && selectionGridMetrics() != nil
         case #selector(find(_:)):
-            if usesNativeTouchSelection {
-                return nativeSelectionSnapshot.length > 0
-            }
-            return false
+            return usesNativeTouchSelection
         case #selector(findNext(_:)), #selector(findPrevious(_:)):
             if #available(iOS 16.0, *), usesNativeTouchSelection {
                 return nativeFindInteraction?.isFindNavigatorVisible == true
@@ -2374,7 +2468,7 @@ class GhosttyTerminalView: UIView {
     }
 
     fileprivate func handleIMEProxyNavigationCommand(_ command: UIKeyCommand) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         guard let input = command.input,
               let key = terminalKey(forKeyCommandInput: input) else { return }
         if case .escape = key {
@@ -2583,6 +2677,10 @@ class GhosttyTerminalView: UIView {
         timer.setEventHandler { [weak self] in
             guard let self = self,
                   let cSurface = self.surface?.unsafeCValue else { return }
+            guard self.canRouteTerminalInput else {
+                self.stopKeyRepeat()
+                return
+            }
             if let repeatKey = self.repeatingHardwareKey,
                self.sendDirectHardwareKeyEvent(
                    repeatKey,
@@ -2685,6 +2783,9 @@ class GhosttyTerminalView: UIView {
         guard let surface = surface, let cSurface = surface.unsafeCValue else {
             return HardwarePressResult(forwardedToSystem: presses, didHandleGhosttyInput: false)
         }
+        guard canRouteTerminalInput else {
+            return HardwarePressResult(forwardedToSystem: presses, didHandleGhosttyInput: false)
+        }
 
         var result = HardwarePressResult()
         for press in presses {
@@ -2732,6 +2833,9 @@ class GhosttyTerminalView: UIView {
 
     fileprivate func processHardwarePressesEnded(_ presses: Set<UIPress>, event _: UIPressesEvent?) -> HardwarePressResult {
         guard let surface = surface, let cSurface = surface.unsafeCValue else {
+            return HardwarePressResult(forwardedToSystem: presses, didHandleGhosttyInput: false)
+        }
+        guard canRouteTerminalInput || !hardwarePressesSentToGhostty.isEmpty else {
             return HardwarePressResult(forwardedToSystem: presses, didHandleGhosttyInput: false)
         }
 
@@ -2817,19 +2921,19 @@ class GhosttyTerminalView: UIView {
 
     /// Send text to the terminal (called from keyboard toolbar or software keyboard)
     func sendText(_ text: String) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         surface?.sendText(text)
         requestRender()
     }
 
     func pasteTextFromClipboard() {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         _ = surface?.perform(action: "paste_from_clipboard")
         requestRender()
     }
 
     private func sendTerminalInputText(_ text: String) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
 
         let normalized = text.precomposedStringWithCanonicalMapping
         guard normalized.count == 1, let character = normalized.first else {
@@ -2857,7 +2961,7 @@ class GhosttyTerminalView: UIView {
     }
 
     fileprivate func handleIMEProxyInsertText(_ text: String) -> Bool {
-        guard acceptsTerminalInput else { return true }
+        guard canRouteTerminalInput else { return true }
 
         let normalized = text.precomposedStringWithCanonicalMapping
         if let key = terminalKey(forKeyCommandInput: normalized) {
@@ -2938,7 +3042,7 @@ class GhosttyTerminalView: UIView {
     }
 
     private func sendKeyPress(_ key: Ghostty.Input.Key) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         guard let surface = surface else { return }
         surface.sendKeyEvent(.init(key: key, action: .press))
         surface.sendKeyEvent(.init(key: key, action: .release))
@@ -2946,14 +3050,14 @@ class GhosttyTerminalView: UIView {
     }
 
     private func sendControlByte(_ value: UInt8) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         invalidateLocalTextInputSession()
         let scalar = UnicodeScalar(value)
         sendText(String(Character(scalar)))
     }
 
     private func sendAnsiSequence(_ data: Data) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         invalidateLocalTextInputSession()
         let text = String(decoding: data, as: UTF8.self)
         sendText(text)
@@ -3008,7 +3112,7 @@ class GhosttyTerminalView: UIView {
         unshiftedCodepoint: UInt32 = 0,
         invalidateLocalSession: Bool = true
     ) {
-        guard acceptsTerminalInput else { return }
+        guard canRouteTerminalInput else { return }
         guard let surface = surface else { return }
         if invalidateLocalSession {
             invalidateLocalTextInputSession()
@@ -3242,7 +3346,11 @@ extension GhosttyTerminalView: UIFindInteractionDelegate {
 
         let session = GhosttyNativeFindSession(
             onSearch: { [weak self] query, _ in
-                self?.performGhosttyFindQuery(query)
+                guard let self else { return }
+                self.performGhosttyFindQuery(
+                    query,
+                    keepNavigatorVisibleOnSearchEnd: query.isEmpty && self.isFindNavigatorActive
+                )
             },
             onNavigate: { [weak self] direction in
                 self?.navigateGhosttyFind(direction)
@@ -3257,12 +3365,16 @@ extension GhosttyTerminalView: UIFindInteractionDelegate {
     }
 
     func findInteraction(_ interaction: UIFindInteraction, didBegin session: UIFindSession) {
+        if !findNavigatorLifecycle.isActive {
+            findNavigatorLifecycle.begin(restoreTerminalFocus: imeProxyTextView.isFirstResponder)
+        }
         refreshNativeSelectionSnapshot()
         applyStoredGhosttyFindResultsToNativeSession()
         notifyFindNavigatorVisibilityChange()
     }
 
     func findInteraction(_ interaction: UIFindInteraction, didEnd session: UIFindSession) {
+        let shouldRestoreTerminalFocus = endFindNavigatorLifecycle()
         nativeFindDecorations.removeAll()
         nativeFindSession?.resetReportedResults()
         nativeFindSession = nil
@@ -3270,6 +3382,12 @@ extension GhosttyTerminalView: UIFindInteractionDelegate {
         ghosttyFindReportedSelectedIndex = nil
         notifyFindNavigatorVisibilityChange()
         endGhosttyFindSearchForNavigatorDismissal()
+        if shouldRestoreTerminalFocus {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isFindNavigatorActive else { return }
+                self.requestKeyboardFocus(for: .explicitUserRequest)
+            }
+        }
     }
 }
 
@@ -3493,7 +3611,7 @@ extension GhosttyTerminalView {
     }
 
     fileprivate func resolvedInputAccessoryView() -> UIView? {
-        guard !shouldHideKeyboardAccessoryBar else {
+        guard !isFindNavigatorActive, !shouldHideKeyboardAccessoryBar else {
             return nil
         }
         if keyboardToolbar == nil {

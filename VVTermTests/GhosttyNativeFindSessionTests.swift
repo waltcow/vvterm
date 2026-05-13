@@ -41,5 +41,47 @@ struct GhosttyNativeFindSessionTests {
         #expect(session.resultCount == 2)
         #expect(session.highlightedResultIndex == NSNotFound)
     }
+
+    @Test
+    func lifecycleConsumesOnlySuppressedGhosttySearchEndEvents() {
+        var lifecycle = TerminalFindNavigatorLifecycle()
+
+        let initialConsume = lifecycle.consumeSuppressedGhosttySearchEnd()
+        #expect(initialConsume == false)
+
+        lifecycle.suppressNextGhosttySearchEnd()
+
+        #expect(lifecycle.suppressedGhosttySearchEndCount == 1)
+        let suppressedConsume = lifecycle.consumeSuppressedGhosttySearchEnd()
+        #expect(suppressedConsume)
+        #expect(lifecycle.suppressedGhosttySearchEndCount == 0)
+        let finalConsume = lifecycle.consumeSuppressedGhosttySearchEnd()
+        #expect(finalConsume == false)
+    }
+
+    @Test
+    func lifecycleCancelsPendingSuppressionWhenSearchCommandFails() {
+        var lifecycle = TerminalFindNavigatorLifecycle()
+
+        lifecycle.suppressNextGhosttySearchEnd()
+        lifecycle.cancelSuppressedGhosttySearchEnd()
+
+        #expect(lifecycle.suppressedGhosttySearchEndCount == 0)
+        let consumeAfterCancel = lifecycle.consumeSuppressedGhosttySearchEnd()
+        #expect(consumeAfterCancel == false)
+    }
+
+    @Test
+    func lifecyclePreservesTerminalFocusRestoreIntentAcrossRepeatedBegin() {
+        var lifecycle = TerminalFindNavigatorLifecycle()
+
+        lifecycle.begin(restoreTerminalFocus: false)
+        lifecycle.begin(restoreTerminalFocus: true)
+
+        #expect(lifecycle.isActive)
+        let shouldRestoreFocus = lifecycle.end()
+        #expect(shouldRestoreFocus)
+        #expect(lifecycle.isActive == false)
+    }
 }
 #endif
