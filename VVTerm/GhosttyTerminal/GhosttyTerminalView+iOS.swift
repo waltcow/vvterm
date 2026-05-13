@@ -399,6 +399,20 @@ class GhosttyTerminalView: UIView {
         }
     }
 
+    @discardableResult
+    func triggerVoiceInput() -> Bool {
+        guard let onVoiceButtonTapped else { return false }
+        onVoiceButtonTapped()
+        return true
+    }
+
+    @discardableResult
+    func sendReturnKey() -> Bool {
+        guard canRouteTerminalInput else { return false }
+        sendToolbarKey(.enter)
+        return true
+    }
+
     /// Optional app-level paste interceptor used for rich clipboard routing.
     var richPasteInterceptor: ((GhosttyTerminalView) -> Bool)?
     private var didSignalReady = false

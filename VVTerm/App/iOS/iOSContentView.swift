@@ -768,6 +768,8 @@ struct iOSTerminalView: View {
     @State private var pendingCloseSession: ConnectionSession?
     @State private var showingZenPanel = false
     @State private var requestedTerminalDismissal = false
+    @State private var voiceRecordingBySession: [UUID: Bool] = [:]
+    @State private var pendingVoiceReturnBySession: [UUID: Bool] = [:]
 
     @SceneStorage("vvterm.zenMode.ios") private var isZenModeEnabled = false
 
@@ -775,6 +777,7 @@ struct iOSTerminalView: View {
     @AppStorage(CloudKitSyncConstants.terminalThemeNameLightKey) private var terminalThemeNameLight = "Aizen Light"
     @AppStorage(CloudKitSyncConstants.terminalUsePerAppearanceThemeKey) private var usePerAppearanceTheme = true
     @AppStorage("sshAutoReconnect") private var autoReconnectEnabled = true
+    @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
     private var effectiveThemeName: String {
         guard usePerAppearanceTheme else { return terminalThemeName }
         return colorScheme == .dark ? terminalThemeName : terminalThemeNameLight
@@ -867,11 +870,26 @@ struct iOSTerminalView: View {
         return sessionManager.terminalFindNavigatorVisibleBySession[sessionId] ?? false
     }
 
-    private var shouldShowFloatingKeyboardButton: Bool {
+    private var isSelectedTerminalVoiceRecording: Bool {
+        guard let sessionId = effectiveSelectedSessionId else { return false }
+        return voiceRecordingBySession[sessionId] ?? false
+    }
+
+    private var shouldShowFloatingTerminalControls: Bool {
         UIDevice.current.userInterfaceIdiom == .phone
             && selectedView == ConnectionViewTab.terminal.id
             && isSelectedTerminalInBrowseMode
             && !isSelectedTerminalFindNavigatorVisible
+            && !isSelectedTerminalVoiceRecording
+    }
+
+    private var shouldShowFloatingVoiceButton: Bool {
+        shouldShowFloatingTerminalControls && terminalVoiceButtonEnabled
+    }
+
+    private var shouldShowFloatingReturnButton: Bool {
+        guard let sessionId = effectiveSelectedSessionId else { return false }
+        return shouldShowFloatingTerminalControls && pendingVoiceReturnBySession[sessionId] == true
     }
 
     private var canUseZenMode: Bool {
@@ -1054,6 +1072,7 @@ struct iOSTerminalView: View {
             }
             .onChange(of: selectedView) { newValue in
                 if newValue != "terminal" {
+                    clearPendingVoiceReturnForCurrentSession()
                     dismissKeyboardForCurrentSession()
                 } else {
                     DispatchQueue.main.async {
@@ -1082,6 +1101,8 @@ struct iOSTerminalView: View {
                 let activeIds = Set(serverSessions.map { $0.id })
                 shouldShowTerminalBySession = shouldShowTerminalBySession.filter { activeIds.contains($0.key) }
                 reconnectTokenBySession = reconnectTokenBySession.filter { activeIds.contains($0.key) }
+                voiceRecordingBySession = voiceRecordingBySession.filter { activeIds.contains($0.key) }
+                pendingVoiceReturnBySession = pendingVoiceReturnBySession.filter { activeIds.contains($0.key) }
                 if currentServerId != nil,
                    let selectedId = sessionManager.selectedSessionId,
                    !serverSessions.contains(where: { $0.id == selectedId }),
@@ -1115,8 +1136,8 @@ struct iOSTerminalView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if shouldShowFloatingKeyboardButton {
-                    floatingKeyboardButton
+                if shouldShowFloatingTerminalControls {
+                    floatingTerminalControls
                         .padding(.bottom, 4)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -1124,7 +1145,8 @@ struct iOSTerminalView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar { navigationToolbar }
             .toolbar(effectiveZenModeEnabled ? .hidden : .visible, for: .navigationBar)
-            .animation(.spring(response: 0.28, dampingFraction: 0.84), value: shouldShowFloatingKeyboardButton)
+            .animation(.spring(response: 0.28, dampingFraction: 0.84), value: shouldShowFloatingTerminalControls)
+            .animation(.spring(response: 0.28, dampingFraction: 0.84), value: shouldShowFloatingReturnButton)
     }
 
     private var sheetContent: some View {
@@ -1397,7 +1419,38 @@ struct iOSTerminalView: View {
         guard selectedView == ConnectionViewTab.terminal.id,
               let selectedId = effectiveSelectedSessionId,
               let terminal = ConnectionSessionManager.shared.peekTerminal(for: selectedId) else { return }
+        clearPendingVoiceReturn(for: selectedId)
         terminal.requestKeyboardFocus(for: .explicitUserRequest)
+    }
+
+    private func startVoiceInputForCurrentSession() {
+        guard selectedView == ConnectionViewTab.terminal.id,
+              terminalVoiceButtonEnabled,
+              !isSelectedTerminalVoiceRecording,
+              let selectedId = effectiveSelectedSessionId,
+              let terminal = ConnectionSessionManager.shared.peekTerminal(for: selectedId) else { return }
+        clearPendingVoiceReturn(for: selectedId)
+        if terminal.triggerVoiceInput() {
+            voiceRecordingBySession[selectedId] = true
+        }
+    }
+
+    private func sendReturnForCurrentSession() {
+        guard selectedView == ConnectionViewTab.terminal.id,
+              let selectedId = effectiveSelectedSessionId,
+              let terminal = ConnectionSessionManager.shared.peekTerminal(for: selectedId) else { return }
+        if terminal.sendReturnKey() {
+            clearPendingVoiceReturn(for: selectedId)
+        }
+    }
+
+    private func clearPendingVoiceReturnForCurrentSession() {
+        guard let selectedId = effectiveSelectedSessionId else { return }
+        clearPendingVoiceReturn(for: selectedId)
+    }
+
+    private func clearPendingVoiceReturn(for sessionId: UUID) {
+        pendingVoiceReturnBySession[sessionId] = false
     }
 
     private func showFindNavigatorForCurrentSession() {
@@ -1408,29 +1461,122 @@ struct iOSTerminalView: View {
     }
 
     @ViewBuilder
-    private var floatingKeyboardButton: some View {
-        let button = Button {
+    private var floatingTerminalControls: some View {
+        if shouldShowFloatingReturnButton {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    floatingKeyboardVoiceControls(showsTitle: true)
+                    Spacer(minLength: 14)
+                    floatingReturnControl()
+                }
+
+                HStack(spacing: 10) {
+                    floatingKeyboardVoiceControls(showsTitle: false)
+                    Spacer(minLength: 14)
+                    floatingReturnControl()
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    floatingKeyboardVoiceControls(showsTitle: true)
+                }
+
+                HStack(spacing: 10) {
+                    floatingKeyboardVoiceControls(showsTitle: false)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    @ViewBuilder
+    private func floatingKeyboardVoiceControls(showsTitle: Bool) -> some View {
+        HStack(spacing: 10) {
+            floatingKeyboardControl(showsTitle: showsTitle)
+            if shouldShowFloatingVoiceButton {
+                floatingVoiceControl(showsTitle: showsTitle)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func floatingKeyboardControl(showsTitle: Bool) -> some View {
+        floatingTerminalControlButton(
+            title: "Keyboard",
+            systemImage: "keyboard",
+            accessibilityLabel: "Show Keyboard",
+            showsTitle: showsTitle
+        ) {
             showKeyboardForCurrentSession()
-        } label: {
-            Label {
-                Text("Keyboard")
-            } icon: {
-                Image(systemName: "keyboard")
+        }
+    }
+
+    @ViewBuilder
+    private func floatingVoiceControl(showsTitle: Bool) -> some View {
+        floatingTerminalControlButton(
+            title: "Voice input",
+            systemImage: "mic.fill",
+            accessibilityLabel: "Voice input",
+            showsTitle: showsTitle
+        ) {
+            startVoiceInputForCurrentSession()
+        }
+    }
+
+    @ViewBuilder
+    private func floatingReturnControl() -> some View {
+        floatingTerminalControlButton(
+            title: "Enter",
+            systemImage: "arrow.turn.down.left",
+            accessibilityLabel: "Enter",
+            showsTitle: false,
+            isPrimary: true
+        ) {
+            sendReturnForCurrentSession()
+        }
+    }
+
+    @ViewBuilder
+    private func floatingTerminalControlButton(
+        title: LocalizedStringKey,
+        systemImage: String,
+        accessibilityLabel: LocalizedStringKey,
+        showsTitle: Bool,
+        isPrimary: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        let button = Button(action: action) {
+            HStack(spacing: showsTitle ? 6 : 0) {
+                Image(systemName: systemImage)
+                if showsTitle {
+                    Text(title)
+                }
             }
             .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 2)
+            .foregroundStyle(isPrimary ? Color.accentColor : Color.primary)
+            .padding(.horizontal, showsTitle ? 2 : 0)
         }
-        .accessibilityLabel(String(localized: "Show Keyboard"))
+        .accessibilityLabel(Text(accessibilityLabel))
 
         if #available(iOS 26, *) {
-            button
-                .buttonStyle(SwiftUI.GlassButtonStyle())
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
+            if isPrimary {
+                button
+                    .tint(Color.accentColor)
+                    .buttonStyle(SwiftUI.GlassButtonStyle())
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+            } else {
+                button
+                    .buttonStyle(SwiftUI.GlassButtonStyle())
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+            }
         } else {
             button
-                .buttonStyle(.glass(tint: Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.14)))
+                .buttonStyle(.glass(tint: Color.accentColor.opacity(isPrimary ? 0.5 : (colorScheme == .dark ? 0.24 : 0.14))))
         }
     }
 
@@ -1466,7 +1612,18 @@ struct iOSTerminalView: View {
                 TerminalContainerView(
                     session: session,
                     server: server,
-                    isActive: effectiveViewSelection == "terminal"
+                    isActive: effectiveViewSelection == "terminal",
+                    onVoiceRecordingChange: { isRecording in
+                        if isRecording {
+                            clearPendingVoiceReturn(for: session.id)
+                        }
+                        voiceRecordingBySession[session.id] = isRecording
+                    },
+                    onVoiceTranscriptionSent: {
+                        if sessionManager.terminalBrowseModeBySession[session.id] == true {
+                            pendingVoiceReturnBySession[session.id] = true
+                        }
+                    }
                 )
                 .id(reconnectToken)
             }

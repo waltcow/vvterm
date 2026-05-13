@@ -16,6 +16,8 @@ struct TerminalContainerView: View {
     let session: ConnectionSession
     let server: Server?
     var isActive: Bool = true
+    var onVoiceRecordingChange: ((Bool) -> Void)? = nil
+    var onVoiceTranscriptionSent: (() -> Void)? = nil
     @EnvironmentObject var ghosttyApp: Ghostty.App
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -302,6 +304,9 @@ struct TerminalContainerView: View {
         } message: {
             Text(permissionErrorMessage)
         }
+        .onChange(of: showingVoiceRecording) { isRecording in
+            onVoiceRecordingChange?(isRecording)
+        }
         #endif
         .alert("Install tmux?", isPresented: $showingTmuxInstallPrompt) {
             Button("Install") {
@@ -336,6 +341,7 @@ struct TerminalContainerView: View {
                 showingVoiceRecording = false
                 voiceProcessing = false
             }
+            onVoiceRecordingChange?(false)
         }
         #endif
         #if os(iOS)
@@ -345,6 +351,7 @@ struct TerminalContainerView: View {
                 showingVoiceRecording = false
                 voiceProcessing = false
             }
+            onVoiceRecordingChange?(false)
         }
         #endif
     }
@@ -733,7 +740,7 @@ struct TerminalContainerView: View {
         VoiceRecordingView(
             audioService: audioService,
             onSend: { transcribedText in
-                sendTranscriptionToTerminal(transcribedText)
+                handleVoiceTranscription(transcribedText)
                 showingVoiceRecording = false
                 voiceProcessing = false
             },
@@ -823,7 +830,7 @@ struct TerminalContainerView: View {
                 let text = await audioService.stopRecording()
                 await MainActor.run {
                     let fallback = text.isEmpty ? audioService.partialTranscription : text
-                    sendTranscriptionToTerminal(fallback)
+                    handleVoiceTranscription(fallback)
                     showingVoiceRecording = false
                     voiceProcessing = false
                 }
@@ -868,10 +875,18 @@ struct TerminalContainerView: View {
     }
     #endif
 
-    private func sendTranscriptionToTerminal(_ text: String) {
+    private func handleVoiceTranscription(_ text: String) {
+        if sendTranscriptionToTerminal(text) {
+            onVoiceTranscriptionSent?()
+        }
+    }
+
+    @discardableResult
+    private func sendTranscriptionToTerminal(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return false }
         ConnectionSessionManager.shared.sendText(trimmed, to: session.id)
+        return true
     }
 
 }
