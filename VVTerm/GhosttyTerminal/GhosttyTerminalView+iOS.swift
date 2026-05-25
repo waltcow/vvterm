@@ -505,6 +505,14 @@ class GhosttyTerminalView: UIView {
             action: #selector(handlePanGesture(_:))
         )
         recognizer.maximumNumberOfTouches = 1
+        recognizer.requiresExclusiveTouchType = false
+        recognizer.allowedTouchTypes = [
+            NSNumber(value: UITouch.TouchType.direct.rawValue),
+            NSNumber(value: UITouch.TouchType.indirectPointer.rawValue),
+        ]
+        if #available(iOS 13.4, *) {
+            recognizer.allowedScrollTypesMask = .all
+        }
         return recognizer
     }()
     private lazy var selectionStartHandleRecognizer: UIPanGestureRecognizer = {
