@@ -16,6 +16,13 @@ struct RemoteTerminalBootstrapTests {
         powerShellExecutable: "powershell"
     )
 
+    private let pwshEnvironment = RemoteEnvironment(
+        platform: .windows,
+        shellProfile: .powershell(executableName: "pwsh"),
+        activeShellName: "pwsh",
+        powerShellExecutable: "pwsh"
+    )
+
     private let cmdEnvironment = RemoteEnvironment(
         platform: .windows,
         shellProfile: .cmd,
@@ -72,6 +79,18 @@ struct RemoteTerminalBootstrapTests {
             Issue.record("Expected exec launch when a PowerShell startup command is provided")
         case .exec(let command):
             #expect(command.hasPrefix("powershell -NoLogo -NoProfile -EncodedCommand "))
+        }
+    }
+
+    @Test
+    func launchPlanWithStartupCommandKeepsPwshExecutable() {
+        let plan = RemoteTerminalBootstrap.launchPlan(startupCommand: "Write-Output 'hi'", environment: pwshEnvironment)
+
+        switch plan {
+        case .shell:
+            Issue.record("Expected exec launch when a pwsh startup command is provided")
+        case .exec(let command):
+            #expect(command.hasPrefix("pwsh -NoLogo -NoProfile -EncodedCommand "))
         }
     }
 

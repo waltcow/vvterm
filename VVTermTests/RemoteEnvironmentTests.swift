@@ -23,6 +23,23 @@ struct RemoteEnvironmentTests {
     }
 
     @Test
+    func windowsDefaultShellParserPrefersPwshExecutable() {
+        let output = #"""
+        HKEY_LOCAL_MACHINE\SOFTWARE\OpenSSH
+            DefaultShell    REG_SZ    C:\Program Files\PowerShell\7\pwsh.exe
+        """#
+
+        #expect(RemoteEnvironmentResolver.powerShellExecutableName(inWindowsShellOutput: output) == "pwsh")
+    }
+
+    @Test
+    func windowsPowerShellExecutableCandidatesPreferActiveShell() {
+        #expect(RemoteEnvironmentResolver.powerShellExecutableCandidates(preferredExecutableName: "pwsh.exe") == ["pwsh", "powershell"])
+        #expect(RemoteEnvironmentResolver.powerShellExecutableCandidates(preferredExecutableName: "powershell.exe") == ["powershell", "pwsh"])
+        #expect(RemoteEnvironmentResolver.powerShellExecutableCandidates(preferredExecutableName: nil) == ["powershell", "pwsh"])
+    }
+
+    @Test
     func posixEnvironmentSupportsTmuxAndMoshRuntime() {
         let environment = RemoteEnvironment(
             platform: .linux,
