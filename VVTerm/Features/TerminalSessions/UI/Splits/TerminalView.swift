@@ -400,6 +400,7 @@ struct TerminalPaneView: View {
     @State private var terminalBackgroundColor: Color = Self.initialTerminalBackgroundColor()
     @State private var connectWatchdogToken = UUID()
     @State private var hasEstablishedConnection = false
+    @State private var showingRetrustHostConfirmation = false
     @StateObject private var richPasteUI = TerminalRichPasteUIModel()
 
     @AppStorage(CloudKitSyncConstants.terminalThemeNameKey) private var terminalThemeName = "Aizen Dark"
@@ -413,6 +414,20 @@ struct TerminalPaneView: View {
 
     private var connectionState: ConnectionState {
         paneState?.connectionState ?? .idle
+    }
+
+    private var isHostKeyVerificationFailure: Bool {
+        guard case .failed(let error) = connectionState else { return false }
+        return error == SSHError.hostKeyVerificationFailed.localizedDescription
+            || error.contains("Host key verification failed")
+    }
+
+    private var retrustHostConfirmationMessage: String {
+        let endpoint = "\(server.host):\(server.port)"
+        return String(
+            format: String(localized: "VVTerm saved a different SSH host key for %@. Only continue if you recreated this server or trust the new host."),
+            endpoint
+        )
     }
 
     /// Should this pane actually have focus (both tab selected AND pane focused)
@@ -663,6 +678,14 @@ struct TerminalPaneView: View {
         } message: {
             Text("Mosh is selected for this server, but mosh-server is missing on the host.")
         }
+        .alert("Replace Trusted Host?", isPresented: $showingRetrustHostConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Replace and Reconnect", role: .destructive) {
+                retrustHostAndRetry()
+            }
+        } message: {
+            Text(retrustHostConfirmationMessage)
+        }
         .terminalRichPastePrompt(using: richPasteUI)
     }
 
@@ -750,6 +773,12 @@ struct TerminalPaneView: View {
                         Text(error)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if isHostKeyVerificationFailure {
+                            Button("Trust New Host Key") {
+                                showingRetrustHostConfirmation = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
                         Button("Retry") {
                             retryConnection()
                         }
@@ -776,6 +805,11 @@ struct TerminalPaneView: View {
 
     private func disableTmuxForServer() {
         TerminalTabManager.shared.disableTmux(for: server.id)
+    }
+
+    private func retrustHostAndRetry() {
+        KnownHostsManager.shared.remove(host: server.host, port: server.port)
+        retryConnection()
     }
 
     private func attemptAutoReconnectIfNeeded() {
