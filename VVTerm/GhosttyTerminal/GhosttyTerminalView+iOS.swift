@@ -3281,11 +3281,11 @@ class GhosttyTerminalView: UIView {
         guard canRouteTerminalInput else { return }
         let normalized = text.precomposedStringWithCanonicalMapping
         guard normalized.count == 1, let character = normalized.first else {
-            sendText(normalized)
+            sendRawTerminalInputText(normalized)
             return
         }
         guard let mapping = ghosttyKeyMapping(for: character) else {
-            sendText(normalized)
+            sendRawTerminalInputText(normalized)
             return
         }
 
@@ -3300,6 +3300,23 @@ class GhosttyTerminalView: UIView {
             unshiftedCodepoint: mapping.codepoint,
             invalidateLocalSession: false
         )
+    }
+
+    private func sendRawTerminalInputText(_ text: String) {
+        guard canRouteTerminalInput else { return }
+        let terminalText = text
+            .replacingOccurrences(of: "\r\n", with: "\r")
+            .replacingOccurrences(of: "\n", with: "\r")
+        let data = Data(terminalText.utf8)
+        guard !data.isEmpty else { return }
+
+        invalidateLocalTextInputSession()
+        if let writeCallback {
+            writeCallback(data)
+        } else {
+            surface?.sendText(terminalText)
+        }
+        requestRender()
     }
 
     fileprivate func handleIMEProxyInsertText(_ text: String, fromIMEComposition: Bool = false) -> Bool {
@@ -3342,7 +3359,7 @@ class GhosttyTerminalView: UIView {
 
         guard mods.ctrl || mods.alt || mods.command else {
             if fromIMEComposition {
-                sendText(normalized)
+                sendRawTerminalInputText(normalized)
             } else {
                 sendTerminalInputText(normalized)
             }
