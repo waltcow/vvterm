@@ -1100,6 +1100,7 @@ struct iOSTerminalView: View {
                 if !newValue {
                     showingZenPanel = false
                 }
+                refreshTerminalAfterChromeChange()
             }
             .onChange(of: sessionManager.sessions) { _ in
                 if currentServerId == nil, let selected = sessionManager.selectedSession {
@@ -1696,6 +1697,18 @@ struct iOSTerminalView: View {
         prepareTerminal(session: session, viewSelection: selectedView, terminalAlreadyExists: terminalAlreadyExists)
         guard selectedView == "terminal" else { return }
         focusTerminal(for: session)
+    }
+
+    private func refreshTerminalAfterChromeChange() {
+        guard selectedView == "terminal",
+              let session = selectedSession ?? serverSessions.first else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            refreshTerminal(for: session)
+            focusTerminal(for: session)
+        }
     }
 
     private func openNewTab() {
