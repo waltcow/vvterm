@@ -609,7 +609,6 @@ final class TerminalTabManager: ObservableObject {
 
     /// Update connection state for a pane
     func updatePaneState(_ paneId: UUID, connectionState: ConnectionState) {
-        let wasConnected = paneStates[paneId]?.connectionState.isConnected == true
         paneStates[paneId]?.connectionState = connectionState
         switch connectionState {
         case .connecting, .reconnecting:
@@ -619,12 +618,6 @@ final class TerminalTabManager: ObservableObject {
             terminalViews[paneId]?.applyPresentationOverrides(.empty)
             if paneTmuxStatus(for: paneId) == .foreground {
                 setPaneTmuxStatus(.background, for: paneId)
-            }
-            if wasConnected {
-                EngagementTracker.shared.noteTerminalSessionEnded(
-                    otherTerminalsActive: hasConnectedPanes,
-                    isPro: StoreManager.shared.isPro
-                )
             }
         case .connected:
             EngagementTracker.shared.recordSuccessfulConnection(

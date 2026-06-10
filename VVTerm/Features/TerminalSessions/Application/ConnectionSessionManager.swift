@@ -394,7 +394,7 @@ final class ConnectionSessionManager: ObservableObject {
     // MARK: - Close Terminal
 
     /// Closes a terminal session and removes it from the list
-    func closeSession(_ session: ConnectionSession) {
+    func closeSession(_ session: ConnectionSession, notingSessionEnd: Bool = true) {
         let sessionId = session.id
         let title = session.title
         let wasSelected = selectedSessionId == sessionId
@@ -437,10 +437,12 @@ final class ConnectionSessionManager: ObservableObject {
             }
         }
 
-        EngagementTracker.shared.noteTerminalSessionEnded(
-            otherTerminalsActive: !activeSessions.isEmpty,
-            isPro: StoreManager.shared.isPro
-        )
+        if notingSessionEnd {
+            EngagementTracker.shared.noteTerminalSessionEnded(
+                otherTerminalsActive: !activeSessions.isEmpty,
+                isPro: StoreManager.shared.isPro
+            )
+        }
 
         logger.info("Closed terminal session \(title)")
     }
@@ -529,10 +531,12 @@ final class ConnectionSessionManager: ObservableObject {
     // MARK: - Disconnect All
 
     /// Fully disconnects all sessions for a server and clears connection state
+    /// Closes every session during app termination — lifecycle teardown,
+    /// not a user-initiated session end.
     func disconnectAll() {
         let sessionsToClose = sessions
         for session in sessionsToClose {
-            closeSession(session)
+            closeSession(session, notingSessionEnd: false)
         }
         connectedServerId = nil
         logger.info("Disconnected all sessions")
@@ -578,10 +582,6 @@ final class ConnectionSessionManager: ObservableObject {
         updateSessionState(sessionId, to: .disconnected)
         markTerminalForReconnectReset(for: sessionId)
         scheduleSSHUnregister(for: sessionId)
-        EngagementTracker.shared.noteTerminalSessionEnded(
-            otherTerminalsActive: !activeSessions.isEmpty,
-            isPro: StoreManager.shared.isPro
-        )
     }
 
     /// Disconnect all sessions for a specific server

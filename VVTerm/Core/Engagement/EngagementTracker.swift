@@ -1,5 +1,10 @@
 import Foundation
 import Combine
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Tracks lightweight usage signals (successful connections, distinct usage days)
 /// and decides when to surface the one-time Pro intro and App Store review requests.
@@ -29,9 +34,22 @@ final class EngagementTracker: ObservableObject {
     private let defaults = UserDefaults.standard
     private var connectionsCountedThisLaunch: Set<UUID> = []
     private var paywallPresentedThisLaunch = false
-    private var proIntroScheduled = false
+    private var proIntroWorkItem: DispatchWorkItem?
+    private var backgroundObserver: NSObjectProtocol?
 
-    private init() {}
+    private init() {
+        #if canImport(UIKit)
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.retractUnconsumedProIntro()
+            }
+        }
+        #endif
+    }
 
     var successfulConnectionCount: Int {
         defaults.integer(forKey: Keys.successfulConnectionCount)
@@ -65,9 +83,12 @@ final class EngagementTracker: ObservableObject {
         }
     }
 
-    /// Called when the user leaves a terminal context: a tab closes, the shell exits,
-    /// or (iOS) navigation returns to the server list. Never called over a live terminal.
+    /// Called when the user leaves a terminal context: a tab closes or (iOS)
+    /// navigation returns to the server list. Never called over a live terminal.
     func noteTerminalSessionEnded(otherTerminalsActive: Bool, isPro: Bool) {
+        // Background suspends and foreground-restore churn produce the same
+        // teardown as a user ending a session; only an active app means intent.
+        guard appIsActive else { return }
         guard !otherTerminalsActive else { return }
         // Failed or Pro-blocked open attempts also land here (back-nav, closing a
         // failed tab). Only act in launches where a connection actually succeeded,
@@ -105,13 +126,43 @@ final class EngagementTracker: ObservableObject {
     // MARK: - Decisions
 
     private func scheduleProIntro() {
-        guard !proIntroScheduled, !shouldShowProIntro else { return }
-        proIntroScheduled = true
+        guard proIntroWorkItem == nil, !shouldShowProIntro else { return }
         // Delay past the navigation transition so sheet presentation is not dropped.
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.proIntroPresentationDelay) { [weak self] in
-            self?.proIntroScheduled = false
-            self?.shouldShowProIntro = true
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.proIntroWorkItem = nil
+            // If the app left the foreground before the delay elapsed, drop the
+            // presentation without consuming the one shot — the intro must not
+            // greet the user when they return to the app.
+            guard self.appIsActive else { return }
+            self.shouldShowProIntro = true
         }
+        proIntroWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Self.proIntroPresentationDelay,
+            execute: workItem
+        )
+    }
+
+    /// Backgrounding cancels any unconsumed intro offer: a pending presentation
+    /// timer is dropped, and an offer already published but not yet registered by
+    /// the sheet is retracted, so the intro never greets the user on return.
+    private func retractUnconsumedProIntro() {
+        proIntroWorkItem?.cancel()
+        proIntroWorkItem = nil
+        if shouldShowProIntro, !hasShownProIntro {
+            shouldShowProIntro = false
+        }
+    }
+
+    private var appIsActive: Bool {
+        #if canImport(UIKit)
+        return UIApplication.shared.applicationState == .active
+        #elseif canImport(AppKit)
+        return NSApplication.shared.isActive
+        #else
+        return true
+        #endif
     }
 
     private func maybeRequestReview() {
