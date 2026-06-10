@@ -70,8 +70,39 @@ struct TerminalFindNavigatorLifecycle {
 @MainActor
 private final class TerminalIMEProxyTextView: UIView, UITextInput {
     weak var terminalOwner: GhosttyTerminalView?
-    private var markedBuffer = ""
+    /// Local mirror of recently typed input. Committed text stays in the document after
+    /// being sent to the terminal (until the session is invalidated by Enter, control
+    /// keys, focus changes, …) so system text services — most importantly inline
+    /// dictation — can read context back and revise text through the standard
+    /// UITextInput document model. Revisions are reconciled to the terminal as
+    /// backspaces plus retyped text by TerminalTextInputModel.
+    private var documentBuffer = ""
+    /// Range of `documentBuffer` holding the in-progress composition (IME preedit or an
+    /// active dictation span). This portion has not been sent to the terminal yet.
+    private var markedRange: NSRange?
     private var deleteRepeatAnchorUsesAlternate = false
+
+    /// While a dictation session is active, inserted text is buffered like an IME
+    /// composition instead of being committed to the terminal. Inline dictation (iOS 16+)
+    /// keeps revising previously inserted text through the document model, which only works
+    /// if that text is still present in the document. The buffer is committed when the
+    /// session ends (input mode change, placeholder removal, or focus loss).
+    enum DictationSessionOrigin: String {
+        case inputMode
+        case placeholder
+    }
+
+    private(set) var dictationSessionOrigin: DictationSessionOrigin?
+    private var activeDictationPlaceholder: NSObject?
+    private var dictationAnchorLocation = 0
+
+    var isDictationSessionActive: Bool { dictationSessionOrigin != nil }
+
+    static let dictationLogger = Logger.forCategory("Dictation")
+
+    private var currentPrimaryLanguage: String {
+        textInputMode?.primaryLanguage ?? "nil"
+    }
     private lazy var terminalNavigationCommands: [UIKeyCommand] = Self.makeTerminalNavigationCommands(
         action: #selector(handleTerminalNavigationCommand(_:))
     )
@@ -100,10 +131,11 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }()
 
     var text: String? {
-        get { markedBuffer }
+        get { documentBuffer }
         set {
-            markedBuffer = newValue?.precomposedStringWithCanonicalMapping ?? ""
-            selectedRange = NSRange(location: markedBuffer.utf16.count, length: 0)
+            documentBuffer = newValue?.precomposedStringWithCanonicalMapping ?? ""
+            markedRange = nil
+            selectedRange = NSRange(location: documentBuffer.utf16.count, length: 0)
         }
     }
 
@@ -213,22 +245,176 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     var hasText: Bool {
-        // This proxy only stores transient IME preedit text. The terminal itself
-        // can still accept Backspace when that buffer is empty, and UIKit uses
-        // this value to keep software-keyboard delete active/repeating.
-        terminalOwner?.canRouteProxyDeleteBackward ?? false
+        // The terminal itself can still accept Backspace when the local document is
+        // empty, and UIKit uses this value to keep software-keyboard delete
+        // active/repeating.
+        !documentBuffer.isEmpty || (terminalOwner?.canRouteProxyDeleteBackward ?? false)
     }
 
     func insertText(_ text: String) {
         guard !text.isEmpty else { return }
-        let wasComposing = !markedBuffer.isEmpty
-        clearMarkedText(notify: true)
-        _ = terminalOwner?.handleIMEProxyInsertText(text, fromIMEComposition: wasComposing)
+        Self.dictationLogger.debug("insertText text=\(text, privacy: .public) mode=\(self.currentPrimaryLanguage, privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public) doc=\(self.documentBuffer, privacy: .public)")
+        beginDictationSessionIfInputModeActive()
+        if let origin = dictationSessionOrigin {
+            if origin == .placeholder
+                || TerminalVisiblePreeditPolicy.isDictationInputMode(textInputMode?.primaryLanguage) {
+                insertDictationBufferText(text)
+                return
+            }
+            // The input mode already left dictation (notification missed or pending):
+            // commit the session and handle this insertion normally.
+            endDictationSession(commit: true)
+        }
+        _ = terminalOwner?.handleIMEProxyInsertText(text, fromIMEComposition: markedRange != nil)
+    }
+
+    /// Inserts plain text into the persistent local document. The text input model
+    /// reconciles the change with the terminal by sending only the delta.
+    func insertCommittedText(_ text: String) {
+        guard !text.isEmpty else { return }
+        performDocumentEdit {
+            let normalized = text.precomposedStringWithCanonicalMapping
+            let nsText = documentBuffer as NSString
+            let replacementRange = markedRange ?? clampedRange(selectedRange)
+            documentBuffer = nsText.replacingCharacters(in: replacementRange, with: normalized)
+            markedRange = nil
+            selectedRange = NSRange(
+                location: replacementRange.location + (normalized as NSString).length,
+                length: 0
+            )
+        }
+    }
+
+    /// Brackets a local document mutation with the UITextInputDelegate notifications
+    /// the system keyboard relies on, then syncs the text input model.
+    private func performDocumentEdit(_ mutate: () -> Void) {
+        inputDelegate?.textWillChange(self)
+        inputDelegate?.selectionWillChange(self)
+        mutate()
+        inputDelegate?.selectionDidChange(self)
+        inputDelegate?.textDidChange(self)
+        notifyTextInputStateDidChange()
+    }
+
+    private func beginDictationSessionIfInputModeActive() {
+        guard dictationSessionOrigin == nil,
+              TerminalVisiblePreeditPolicy.isDictationInputMode(textInputMode?.primaryLanguage) else { return }
+        beginDictationSession(origin: .inputMode)
+    }
+
+    func insertDictationResult(_ dictationResult: [UIDictationPhrase]) {
+        let text = dictationResult.map(\.text).joined()
+        Self.dictationLogger.log("insertDictationResult phrases=\(dictationResult.count) text=\(text, privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
+        if !text.isEmpty {
+            insertText(text)
+        }
+        endDictationSession(commit: true)
+    }
+
+    func dictationRecordingDidEnd() {
+        // Recognition results can still arrive after recording stops; the buffer is
+        // committed when the session ends.
+        Self.dictationLogger.log("dictationRecordingDidEnd session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public) doc=\(self.documentBuffer, privacy: .public)")
+    }
+
+    func dictationRecognitionFailed() {
+        Self.dictationLogger.log("dictationRecognitionFailed session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public) doc=\(self.documentBuffer, privacy: .public)")
+        endDictationSession(commit: true)
+    }
+
+    func insertDictationResultPlaceholder() -> Any {
+        Self.dictationLogger.log("insertDictationResultPlaceholder mode=\(self.currentPrimaryLanguage, privacy: .public)")
+        let placeholder = NSObject()
+        activeDictationPlaceholder = placeholder
+        beginDictationSession(origin: .placeholder)
+        return placeholder
+    }
+
+    func frame(forDictationResultPlaceholder placeholder: Any) -> CGRect {
+        let rect = terminalOwner?.imeProxyCaretRect(for: endOfDocument) ?? .zero
+        Self.dictationLogger.debug("frameForDictationResultPlaceholder -> \(String(describing: rect), privacy: .public)")
+        return rect
+    }
+
+    func removeDictationResultPlaceholder(_ placeholder: Any, willInsertResult: Bool) {
+        Self.dictationLogger.log("removeDictationResultPlaceholder willInsertResult=\(willInsertResult) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public) doc=\(self.documentBuffer, privacy: .public)")
+        activeDictationPlaceholder = nil
+        if !willInsertResult {
+            // Recognition failed: commit whatever was buffered so far.
+            endDictationSession(commit: true)
+        }
+        // Otherwise insertDictationResult delivers the result and ends the session.
+    }
+
+    func beginDictationSession(origin: DictationSessionOrigin = .inputMode) {
+        guard dictationSessionOrigin == nil else { return }
+        Self.dictationLogger.log("beginDictationSession origin=\(origin.rawValue, privacy: .public)")
+        // Commit any pending IME composition so dictation starts from a clean state.
+        if markedRange != nil {
+            unmarkText()
+        }
+        dictationAnchorLocation = clampedRange(selectedRange).location
+        dictationSessionOrigin = origin
+    }
+
+    func endDictationSession(commit: Bool) {
+        guard let origin = dictationSessionOrigin else { return }
+        Self.dictationLogger.log("endDictationSession origin=\(origin.rawValue, privacy: .public) commit=\(commit) doc=\(self.documentBuffer, privacy: .public)")
+        dictationSessionOrigin = nil
+        activeDictationPlaceholder = nil
+        guard let marked = markedRange, marked.length > 0 else {
+            markedRange = nil
+            notifyTextInputStateDidChange()
+            return
+        }
+        if commit {
+            unmarkText()
+        } else {
+            removeMarkedSpan()
+        }
+    }
+
+    private func insertDictationBufferText(_ text: String) {
+        performDocumentEdit {
+            let normalized = text.precomposedStringWithCanonicalMapping
+            let nsText = documentBuffer as NSString
+            let insertionRange = clampedRange(selectedRange)
+            documentBuffer = nsText.replacingCharacters(in: insertionRange, with: normalized)
+            selectedRange = NSRange(
+                location: insertionRange.location + (normalized as NSString).length,
+                length: 0
+            )
+            refreshDictationMarkedRange()
+        }
+    }
+
+    /// During a dictation session everything dictated since the session anchor stays
+    /// marked, so it renders as preedit and is not sent until the session ends.
+    private func refreshDictationMarkedRange() {
+        guard isDictationSessionActive else { return }
+        let documentLength = (documentBuffer as NSString).length
+        let anchor = min(dictationAnchorLocation, documentLength)
+        markedRange = documentLength > anchor
+            ? NSRange(location: anchor, length: documentLength - anchor)
+            : nil
+    }
+
+    private func removeMarkedSpan() {
+        guard let marked = markedRange, marked.length > 0 else {
+            markedRange = nil
+            return
+        }
+        performDocumentEdit {
+            documentBuffer = (documentBuffer as NSString).replacingCharacters(in: marked, with: "")
+            markedRange = nil
+            selectedRange = NSRange(location: marked.location, length: 0)
+        }
     }
 
     func deleteBackward() {
+        Self.dictationLogger.debug("deleteBackward doc=\(self.documentBuffer, privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
         let before = terminalOwner?.imeProxySnapshot()
-        guard !markedBuffer.isEmpty else {
+        guard !documentBuffer.isEmpty else {
             notifyVirtualDeleteAnchorDidChange()
             terminalOwner?.imeProxyDidDeleteBackward(before: before)
             return
@@ -236,7 +422,7 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
 
         inputDelegate?.textWillChange(self)
         inputDelegate?.selectionWillChange(self)
-        let nsText = markedBuffer as NSString
+        let nsText = documentBuffer as NSString
         let deletionRange: NSRange
         if selectedRange.length > 0 {
             deletionRange = NSIntersectionRange(selectedRange, NSRange(location: 0, length: nsText.length))
@@ -246,12 +432,36 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
             deletionRange = NSRange(location: 0, length: 0)
         }
         if deletionRange.length > 0 {
-            markedBuffer = nsText.replacingCharacters(in: deletionRange, with: "")
+            documentBuffer = nsText.replacingCharacters(in: deletionRange, with: "")
+            adjustMarkedRange(afterReplacing: deletionRange, insertedLength: 0)
             selectedRange = NSRange(location: deletionRange.location, length: 0)
         }
         inputDelegate?.selectionDidChange(self)
         inputDelegate?.textDidChange(self)
         terminalOwner?.imeProxyDidDeleteBackward(before: before)
+    }
+
+    private func adjustMarkedRange(afterReplacing range: NSRange, insertedLength: Int) {
+        if isDictationSessionActive {
+            refreshDictationMarkedRange()
+            return
+        }
+        guard let marked = markedRange else { return }
+        let delta = insertedLength - range.length
+        let markedEnd = marked.location + marked.length
+        let rangeEnd = range.location + range.length
+        if rangeEnd <= marked.location {
+            markedRange = NSRange(location: max(marked.location + delta, 0), length: marked.length)
+        } else if range.location >= markedEnd {
+            // Replacement after the composition: nothing to adjust.
+        } else {
+            // Replacement overlaps the composition: recompute a best-effort span.
+            let newStart = min(marked.location, range.location)
+            let newEnd = max(markedEnd + delta, range.location + insertedLength)
+            markedRange = newEnd > newStart
+                ? NSRange(location: newStart, length: newEnd - newStart)
+                : nil
+        }
     }
 
     override func draw(_ rect: CGRect) {
@@ -267,6 +477,7 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
         }
         set {
             guard let range = newValue as? TerminalNativeTextRange else { return }
+            Self.dictationLogger.debug("setSelectedTextRange range=\(String(describing: range.nsRange), privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
             inputDelegate?.selectionWillChange(self)
             selectedRange = usesDeleteRepeatAnchor ? NSRange(location: 0, length: 0) : clampedRange(range.nsRange)
             inputDelegate?.selectionDidChange(self)
@@ -275,8 +486,11 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     var markedTextRange: UITextRange? {
-        guard !markedBuffer.isEmpty else { return nil }
-        return TerminalNativeTextRange(start: 0, end: markedBuffer.utf16.count)
+        guard let markedRange, markedRange.length > 0 else { return nil }
+        return TerminalNativeTextRange(
+            start: markedRange.location,
+            end: markedRange.location + markedRange.length
+        )
     }
 
     var beginningOfDocument: UITextPosition {
@@ -292,57 +506,92 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
+        Self.dictationLogger.debug("setMarkedText text=\(markedText ?? "nil", privacy: .public) sel=\(selectedRange.location),\(selectedRange.length) mode=\(self.currentPrimaryLanguage, privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
         terminalOwner?.discardPendingSystemTextInputHardwareKey()
-        inputDelegate?.textWillChange(self)
-        inputDelegate?.selectionWillChange(self)
-        markedBuffer = markedText?.precomposedStringWithCanonicalMapping ?? ""
-        self.selectedRange = clampedRange(selectedRange)
-        inputDelegate?.selectionDidChange(self)
-        inputDelegate?.textDidChange(self)
-        notifyTextInputStateDidChange()
+        performDocumentEdit {
+            let normalized = markedText?.precomposedStringWithCanonicalMapping ?? ""
+            let nsText = documentBuffer as NSString
+            let replacementRange = markedRange ?? clampedRange(self.selectedRange)
+            documentBuffer = nsText.replacingCharacters(in: replacementRange, with: normalized)
+            let normalizedLength = (normalized as NSString).length
+            if normalizedLength > 0 {
+                let newMarkedRange = NSRange(location: replacementRange.location, length: normalizedLength)
+                markedRange = newMarkedRange
+                // The selection passed by UIKit is relative to the marked text.
+                let selectionLocation = min(max(selectedRange.location, 0), normalizedLength)
+                let selectionLength = min(max(selectedRange.length, 0), normalizedLength - selectionLocation)
+                self.selectedRange = NSRange(
+                    location: newMarkedRange.location + selectionLocation,
+                    length: selectionLength
+                )
+            } else {
+                markedRange = nil
+                self.selectedRange = NSRange(location: replacementRange.location, length: 0)
+            }
+            if isDictationSessionActive {
+                refreshDictationMarkedRange()
+            }
+        }
     }
 
     func unmarkText() {
-        guard !markedBuffer.isEmpty else {
+        Self.dictationLogger.debug("unmarkText doc=\(self.documentBuffer, privacy: .public) marked=\(String(describing: self.markedRange), privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
+        guard let marked = markedRange, marked.length > 0 else {
+            markedRange = nil
             notifyTextInputStateDidChange()
             return
         }
-        let committed = markedBuffer
-        clearMarkedText(notify: true)
-        _ = terminalOwner?.handleIMEProxyInsertText(committed, fromIMEComposition: true)
+        if isDictationSessionActive {
+            // Keep the dictated span marked (unsent) so the system can keep revising
+            // it; the span is committed when the session ends.
+            notifyTextInputStateDidChange()
+            return
+        }
+        // The text input model observes the composition becoming committed text and
+        // sends it to the terminal.
+        performDocumentEdit {
+            markedRange = nil
+            selectedRange = NSRange(location: marked.location + marked.length, length: 0)
+        }
     }
 
     func text(in range: UITextRange) -> String? {
         guard let range = range as? TerminalNativeTextRange else { return nil }
         let clamped = clampedTextInputRange(range.nsRange)
-        guard clamped.length > 0 else { return "" }
-        return (textInputDocument as NSString).substring(with: clamped)
+        let result: String
+        if clamped.length > 0 {
+            result = (textInputDocument as NSString).substring(with: clamped)
+        } else {
+            result = ""
+        }
+        Self.dictationLogger.debug("textIn range=\(String(describing: range.nsRange), privacy: .public) -> \(result, privacy: .public)")
+        return result
     }
 
     func replace(_ range: UITextRange, withText text: String) {
+        Self.dictationLogger.debug("replace range=\(String(describing: (range as? TerminalNativeTextRange)?.nsRange), privacy: .public) text=\(text, privacy: .public) doc=\(self.documentBuffer, privacy: .public) session=\(self.dictationSessionOrigin?.rawValue ?? "none", privacy: .public)")
         guard let range = range as? TerminalNativeTextRange else {
             if !text.isEmpty {
-                _ = terminalOwner?.handleIMEProxyInsertText(text, fromIMEComposition: !markedBuffer.isEmpty)
+                insertText(text)
             }
             return
         }
-        guard !markedBuffer.isEmpty else {
-            if !text.isEmpty {
-                _ = terminalOwner?.handleIMEProxyInsertText(text, fromIMEComposition: false)
-            } else {
-                notifyVirtualDeleteAnchorDidChange()
-                terminalOwner?.imeProxyDidDeleteBackward(before: terminalOwner?.imeProxySnapshot())
-            }
+        if documentBuffer.isEmpty, text.isEmpty {
+            notifyVirtualDeleteAnchorDidChange()
+            terminalOwner?.imeProxyDidDeleteBackward(before: terminalOwner?.imeProxySnapshot())
             return
         }
-        inputDelegate?.textWillChange(self)
-        inputDelegate?.selectionWillChange(self)
-        let clamped = clampedRange(range.nsRange)
-        markedBuffer = (markedBuffer as NSString).replacingCharacters(in: clamped, with: text)
-        selectedRange = NSRange(location: clamped.location + text.utf16.count, length: 0)
-        inputDelegate?.selectionDidChange(self)
-        inputDelegate?.textDidChange(self)
-        notifyTextInputStateDidChange()
+        beginDictationSessionIfInputModeActive()
+        performDocumentEdit {
+            let normalized = text.precomposedStringWithCanonicalMapping
+            let clamped = clampedRange(range.nsRange)
+            documentBuffer = (documentBuffer as NSString).replacingCharacters(in: clamped, with: normalized)
+            adjustMarkedRange(afterReplacing: clamped, insertedLength: (normalized as NSString).length)
+            selectedRange = NSRange(
+                location: clamped.location + (normalized as NSString).length,
+                length: 0
+            )
+        }
     }
 
     func textRange(from fromPosition: UITextPosition, to toPosition: UITextPosition) -> UITextRange? {
@@ -483,15 +732,15 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
 
     func moveSelectionLeft() {
         guard selectedRange.location > 0 else { return }
-        let previousRange = (markedBuffer as NSString).rangeOfComposedCharacterSequence(at: selectedRange.location - 1)
+        let previousRange = (documentBuffer as NSString).rangeOfComposedCharacterSequence(at: selectedRange.location - 1)
         selectedRange = NSRange(location: previousRange.location, length: 0)
         notifyTextInputStateDidChange()
     }
 
     func moveSelectionRight() {
-        let length = markedBuffer.utf16.count
+        let length = documentBuffer.utf16.count
         guard selectedRange.location < length else { return }
-        let nextRange = (markedBuffer as NSString).rangeOfComposedCharacterSequence(at: selectedRange.location)
+        let nextRange = (documentBuffer as NSString).rangeOfComposedCharacterSequence(at: selectedRange.location)
         selectedRange = NSRange(location: nextRange.location + nextRange.length, length: 0)
         notifyTextInputStateDidChange()
     }
@@ -502,7 +751,7 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     func moveSelectionToEnd() {
-        selectedRange = NSRange(location: markedBuffer.utf16.count, length: 0)
+        selectedRange = NSRange(location: documentBuffer.utf16.count, length: 0)
         notifyTextInputStateDidChange()
     }
 
@@ -511,32 +760,12 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
         terminalOwner?.handleIMEProxyNavigationCommand(sender)
     }
 
-    private func clearMarkedText(notify: Bool) {
-        guard !markedBuffer.isEmpty || selectedRange.location != 0 || selectedRange.length != 0 else {
-            if notify {
-                notifyTextInputStateDidChange()
-            }
-            return
-        }
-        if notify {
-            inputDelegate?.textWillChange(self)
-            inputDelegate?.selectionWillChange(self)
-        }
-        markedBuffer = ""
-        selectedRange = NSRange(location: 0, length: 0)
-        if notify {
-            inputDelegate?.selectionDidChange(self)
-            inputDelegate?.textDidChange(self)
-            notifyTextInputStateDidChange()
-        }
-    }
-
     private func notifyTextInputStateDidChange() {
         terminalOwner?.syncTextInputModelFromIMEProxy()
     }
 
     private var usesDeleteRepeatAnchor: Bool {
-        markedBuffer.isEmpty && terminalOwner?.canRouteProxyDeleteBackward == true
+        documentBuffer.isEmpty && terminalOwner?.canRouteProxyDeleteBackward == true
     }
 
     private var deleteRepeatAnchorText: String {
@@ -544,7 +773,7 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     private var textInputDocument: String {
-        usesDeleteRepeatAnchor ? deleteRepeatAnchorText : markedBuffer
+        usesDeleteRepeatAnchor ? deleteRepeatAnchorText : documentBuffer
     }
 
     private var textInputDocumentLength: Int {
@@ -562,7 +791,7 @@ private final class TerminalIMEProxyTextView: UIView, UITextInput {
     }
 
     private func clampedRange(_ range: NSRange) -> NSRange {
-        let length = markedBuffer.utf16.count
+        let length = documentBuffer.utf16.count
         let location = min(max(range.location, 0), length)
         let rangeLength = min(max(range.length, 0), max(length - location, 0))
         return NSRange(location: location, length: rangeLength)
@@ -1091,6 +1320,20 @@ class GhosttyTerminalView: UIView {
 
     private func handleCurrentInputModeDidChange() {
         guard !isShuttingDown else { return }
+        TerminalIMEProxyTextView.dictationLogger.log("inputModeDidChange primary=\(self.currentIMEPrimaryLanguage ?? "nil", privacy: .public) proxyFirstResponder=\(self.imeProxyTextView.isFirstResponder) session=\(self.imeProxyTextView.isDictationSessionActive)")
+        if isDictationInputModeActive {
+            // Entering dictation. Invalidating the session or reloading input views here
+            // would terminate dictation immediately after it starts.
+            if imeProxyTextView.isFirstResponder {
+                imeProxyTextView.beginDictationSession()
+            }
+            return
+        }
+        if imeProxyTextView.isDictationSessionActive {
+            // Leaving dictation: commit what was dictated to the terminal.
+            imeProxyTextView.endDictationSession(commit: true)
+            return
+        }
         invalidateLocalTextInputSession()
         if hasHardwareKeyboardAttached {
             focusForHardwareKeyboardIfNeeded()
@@ -1100,6 +1343,10 @@ class GhosttyTerminalView: UIView {
             guard let self, !self.isShuttingDown else { return }
             self.imeProxyTextView.reloadInputViews()
         }
+    }
+
+    private var isDictationInputModeActive: Bool {
+        TerminalVisiblePreeditPolicy.isDictationInputMode(currentIMEPrimaryLanguage)
     }
 
     private func setupSurface() {
@@ -1383,6 +1630,8 @@ class GhosttyTerminalView: UIView {
         if isFocused {
             updateHardwareKeyboardState(reloadInputViewsIfNeeded: true)
         } else {
+            imeProxyTextView.endDictationSession(commit: true)
+            invalidateLocalTextInputSession()
             stopKeyRepeat()
         }
     }
@@ -2998,6 +3247,7 @@ class GhosttyTerminalView: UIView {
     }
 
     private func performPasteAction(requestRenderAfterward: Bool = false) {
+        invalidateLocalTextInputSession()
         if interceptRichPasteIfNeeded() {
             clearSelectionAfterPaste()
             if requestRenderAfterward {
@@ -3468,11 +3718,11 @@ class GhosttyTerminalView: UIView {
         guard canRouteTerminalInput else { return }
         let normalized = text.precomposedStringWithCanonicalMapping
         guard normalized.count == 1, let character = normalized.first else {
-            sendRawTerminalInputText(normalized)
+            sendRawTerminalInputText(normalized, invalidateLocalSession: false)
             return
         }
         guard let mapping = ghosttyKeyMapping(for: character) else {
-            sendRawTerminalInputText(normalized)
+            sendRawTerminalInputText(normalized, invalidateLocalSession: false)
             return
         }
 
@@ -3489,7 +3739,7 @@ class GhosttyTerminalView: UIView {
         )
     }
 
-    private func sendRawTerminalInputText(_ text: String) {
+    private func sendRawTerminalInputText(_ text: String, invalidateLocalSession: Bool = true) {
         guard canRouteTerminalInput else { return }
         let terminalText = text
             .replacingOccurrences(of: "\r\n", with: "\r")
@@ -3497,7 +3747,9 @@ class GhosttyTerminalView: UIView {
         let data = Data(terminalText.utf8)
         guard !data.isEmpty else { return }
 
-        invalidateLocalTextInputSession()
+        if invalidateLocalSession {
+            invalidateLocalTextInputSession()
+        }
         if let writeCallback {
             writeCallback(data)
         } else {
@@ -3528,12 +3780,14 @@ class GhosttyTerminalView: UIView {
         if !fromIMEComposition,
            let key = consumePendingSystemTextInputHardwareKey(),
            sendInterpretedHardwareKeyText(normalized, for: key) {
+            invalidateLocalTextInputSession()
             return true
         }
 
         let mods = keyboardToolbar?.consumeModifiers() ?? (ctrl: false, alt: false, command: false, shift: false)
         if mods.ctrl, normalized.compare("v", options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame,
            interceptRichPasteIfNeeded() {
+            invalidateLocalTextInputSession()
             return true
         }
         if normalized == "\n" || normalized == "\r" {
@@ -3548,11 +3802,9 @@ class GhosttyTerminalView: UIView {
         }
 
         guard mods.ctrl || mods.alt || mods.command else {
-            if fromIMEComposition {
-                sendRawTerminalInputText(normalized)
-            } else {
-                sendTerminalInputText(normalized)
-            }
+            // Plain text goes into the persistent local document; the text input
+            // model reconciles it with the terminal by sending the delta.
+            imeProxyTextView.insertCommittedText(normalized)
             return true
         }
         guard let firstChar = normalized.first else { return true }

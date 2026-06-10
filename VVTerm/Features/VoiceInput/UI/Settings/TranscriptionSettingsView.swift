@@ -11,7 +11,7 @@ struct TranscriptionSettingsView: View {
     @AppStorage(TranscriptionSettingsKeys.provider) private var provider = TranscriptionSettingsDefaults.provider.rawValue
     @AppStorage(TranscriptionSettingsKeys.mlxWhisperModelId) private var whisperModelId = TranscriptionSettingsDefaults.mlxWhisperModelId
     @AppStorage(TranscriptionSettingsKeys.mlxParakeetModelId) private var parakeetModelId = TranscriptionSettingsDefaults.mlxParakeetModelId
-    @AppStorage("transcriptionLanguage") private var language = "en"
+    @AppStorage(TranscriptionSettingsKeys.language) private var language = TranscriptionSettingsDefaults.language
     @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
 
     @StateObject private var whisperManager: MLXModelManager
@@ -65,11 +65,21 @@ struct TranscriptionSettingsView: View {
                 Text(providerDescription)
             }
 
-            if provider == TranscriptionProvider.system.rawValue {
-                Section("Language") {
+            if provider == TranscriptionProvider.system.rawValue || provider == TranscriptionProvider.mlxWhisper.rawValue {
+                Section {
                     Picker("Language", selection: $language) {
                         ForEach(languages, id: \.0) { code, name in
                             Text(name).tag(code)
+                        }
+                    }
+                } header: {
+                    Text("Language")
+                } footer: {
+                    if language == TranscriptionSettingsDefaults.autoLanguageCode {
+                        if provider == TranscriptionProvider.system.rawValue {
+                            Text("Auto-detect uses your device language.")
+                        } else {
+                            Text("Auto-detect identifies the spoken language before transcribing.")
                         }
                     }
                 }
@@ -97,7 +107,8 @@ struct TranscriptionSettingsView: View {
                     modelBinding: $parakeetModelId,
                     models: [
                         ("mlx-community/parakeet-tdt-0.6b-v2", String(localized: "Parakeet TDT 0.6B"), "~600 MB")
-                    ]
+                    ],
+                    footnote: String(localized: "Parakeet supports English only.")
                 )
             }
             #endif
@@ -129,7 +140,8 @@ struct TranscriptionSettingsView: View {
     private func modelSection(
         manager: MLXModelManager,
         modelBinding: Binding<String>,
-        models: [(String, String, String)]
+        models: [(String, String, String)],
+        footnote: String? = nil
     ) -> some View {
         Section {
             Picker("Model", selection: modelBinding) {
@@ -181,9 +193,14 @@ struct TranscriptionSettingsView: View {
         } header: {
             Text("Model")
         } footer: {
-            if let repoSize = manager.repoSizeBytes {
-                Text(String(format: String(localized: "Download size: %@"),
-                            ByteCountFormatter.string(fromByteCount: repoSize, countStyle: .file)))
+            VStack(alignment: .leading, spacing: 4) {
+                if let footnote {
+                    Text(footnote)
+                }
+                if let repoSize = manager.repoSizeBytes {
+                    Text(String(format: String(localized: "Download size: %@"),
+                                ByteCountFormatter.string(fromByteCount: repoSize, countStyle: .file)))
+                }
             }
         }
     }
