@@ -1562,52 +1562,6 @@ class GhosttyTerminalView: UIView {
         textInputModel.documentLength > 0 || textInputModel.hasActiveIMEComposition
     }
 
-    private func setIMEProxySelection(_ range: NSRange) {
-        withSuppressedIMEProxyCallbacks {
-            imeProxyTextView.selectedRange = range
-        }
-        syncTextInputModelFromIMEProxy()
-    }
-
-    private func moveIMEProxyCursorLeft() {
-        let selection = imeProxyTextView.selectedRange
-        let nsText = (imeProxyTextView.text ?? "") as NSString
-        let newLocation: Int
-        if selection.length > 0 {
-            newLocation = selection.location
-        } else if selection.location > 0 {
-            let previousRange = nsText.rangeOfComposedCharacterSequence(at: max(selection.location - 1, 0))
-            newLocation = previousRange.location
-        } else {
-            newLocation = 0
-        }
-        setIMEProxySelection(NSRange(location: newLocation, length: 0))
-    }
-
-    private func moveIMEProxyCursorRight() {
-        let selection = imeProxyTextView.selectedRange
-        let nsText = (imeProxyTextView.text ?? "") as NSString
-        let newLocation: Int
-        if selection.length > 0 {
-            newLocation = selection.location + selection.length
-        } else if selection.location < nsText.length {
-            let nextRange = nsText.rangeOfComposedCharacterSequence(at: selection.location)
-            newLocation = nextRange.location + nextRange.length
-        } else {
-            newLocation = nsText.length
-        }
-        setIMEProxySelection(NSRange(location: newLocation, length: 0))
-    }
-
-    private func moveIMEProxyCursorToStart() {
-        setIMEProxySelection(NSRange(location: 0, length: 0))
-    }
-
-    private func moveIMEProxyCursorToEnd() {
-        let length = (imeProxyTextView.text ?? "").utf16.count
-        setIMEProxySelection(NSRange(location: length, length: 0))
-    }
-
     fileprivate func imeProxyDidDeleteBackward(before: IMEProxySnapshot?) {
         guard !suppressIMEProxyCallbacks else { return }
         let after = imeProxySnapshot()
@@ -4514,29 +4468,13 @@ extension GhosttyTerminalView {
         case .arrowDown:
             sendToolbarGhosttyKey(.arrowDown, mods: accumulatedMods)
         case .arrowLeft:
-            if accumulatedMods.isEmpty, hasLocalTextInputSession {
-                moveIMEProxyCursorLeft()
-            } else {
-                sendToolbarGhosttyKey(.arrowLeft, mods: accumulatedMods)
-            }
+            sendToolbarGhosttyKey(.arrowLeft, mods: accumulatedMods)
         case .arrowRight:
-            if accumulatedMods.isEmpty, hasLocalTextInputSession {
-                moveIMEProxyCursorRight()
-            } else {
-                sendToolbarGhosttyKey(.arrowRight, mods: accumulatedMods)
-            }
+            sendToolbarGhosttyKey(.arrowRight, mods: accumulatedMods)
         case .home:
-            if accumulatedMods.isEmpty, hasLocalTextInputSession {
-                moveIMEProxyCursorToStart()
-            } else {
-                sendToolbarGhosttyKey(.home, mods: accumulatedMods)
-            }
+            sendToolbarGhosttyKey(.home, mods: accumulatedMods)
         case .end:
-            if accumulatedMods.isEmpty, hasLocalTextInputSession {
-                moveIMEProxyCursorToEnd()
-            } else {
-                sendToolbarGhosttyKey(.end, mods: accumulatedMods)
-            }
+            sendToolbarGhosttyKey(.end, mods: accumulatedMods)
         case .pageUp:
             sendToolbarGhosttyKey(.pageUp, mods: accumulatedMods)
         case .pageDown:
