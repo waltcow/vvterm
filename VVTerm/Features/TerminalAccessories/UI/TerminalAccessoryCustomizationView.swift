@@ -176,7 +176,9 @@ struct TerminalAccessoryCustomizationView: View {
         )
         .sheet(isPresented: $showingCreateActionSheet) {
             TerminalCustomActionFormView()
+                .adaptiveSoftScrollEdges()
         }
+        .adaptiveSoftScrollEdges()
     }
 
     @ViewBuilder

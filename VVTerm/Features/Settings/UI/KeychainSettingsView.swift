@@ -84,6 +84,7 @@ struct KeychainSettingsView: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
         .onAppear {
             loadKeys()
         }
@@ -91,15 +92,18 @@ struct KeychainSettingsView: View {
             AddSSHKeySheet(onSave: { _ in
                 loadKeys()
             })
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingGenerateKey) {
             GenerateSSHKeySheet(onSave: { entry in
                 loadKeys()
                 keyToShowDetails = entry
             })
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $keyToShowDetails) { key in
             KeyDetailsSheet(keyEntry: key)
+                .adaptiveSoftScrollEdges()
         }
         .alert(
             "Delete SSH Key",
@@ -352,6 +356,7 @@ struct AddSSHKeySheet: View {
                 handleKeyImport(result)
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private var isValid: Bool {
@@ -509,6 +514,7 @@ struct GenerateSSHKeySheet: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private var isValidForGeneration: Bool {
@@ -615,6 +621,7 @@ struct KeyDetailsSheet: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private func copyToClipboard(_ text: String) {
@@ -688,6 +695,7 @@ struct PublicKeyDisplaySheet: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private func copyToClipboard(_ text: String) {

@@ -103,6 +103,7 @@ struct iOSContentView: View {
             }
         }
         .navigationBarAppearance(backgroundColor: .clear, isTranslucent: true, shadowColor: .clear)
+        .adaptiveSoftScrollEdges()
         .onAppear {
             // Select first workspace on appear
             if selectedWorkspace == nil {
@@ -246,6 +247,7 @@ struct iOSServerListView: View {
                     onSave: { _ in showingAddServer = false }
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingAddWorkspace) {
             NavigationStack {
@@ -257,10 +259,12 @@ struct iOSServerListView: View {
                     }
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .modifier(AppearanceModifier())
+                .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingWorkspacePicker) {
             NavigationStack {
@@ -270,6 +274,7 @@ struct iOSServerListView: View {
                     onDismiss: { showingWorkspacePicker = false }
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $serverToEdit) { server in
             NavigationStack {
@@ -283,6 +288,7 @@ struct iOSServerListView: View {
                     }
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $serverToMove) { server in
             NavigationStack {
@@ -295,6 +301,7 @@ struct iOSServerListView: View {
                     }
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingCreateEnvironment) {
             if let workspace = selectedWorkspace {
@@ -307,6 +314,7 @@ struct iOSServerListView: View {
                         showingCreateEnvironment = false
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
         }
         .sheet(item: $editingEnvironment) { environment in
@@ -323,6 +331,7 @@ struct iOSServerListView: View {
                         editingEnvironment = nil
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
         }
         .alert(String(localized: "Delete Environment?"), isPresented: Binding(
@@ -1166,6 +1175,7 @@ struct iOSTerminalView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .modifier(AppearanceModifier())
+                    .adaptiveSoftScrollEdges()
             }
             .sheet(item: $serverToEdit) { server in
                 NavigationStack {
@@ -1176,6 +1186,7 @@ struct iOSTerminalView: View {
                         onSave: { _ in serverToEdit = nil }
                     )
                 }
+                .adaptiveSoftScrollEdges()
             }
             .sheet(item: tmuxAttachPromptBinding) { prompt in
                 TmuxAttachPromptSheet(
@@ -1184,6 +1195,7 @@ struct iOSTerminalView: View {
                         sessionManager.resolveTmuxAttachPrompt(sessionId: prompt.id, selection: selection)
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
     }
 

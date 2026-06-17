@@ -107,9 +107,12 @@ struct TerminalCustomActionLibraryView: View {
         )
         .sheet(isPresented: $showingCreateSheet) {
             TerminalCustomActionFormView()
+                .adaptiveSoftScrollEdges()
         }
         .sheet(item: $editingAction) { action in
             TerminalCustomActionFormView(action: action)
+                .adaptiveSoftScrollEdges()
         }
+        .adaptiveSoftScrollEdges()
     }
 }

@@ -143,6 +143,7 @@ struct WorkspaceFormSheet: View {
                 Text(deleteWarningText(for: workspaceToDelete))
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     // MARK: - Actions

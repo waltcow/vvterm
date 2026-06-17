@@ -427,12 +427,14 @@ struct ServerFormSheet: View {
                 }
             }
         #endif
+            .adaptiveSoftScrollEdges()
             .sheet(isPresented: $showingAddKeySheet) {
                 AddSSHKeySheet(onSave: { entry in
                     storedKeys = KeychainManager.shared.getStoredSSHKeys()
                     selectedStoredKey = entry
                     loadStoredKey(entry)
                 })
+                .adaptiveSoftScrollEdges()
             }
             .sheet(isPresented: $showingCreateWorkspace) {
                 WorkspaceFormSheet(
@@ -441,11 +443,13 @@ struct ServerFormSheet: View {
                         selectedWorkspaceId = workspace.id
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
             .sheet(isPresented: $showingLocalDiscoverySheet) {
                 LocalDeviceDiscoverySheet(manager: LocalSSHDiscoveryManager()) { discoveredHost in
                     applyPrefill(ServerFormPrefill(discoveredHost: discoveredHost))
                 }
+                .adaptiveSoftScrollEdges()
             }
             .limitReachedAlert(.servers, isPresented: $showingServerLimitAlert)
             .onAppear {
@@ -1428,6 +1432,7 @@ struct MoveServerSheet: View {
                     selectedWorkspaceId = workspace.id
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .proUpgradePresentation(isPresented: $showingUpgrade, source: .workspaceLimit)
         #if os(iOS)
@@ -1454,6 +1459,7 @@ struct MoveServerSheet: View {
             }
         }
         #endif
+        .adaptiveSoftScrollEdges()
     }
 
     #if os(macOS)

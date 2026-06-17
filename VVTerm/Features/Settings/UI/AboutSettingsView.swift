@@ -226,7 +226,9 @@ struct AboutSettingsView: View {
         .formStyle(.grouped)
         .sheet(isPresented: $showingReviewSheet) {
             ReviewModeSheet()
+                .adaptiveSoftScrollEdges()
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private func openURL(_ urlString: String) {
@@ -275,6 +277,7 @@ private struct ReviewModeSheet: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private var header: some View {

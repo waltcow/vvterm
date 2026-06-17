@@ -90,6 +90,7 @@ struct VVTermApp: App {
                                 set: { if !$0 { hasSeenWelcome = true } }
                             )) {
                                 WelcomeView(hasSeenWelcome: $hasSeenWelcome)
+                                    .adaptiveSoftScrollEdges()
                             }
                         #else
                         ContentView(
@@ -108,9 +109,11 @@ struct VVTermApp: App {
                                 set: { if !$0 { hasSeenWelcome = true } }
                             )) {
                                 WelcomeView(hasSeenWelcome: $hasSeenWelcome)
+                                    .adaptiveSoftScrollEdges()
                             }
                         #endif
                     }
+                    .adaptiveSoftScrollEdges()
                     .environment(\.locale, appLocale)
                     .environment(\.privacyModeEnabled, privacyModeEnabled)
                     .onAppear {

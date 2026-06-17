@@ -127,6 +127,7 @@ struct SupportSheet: View {
             .buttonStyle(.plain)
         }
         .frame(width: 340)
+        .adaptiveSoftScrollEdges()
     }
 
     private func openURL(_ urlString: String) {
@@ -223,6 +224,7 @@ struct SupportSettingsView: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private func openURL(_ urlString: String) {

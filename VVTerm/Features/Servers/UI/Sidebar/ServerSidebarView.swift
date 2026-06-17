@@ -190,6 +190,7 @@ struct ServerSidebarView: View {
                 serverManager: serverManager,
                 selectedWorkspace: $selectedWorkspace
             )
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingAddServer) {
             ServerFormSheet(
@@ -198,6 +199,7 @@ struct ServerSidebarView: View {
                 prefill: addServerPrefill,
                 onSave: { _ in showingAddServer = false }
             )
+            .adaptiveSoftScrollEdges()
             #if os(macOS)
             .frame(
                 minWidth: 640,
@@ -214,6 +216,7 @@ struct ServerSidebarView: View {
                 queuedDiscoveryPrefill = ServerFormPrefill(discoveredHost: discoveredHost)
                 showingLocalDiscovery = false
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $serverToEdit) { server in
             ServerFormSheet(
@@ -225,6 +228,7 @@ struct ServerSidebarView: View {
                     serverToEdit = nil
                 }
             )
+            .adaptiveSoftScrollEdges()
             #if os(macOS)
             .frame(
                 minWidth: 640,
@@ -245,6 +249,7 @@ struct ServerSidebarView: View {
                     serverToMove = nil
                 }
             )
+            .adaptiveSoftScrollEdges()
             #if os(macOS)
             .frame(
                 minWidth: 520,
@@ -258,6 +263,7 @@ struct ServerSidebarView: View {
         }
         .sheet(isPresented: $showingSupport) {
             SupportSheet()
+                .adaptiveSoftScrollEdges()
         }
         .proUpgradePresentation(isPresented: $showingProUpgrade, source: .sidebarBanner)
         .sheet(isPresented: $showingCreateEnvironment) {
@@ -270,6 +276,7 @@ struct ServerSidebarView: View {
                         showingCreateEnvironment = false
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
         }
         .sheet(item: $editingEnvironment) { environment in
@@ -283,6 +290,7 @@ struct ServerSidebarView: View {
                         editingEnvironment = nil
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
         }
         .alert(String(localized: "Delete Environment?"), isPresented: Binding(

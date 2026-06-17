@@ -541,6 +541,7 @@ struct TerminalSettingsView: View {
             dangerZoneSection
         }
         .formStyle(.grouped)
+        .adaptiveSoftScrollEdges()
         .sheet(isPresented: $showingCustomThemeManager) {
             ManageCustomThemesSheet(
                 customThemes: customThemes,
@@ -566,6 +567,7 @@ struct TerminalSettingsView: View {
                     ensureThemeSelectionIsValid()
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .alert("Custom Theme", isPresented: customThemeErrorAlertBinding) {
             Button("OK", role: .cancel) {}
@@ -726,6 +728,7 @@ private struct CustomThemeSaveSheet: View {
                 }
             }
         }
+        .adaptiveSoftScrollEdges()
         #else
         VStack(spacing: 0) {
             DialogSheetHeader(title: "Save Custom Theme") {
@@ -906,6 +909,7 @@ private struct ManageCustomThemesSheet: View {
             ) { name, content, _ in
                 try onSaveEdit(theme.id, name, content)
             }
+            .adaptiveSoftScrollEdges()
             #if os(macOS)
             .frame(minWidth: 700, minHeight: 600)
             #endif
@@ -924,11 +928,13 @@ private struct ManageCustomThemesSheet: View {
             ) { name, applyTarget in
                 try onCreateTheme(name, source.content, applyTarget)
             }
+            .adaptiveSoftScrollEdges()
         }
         .sheet(isPresented: $showingThemeBuilder) {
             ThemeBuilderSheet(usePerAppearanceTheme: usePerAppearanceTheme) { name, content, applyTarget in
                 try onCreateTheme(name, content, applyTarget)
             }
+            .adaptiveSoftScrollEdges()
             #if os(macOS)
             .frame(minWidth: 700, minHeight: 600)
             #endif
@@ -951,6 +957,7 @@ private struct ManageCustomThemesSheet: View {
         } message: {
             Text(customThemeErrorMessage ?? "")
         }
+        .adaptiveSoftScrollEdges()
     }
 
     #if os(iOS)
@@ -1506,6 +1513,7 @@ private struct ThemeBuilderSheet: View {
         } message: {
             Text("This cannot be undone.")
         }
+        .adaptiveSoftScrollEdges()
     }
 
     private var formContent: some View {

@@ -374,6 +374,7 @@ struct iOSWorkspacePickerView: View {
                     selectedWorkspace = newWorkspace
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $workspaceToEdit) { workspace in
             WorkspaceFormSheet(
@@ -385,6 +386,7 @@ struct iOSWorkspacePickerView: View {
                     }
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $workspaceToManageServers) { workspace in
             NavigationStack {
@@ -393,6 +395,7 @@ struct iOSWorkspacePickerView: View {
                     workspace: workspace
                 )
             }
+            .adaptiveSoftScrollEdges()
         }
         .lockedItemAlert(
             .workspace,

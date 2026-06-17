@@ -74,6 +74,7 @@ struct WorkspaceSwitcherSheet: View {
             }
         }
         .frame(width: 400, height: 500)
+        .adaptiveSoftScrollEdges()
         .sheet(isPresented: $showingCreateWorkspace) {
             WorkspaceFormSheet(
                 serverManager: serverManager,
@@ -81,6 +82,7 @@ struct WorkspaceSwitcherSheet: View {
                     selectedWorkspace = newWorkspace
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $workspaceToEdit) { workspace in
             WorkspaceFormSheet(
@@ -92,12 +94,14 @@ struct WorkspaceSwitcherSheet: View {
                     }
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
         .sheet(item: $workspaceToManageServers) { workspace in
             LockedWorkspaceServerManagementSheet(
                 serverManager: serverManager,
                 workspace: workspace
             )
+            .adaptiveSoftScrollEdges()
             .frame(width: 560, height: 460)
         }
         .lockedItemAlert(
@@ -402,6 +406,7 @@ struct LockedWorkspaceServerManagementSheet: View {
                     }
                 )
             }
+            .adaptiveSoftScrollEdges()
             #else
             MoveServerSheet(
                 serverManager: serverManager,
@@ -412,5 +417,6 @@ struct LockedWorkspaceServerManagementSheet: View {
             )
             #endif
         }
+        .adaptiveSoftScrollEdges()
     }
 }

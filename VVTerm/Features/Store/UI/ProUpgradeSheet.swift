@@ -66,6 +66,7 @@ struct ProUpgradeSheet: View {
                     }
                 }
         }
+        .adaptiveSoftScrollEdges()
         #else
         macSheetContent
         #endif
@@ -675,6 +676,7 @@ private struct ProUpgradePresentationModifier: ViewModifier {
         content
             .sheet(isPresented: $isPresented) {
                 ProUpgradeSheet(source: source)
+                    .adaptiveSoftScrollEdges()
             }
         #endif
     }

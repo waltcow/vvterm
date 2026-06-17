@@ -222,6 +222,7 @@ struct ConnectionTerminalContainer: View {
                         tabManager.resolveTmuxAttachPrompt(paneId: prompt.id, selection: selection)
                     }
                 )
+                .adaptiveSoftScrollEdges()
             }
     }
 
@@ -513,6 +514,7 @@ struct ConnectionTerminalContainer: View {
                         serverToEdit = nil
                     }
                 )
+                .adaptiveSoftScrollEdges()
                 .frame(
                     minWidth: 640,
                     idealWidth: 700,
@@ -839,6 +841,7 @@ struct ConnectionTerminalContainer: View {
                     }
                 }
             )
+            .adaptiveSoftScrollEdges()
         }
     }
 
