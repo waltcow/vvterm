@@ -122,7 +122,9 @@ struct ConnectionTerminalContainer: View {
                       let tab = serverFileTabs.first(where: { $0.id == newValue }) else {
                     return
                 }
-                fileTabManager.selectTab(tab)
+                DispatchQueue.main.async {
+                    fileTabManager.selectTab(tab)
+                }
             }
         )
     }
@@ -315,8 +317,11 @@ struct ConnectionTerminalContainer: View {
         guard selectedView == ConnectionViewTab.files.id else { return }
 
         let seedPath = selectedTab.flatMap { tabManager.workingDirectory(for: $0.focusedPaneId) }
-        guard let fileTab = fileTabManager.ensureInitialTab(for: server, seedPath: seedPath) else { return }
-        fileBrowser.prepareNewTab(fileTab, duplicating: nil)
+        DispatchQueue.main.async {
+            guard selectedView == ConnectionViewTab.files.id else { return }
+            guard let fileTab = fileTabManager.ensureInitialTab(for: server, seedPath: seedPath) else { return }
+            fileBrowser.prepareNewTab(fileTab, duplicating: nil)
+        }
     }
 
     private func openNewTab(selectTerminalViewOnSuccess: Bool = false) {
@@ -480,12 +485,11 @@ struct ConnectionTerminalContainer: View {
             .toolbar {
                 if !isZenModeEnabled {
                     viewPickerToolbarItem
-                    if (selectedView == "terminal" && !serverTabs.isEmpty)
-                        || (selectedView == "files" && !serverFileTabs.isEmpty) {
+                    if (selectedView == ConnectionViewTab.terminal.id && !serverTabs.isEmpty)
+                        || (selectedView == ConnectionViewTab.files.id && !serverFileTabs.isEmpty) {
                         tabsToolbarSpacer
                         tabsToolbarItem
                     }
-                    toolbarSpacer
                     trailingToolbarItems
                 } else {
                     ToolbarItem(placement: .primaryAction) {
@@ -560,6 +564,14 @@ struct ConnectionTerminalContainer: View {
     @ToolbarContentBuilder
     private var tabsToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
+            tabsToolbarView
+                .frame(maxWidth: .infinity)
+                .layoutPriority(1)
+        }
+    }
+
+    @ViewBuilder
+    private var tabsToolbarView: some View {
             if selectedView == ConnectionViewTab.files.id {
                 RemoteFileTabsScrollView(
                     tabs: serverFileTabs,
@@ -607,30 +619,36 @@ struct ConnectionTerminalContainer: View {
                     tabManager: tabManager
                 )
             }
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var toolbarSpacer: some ToolbarContent {
-        ToolbarItem(placement: .automatic) {
-            Spacer()
-        }
     }
 
     @ToolbarContentBuilder
     private var trailingToolbarItems: some ToolbarContent {
-        if selectedView == "files" {
+        if selectedView == ConnectionViewTab.files.id {
             ToolbarItem(placement: .primaryAction) {
                 filesActionsToolbarButton
             }
+            trailingToolbarSpacer
         }
 
         ToolbarItem(placement: .primaryAction) {
             zenModeToolbarButton
         }
+        trailingToolbarSpacer
 
         ToolbarItem(placement: .primaryAction) {
             serverMenuToolbarButton
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var trailingToolbarSpacer: some ToolbarContent {
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        } else {
+            ToolbarItem(placement: .primaryAction) {
+                Color.clear
+                    .frame(width: 8, height: 1)
+            }
         }
     }
 
@@ -1111,48 +1129,24 @@ struct TerminalTabsScrollView: View {
     @ObservedObject var tabManager: TerminalTabManager
 
     var body: some View {
-        HStack(spacing: 4) {
-            // Navigation arrows
-            HStack(spacing: 4) {
-                ServerViewTabNavigationButton(
-                    icon: "chevron.left",
-                    action: { selectPrevious() },
-                    help: String(localized: "Previous tab")
-                )
-                .disabled(tabs.count <= 1)
-
-                ServerViewTabNavigationButton(
-                    icon: "chevron.right",
-                    action: { selectNext() },
-                    help: String(localized: "Next tab")
-                )
-                .disabled(tabs.count <= 1)
-            }
-            .padding(.leading, 8)
-
-            // Tabs scroll view
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(tabs, id: \.id) { tab in
-                        TerminalTabButton(
-                            tab: tab,
-                            isSelected: selectedTabId == tab.id,
-                            onSelect: { selectedTabId = tab.id },
-                            onClose: { onClose(tab) },
-                            tabManager: tabManager
-                        )
-                    }
-                }
-                .padding(.horizontal, 6)
-            }
-            .frame(maxWidth: 600, maxHeight: 36)
-
-            // New tab button
-            ServerViewNewTabButton(
-                help: String(localized: "New terminal tab"),
-                action: onNew
+        ServerToolbarTabStrip(
+            items: tabs,
+            selectedId: selectedTabId,
+            previousHelp: String(localized: "Previous tab"),
+            nextHelp: String(localized: "Next tab"),
+            newHelp: String(localized: "New terminal tab"),
+            onPrevious: selectPrevious,
+            onNext: selectNext,
+            onNew: onNew
+        ) { tab, tabWidth in
+            TerminalTabButton(
+                tab: tab,
+                isSelected: selectedTabId == tab.id,
+                width: tabWidth,
+                onSelect: { selectedTabId = tab.id },
+                onClose: { onClose(tab) },
+                tabManager: tabManager
             )
-            .padding(.trailing, 8)
         }
     }
 
@@ -1176,11 +1170,10 @@ struct TerminalTabsScrollView: View {
 struct TerminalTabButton: View {
     let tab: TerminalTab
     let isSelected: Bool
+    let width: CGFloat
     let onSelect: () -> Void
     let onClose: () -> Void
     @ObservedObject var tabManager: TerminalTabManager
-
-    @State private var isHovering = false
 
     /// Get pane state for the focused pane
     private var paneState: TerminalPaneState? {
@@ -1198,50 +1191,21 @@ struct TerminalTabButton: View {
     }
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 6) {
-                // Close button (like Aizen's DetailCloseButton)
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 14, height: 14)
-                        .background(
-                            Circle()
-                                .fill(Color.primary.opacity(isHovering ? 0.1 : 0))
-                        )
-                }
-                .buttonStyle(.plain)
+        ServerToolbarTabCell(
+            title: tabTitle,
+            isSelected: isSelected,
+            statusColor: statusColor,
+            width: width,
+            accessibilityLabel: tabManager.displayTitle(for: tab),
+            onSelect: onSelect,
+            onClose: onClose
+        )
+    }
 
-                // Status indicator
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 6, height: 6)
-
-                // Title
-                Text(tabManager.displayTitle(for: tab))
-                    .font(.callout)
-                    .lineLimit(1)
-
-                // Pane count indicator (if splits)
-                if tab.paneCount > 1 {
-                    Text(verbatim: "⊞")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.leading, 6)
-            .padding(.trailing, 12)
-            .padding(.vertical, 6)
-            .background(
-                isSelected ?
-                Color(nsColor: .separatorColor) :
-                (isHovering ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear),
-                in: Capsule()
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
+    private var tabTitle: String {
+        let title = tabManager.displayTitle(for: tab)
+        guard tab.paneCount > 1 else { return title }
+        return "\(title) ⊞"
     }
 }
 #endif

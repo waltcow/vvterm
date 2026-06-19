@@ -66,74 +66,51 @@ struct RemoteFileTabsScrollView: View {
     let onNew: () -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
-            HStack(spacing: 4) {
-                ServerViewTabNavigationButton(
-                    icon: "chevron.left",
-                    action: selectPrevious,
-                    help: String(localized: "Previous file tab")
-                )
-                .disabled(tabs.count <= 1)
-
-                ServerViewTabNavigationButton(
-                    icon: "chevron.right",
-                    action: selectNext,
-                    help: String(localized: "Next file tab")
-                )
-                .disabled(tabs.count <= 1)
-            }
-            .padding(.leading, 8)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(tabs) { tab in
-                        RemoteFileTabButton(
-                            title: titleForTab(tab),
-                            isSelected: selectedTabId == tab.id,
-                            onSelect: {
-                                selectedTabId = tab.id
-                                onSelect(tab)
-                            },
-                            onClose: { onClose(tab) }
-                        )
-                        .contextMenu {
-                            Button(String(localized: "Close Tab")) {
-                                onClose(tab)
-                            }
-
-                            Divider()
-
-                            Button(String(localized: "Close Other Tabs")) {
-                                onCloseOtherTabs(tab)
-                            }
-
-                            Button(String(localized: "Close All to the Left")) {
-                                onCloseTabsToLeft(tab)
-                            }
-                            .disabled((tabs.firstIndex(where: { $0.id == tab.id }) ?? 0) == 0)
-
-                            Button(String(localized: "Close All to the Right")) {
-                                onCloseTabsToRight(tab)
-                            }
-                            .disabled((tabs.firstIndex(where: { $0.id == tab.id }) ?? (tabs.count - 1)) >= tabs.count - 1)
-
-                            Divider()
-
-                            Button(String(localized: "Duplicate Tab")) {
-                                onDuplicate(tab)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 6)
-            }
-            .frame(maxWidth: 600, maxHeight: 36)
-
-            ServerViewNewTabButton(
-                help: String(localized: "New file tab"),
-                action: onNew
+        ServerToolbarTabStrip(
+            items: tabs,
+            selectedId: selectedTabId,
+            previousHelp: String(localized: "Previous file tab"),
+            nextHelp: String(localized: "Next file tab"),
+            newHelp: String(localized: "New file tab"),
+            onPrevious: selectPrevious,
+            onNext: selectNext,
+            onNew: onNew
+        ) { tab, tabWidth in
+            ServerToolbarTabCell(
+                title: titleForTab(tab),
+                isSelected: selectedTabId == tab.id,
+                statusColor: .green,
+                width: tabWidth,
+                onSelect: { onSelect(tab) },
+                onClose: { onClose(tab) }
             )
-            .padding(.trailing, 8)
+            .contextMenu {
+                Button(String(localized: "Close Tab")) {
+                    onClose(tab)
+                }
+
+                Divider()
+
+                Button(String(localized: "Close Other Tabs")) {
+                    onCloseOtherTabs(tab)
+                }
+
+                Button(String(localized: "Close All to the Left")) {
+                    onCloseTabsToLeft(tab)
+                }
+                .disabled((tabs.firstIndex(where: { $0.id == tab.id }) ?? 0) == 0)
+
+                Button(String(localized: "Close All to the Right")) {
+                    onCloseTabsToRight(tab)
+                }
+                .disabled((tabs.firstIndex(where: { $0.id == tab.id }) ?? (tabs.count - 1)) >= tabs.count - 1)
+
+                Divider()
+
+                Button(String(localized: "Duplicate Tab")) {
+                    onDuplicate(tab)
+                }
+            }
         }
     }
 
@@ -143,7 +120,6 @@ struct RemoteFileTabsScrollView: View {
               currentIndex > 0 else { return }
 
         let target = tabs[currentIndex - 1]
-        selectedTabId = target.id
         onSelect(target)
     }
 
@@ -153,56 +129,10 @@ struct RemoteFileTabsScrollView: View {
               currentIndex < tabs.count - 1 else { return }
 
         let target = tabs[currentIndex + 1]
-        selectedTabId = target.id
         onSelect(target)
     }
 }
 
-private struct RemoteFileTabButton: View {
-    let title: String
-    let isSelected: Bool
-    let onSelect: () -> Void
-    let onClose: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 6) {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 14, height: 14)
-                        .background(
-                            Circle()
-                                .fill(Color.primary.opacity(isHovering ? 0.1 : 0))
-                        )
-                }
-                .buttonStyle(.plain)
-
-                Image(systemName: "folder")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(title)
-                    .font(.callout)
-                    .lineLimit(1)
-            }
-            .padding(.leading, 6)
-            .padding(.trailing, 12)
-            .padding(.vertical, 6)
-            .background(
-                isSelected
-                    ? Color(nsColor: .separatorColor)
-                    : (isHovering ? Color(nsColor: .separatorColor).opacity(0.5) : Color.clear),
-                in: Capsule()
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-    }
-}
 #endif
 
 #if os(iOS)
