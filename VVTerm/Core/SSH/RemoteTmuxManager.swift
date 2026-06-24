@@ -830,7 +830,7 @@ actor RemoteTmuxManager {
         let lines = configLines(
             terminalType: terminalType,
             includeWheelBindings: true,
-            guardAllowSetTitle: true
+            quietAllowSetTitle: true
         )
         let quotedLines = lines.map { "\"\(escapeForDoubleQuotes($0))\"" }.joined(separator: " ")
         return "mkdir -p \(configDirectory); printf '%s\\n' \(quotedLines) > \(configPath)"
@@ -839,7 +839,7 @@ actor RemoteTmuxManager {
     nonisolated private func configLines(
         terminalType: RemoteTerminalType,
         includeWheelBindings: Bool,
-        guardAllowSetTitle: Bool
+        quietAllowSetTitle: Bool
     ) -> [String] {
         let themeName = UserDefaults.standard.string(forKey: CloudKitSyncConstants.terminalThemeNameKey) ?? "Aizen Dark"
         let modeStyle = ThemeColorParser.tmuxModeStyle(for: themeName)
@@ -869,7 +869,7 @@ actor RemoteTmuxManager {
             "",
             "# Publish the active pane title to the outer VVTerm terminal"
         ])
-        lines.append(contentsOf: titlePropagationConfigLines(guardAllowSetTitle: guardAllowSetTitle))
+        lines.append(contentsOf: titlePropagationConfigLines(quietAllowSetTitle: quietAllowSetTitle))
         lines.append(contentsOf: [
             "",
             "# Hide status bar",
@@ -921,7 +921,7 @@ actor RemoteTmuxManager {
         let lines = configLines(
             terminalType: terminalType,
             includeWheelBindings: false,
-            guardAllowSetTitle: false
+            quietAllowSetTitle: false
         )
         let content = lines.joined(separator: "\n") + "\n"
         return """
@@ -933,22 +933,12 @@ actor RemoteTmuxManager {
         """
     }
 
-    nonisolated private func titlePropagationConfigLines(guardAllowSetTitle: Bool) -> [String] {
-        var lines: [String] = []
-        if guardAllowSetTitle {
-            lines.append(contentsOf: [
-                "%if \"#{m/r:^(3\\.([5-9]|[1-9][0-9]+)|[4-9]|[1-9][0-9]+),#{version}}\"",
-                "set -g allow-set-title on",
-                "%endif"
-            ])
-        } else {
-            lines.append("set -g allow-set-title on")
-        }
-        lines.append(contentsOf: [
+    nonisolated private func titlePropagationConfigLines(quietAllowSetTitle: Bool) -> [String] {
+        [
+            quietAllowSetTitle ? "set -gq allow-set-title on" : "set -g allow-set-title on",
             "set -g set-titles on",
             "set -g set-titles-string \"#{pane_title}\""
-        ])
-        return lines
+        ]
     }
 
     nonisolated private func windowsInstallAndAttachScript(

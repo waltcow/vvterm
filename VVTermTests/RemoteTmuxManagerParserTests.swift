@@ -103,10 +103,9 @@ struct RemoteTmuxManagerParserTests {
         #expect(script.contains("/tmp/work dir"))
         #expect(script.contains("set -g default-terminal"))
         #expect(script.contains("xterm-ghostty"))
-        #expect(script.contains("%if"))
-        #expect(script.contains("#{version}"))
-        #expect(script.contains("set -g allow-set-title on"))
-        #expect(script.contains("%endif"))
+        #expect(script.contains("set -gq allow-set-title on"))
+        #expect(!script.contains("%if"))
+        #expect(!script.contains("#{version}"))
     }
 
     @Test
@@ -121,10 +120,9 @@ struct RemoteTmuxManagerParserTests {
         #expect(command.contains("> ~/.vvterm/tmux.conf"))
         #expect(command.contains("set -g default-terminal"))
         #expect(command.contains("xterm-ghostty"))
-        #expect(command.contains("%if"))
-        #expect(command.contains("#{version}"))
-        #expect(command.contains("set -g allow-set-title on"))
-        #expect(command.contains("%endif"))
+        #expect(command.contains("set -gq allow-set-title on"))
+        #expect(!command.contains("%if"))
+        #expect(!command.contains("#{version}"))
     }
 
     @Test
