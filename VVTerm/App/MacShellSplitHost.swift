@@ -30,8 +30,8 @@ struct MacShellSplitHost<Sidebar: View, Detail: View>: NSViewControllerRepresent
     @ViewBuilder var sidebar: () -> Sidebar
     @ViewBuilder var detail: () -> Detail
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
+    func makeCoordinator() -> MacShellSplitHostCoordinator {
+        MacShellSplitHostCoordinator()
     }
 
     func makeNSViewController(context: Context) -> NSSplitViewController {
@@ -80,13 +80,13 @@ struct MacShellSplitHost<Sidebar: View, Detail: View>: NSViewControllerRepresent
             item.animator().isCollapsed = isSidebarCollapsed
         }
     }
+}
 
-    final class Coordinator {
-        var splitViewController: NSSplitViewController?
-        var sidebarHostingController: NSHostingController<AnyView>?
-        var detailHostingController: NSHostingController<AnyView>?
-        var sidebarItem: NSSplitViewItem?
-    }
+final class MacShellSplitHostCoordinator {
+    var splitViewController: NSSplitViewController?
+    var sidebarHostingController: NSHostingController<AnyView>?
+    var detailHostingController: NSHostingController<AnyView>?
+    var sidebarItem: NSSplitViewItem?
 }
 
 /// NSSplitViewController that applies an initial sidebar width once, since
