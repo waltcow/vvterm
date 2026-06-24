@@ -827,14 +827,19 @@ actor RemoteTmuxManager {
             return windowsConfigWriteCommand(terminalType: terminalType, backend: backend)
         }
 
-        let lines = configLines(terminalType: terminalType, includeWheelBindings: true)
+        let lines = configLines(
+            terminalType: terminalType,
+            includeWheelBindings: true,
+            guardAllowSetTitle: true
+        )
         let quotedLines = lines.map { "\"\(escapeForDoubleQuotes($0))\"" }.joined(separator: " ")
         return "mkdir -p \(configDirectory); printf '%s\\n' \(quotedLines) > \(configPath)"
     }
 
     nonisolated private func configLines(
         terminalType: RemoteTerminalType,
-        includeWheelBindings: Bool
+        includeWheelBindings: Bool,
+        guardAllowSetTitle: Bool
     ) -> [String] {
         let themeName = UserDefaults.standard.string(forKey: CloudKitSyncConstants.terminalThemeNameKey) ?? "Aizen Dark"
         let modeStyle = ThemeColorParser.tmuxModeStyle(for: themeName)
@@ -862,10 +867,10 @@ actor RemoteTmuxManager {
             "# Allow OSC sequences to pass through (title updates, etc.)",
             "set -g allow-passthrough on",
             "",
-            "# Publish the active pane title to the outer VVTerm terminal",
-            "set -g allow-set-title on",
-            "set -g set-titles on",
-            "set -g set-titles-string \"#{pane_title}\"",
+            "# Publish the active pane title to the outer VVTerm terminal"
+        ])
+        lines.append(contentsOf: titlePropagationConfigLines(guardAllowSetTitle: guardAllowSetTitle))
+        lines.append(contentsOf: [
             "",
             "# Hide status bar",
             "set -g status off",
@@ -913,7 +918,11 @@ actor RemoteTmuxManager {
     nonisolated private func windowsConfigWritePowerShell(
         terminalType: RemoteTerminalType
     ) -> String {
-        let lines = configLines(terminalType: terminalType, includeWheelBindings: false)
+        let lines = configLines(
+            terminalType: terminalType,
+            includeWheelBindings: false,
+            guardAllowSetTitle: false
+        )
         let content = lines.joined(separator: "\n") + "\n"
         return """
         $vvtermConfigDirectory = \(windowsConfigDirectoryPowerShellExpression())
@@ -922,6 +931,24 @@ actor RemoteTmuxManager {
         @'
         \(content)'@ | Set-Content -Encoding UTF8 -NoNewline -Path $vvtermConfigPath
         """
+    }
+
+    nonisolated private func titlePropagationConfigLines(guardAllowSetTitle: Bool) -> [String] {
+        var lines: [String] = []
+        if guardAllowSetTitle {
+            lines.append(contentsOf: [
+                "%if \"#{m/r:^(3\\.([5-9]|[1-9][0-9]+)|[4-9]|[1-9][0-9]+),#{version}}\"",
+                "set -g allow-set-title on",
+                "%endif"
+            ])
+        } else {
+            lines.append("set -g allow-set-title on")
+        }
+        lines.append(contentsOf: [
+            "set -g set-titles on",
+            "set -g set-titles-string \"#{pane_title}\""
+        ])
+        return lines
     }
 
     nonisolated private func windowsInstallAndAttachScript(
