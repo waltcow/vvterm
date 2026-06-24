@@ -600,7 +600,10 @@ struct ServerFormSheet: View {
             Section {
                 ProLimitBanner(
                     title: String(localized: "Server Limit Reached"),
-                    message: String(format: String(localized: "You've reached the free limit of %lld servers. Pro unlocks unlimited servers, connections, and split panes."), Int64(FreeTierLimits.maxServers))
+                    message: String(
+                        format: String(localized: "You've reached the free limit of %@. Pro unlocks unlimited servers, connections, and split panes."),
+                        FreeTierLimits.serverLimitDescription(serverManager.freeServerLimit)
+                    )
                 ) {
                     showingServerLimitAlert = true
                 }
@@ -609,7 +612,7 @@ struct ServerFormSheet: View {
             Section {
                 UsageIndicator(
                     current: serverCount,
-                    limit: FreeTierLimits.maxServers,
+                    limit: serverManager.freeServerLimit,
                     label: String(localized: "Servers"),
                     showUpgrade: $showingServerLimitAlert
                 )

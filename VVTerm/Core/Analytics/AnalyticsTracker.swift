@@ -49,10 +49,70 @@ final class AnalyticsTracker {
         send(name: "paywall_viewed", url: "/app/paywall", data: ["source": .string(source)])
     }
 
+    func trackPaywallCTATapped(source: String, productId: String) {
+        send(name: "paywall_cta_tapped", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId)
+        ])
+    }
+
+    func trackPurchaseStarted(source: String, productId: String) {
+        send(name: "purchase_started", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId)
+        ])
+    }
+
     func trackPurchase(source: String, productId: String) {
         send(name: "purchased", url: "/app/paywall", data: [
             "source": .string(source),
             "product": .string(productId)
+        ])
+    }
+
+    func trackPurchaseSucceeded(source: String, productId: String) {
+        send(name: "purchase_succeeded", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId)
+        ])
+    }
+
+    func trackPurchaseCancelled(source: String, productId: String) {
+        send(name: "purchase_cancelled", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId)
+        ])
+    }
+
+    func trackPurchasePending(source: String, productId: String) {
+        send(name: "purchase_pending", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId)
+        ])
+    }
+
+    func trackPurchaseFailed(source: String, productId: String, reason: String) {
+        send(name: "purchase_failed", url: "/app/paywall", data: [
+            "source": .string(source),
+            "product": .string(productId),
+            "reason": .string(reason)
+        ])
+    }
+
+    func trackLimitHit(source: String, generation: String, current: Int, limit: Int) {
+        send(name: "\(source)_hit", url: "/app/limit", data: [
+            "source": .string(source),
+            "generation": .string(generation),
+            "current": .string(String(current)),
+            "limit": .string(String(limit))
+        ])
+    }
+
+    func trackFreePlanGenerationAssigned(generation: String, serverCount: Int, reason: String) {
+        send(name: "free_plan_generation_assigned", url: "/app/free-plan", data: [
+            "generation": .string(generation),
+            "server_count": .string(String(serverCount)),
+            "reason": .string(reason)
         ])
     }
 

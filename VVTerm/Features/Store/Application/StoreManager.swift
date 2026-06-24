@@ -85,11 +85,22 @@ final class StoreManager: ObservableObject {
         AnalyticsTracker.shared.trackPaywallViewed(source: source.rawValue)
     }
 
+    func notePaywallCTATapped(product: Product) {
+        AnalyticsTracker.shared.trackPaywallCTATapped(
+            source: activePaywallSource.rawValue,
+            productId: product.id
+        )
+    }
+
     // MARK: - Purchase
 
     func purchase(_ product: Product) async {
         purchaseState = .purchasing
         lastPurchasedProductId = nil
+        AnalyticsTracker.shared.trackPurchaseStarted(
+            source: activePaywallSource.rawValue,
+            productId: product.id
+        )
         logger.info("Purchasing \(product.id)")
 
         do {
@@ -103,15 +114,28 @@ final class StoreManager: ObservableObject {
                 applySuccessfulPurchase(of: product)
 
             case .userCancelled:
+                AnalyticsTracker.shared.trackPurchaseCancelled(
+                    source: activePaywallSource.rawValue,
+                    productId: product.id
+                )
                 applyIdlePurchaseState(logMessage: "Purchase cancelled by user")
 
             case .pending:
+                AnalyticsTracker.shared.trackPurchasePending(
+                    source: activePaywallSource.rawValue,
+                    productId: product.id
+                )
                 applyIdlePurchaseState(logMessage: "Purchase pending")
 
             @unknown default:
                 purchaseState = .idle
             }
         } catch {
+            AnalyticsTracker.shared.trackPurchaseFailed(
+                source: activePaywallSource.rawValue,
+                productId: product.id,
+                reason: String(describing: type(of: error))
+            )
             purchaseState = .failed(error.localizedDescription)
             logger.error("Purchase failed: \(error.localizedDescription)")
         }
@@ -274,6 +298,10 @@ final class StoreManager: ObservableObject {
         lastPurchasedProductId = product.id
         purchaseState = .purchased
         AnalyticsTracker.shared.trackPurchase(
+            source: activePaywallSource.rawValue,
+            productId: product.id
+        )
+        AnalyticsTracker.shared.trackPurchaseSucceeded(
             source: activePaywallSource.rawValue,
             productId: product.id
         )

@@ -12,6 +12,7 @@ import AppKit
 struct ProUpgradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var storeManager: StoreManager
+    @ObservedObject private var serverManager = ServerManager.shared
     private let source: PaywallSource
     private let onDismiss: (() -> Void)?
 
@@ -220,6 +221,7 @@ struct ProUpgradeSheet: View {
     private var contentStack: some View {
         VStack(alignment: .leading, spacing: 18) {
             comparisonSection
+            crossPlatformBenefitSection
             planSection
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -231,6 +233,31 @@ struct ProUpgradeSheet: View {
 
             NativeSectionCard(padding: 0) {
                 ComparisonTable(rows: comparisonRows)
+            }
+        }
+    }
+
+    private var crossPlatformBenefitSection: some View {
+        NativeSectionCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "macbook.and.iphone")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 30, height: 30)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(crossPlatformBenefitTitle)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text(crossPlatformBenefitMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
             }
         }
     }
@@ -270,6 +297,7 @@ struct ProUpgradeSheet: View {
         VStack(spacing: 5) {
             Button {
                 if let product = selectedProduct {
+                    storeManager.notePaywallCTATapped(product: product)
                     Task { await storeManager.purchase(product) }
                 }
             } label: {
@@ -421,6 +449,18 @@ struct ProUpgradeSheet: View {
         }
     }
 
+    private var crossPlatformBenefitTitle: String {
+        #if os(macOS)
+        return String(localized: "Also on iPhone and iPad")
+        #else
+        return String(localized: "Also on Mac")
+        #endif
+    }
+
+    private var crossPlatformBenefitMessage: String {
+        String(localized: "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID.")
+    }
+
     private var subscribeButtonTitle: String {
         guard let product = selectedProduct else { return String(localized: "Select a Plan") }
         if product.id == VVTermProducts.proLifetime {
@@ -436,7 +476,7 @@ struct ProUpgradeSheet: View {
             ComparisonFeature(
                 icon: "server.rack",
                 title: String(localized: "Servers"),
-                free: .number(String(FreeTierLimits.maxServers)),
+                free: .number(String(serverManager.freeServerLimit)),
                 pro: .unlimited(accessibilityLabel: String(localized: "Unlimited servers"))
             ),
             ComparisonFeature(

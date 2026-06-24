@@ -71,6 +71,7 @@ struct ProFeatureLock: View {
 struct LimitReachedAlert: ViewModifier {
     let limitType: LimitType
     @Binding var isPresented: Bool
+    @ObservedObject private var serverManager = ServerManager.shared
     @State private var showUpgrade = false
 
     enum LimitType {
@@ -88,10 +89,13 @@ struct LimitReachedAlert: ViewModifier {
             }
         }
 
-        var message: String {
+        func message(serverLimit: Int) -> String {
             switch self {
             case .servers:
-                return String(format: String(localized: "You've reached the free limit of %lld servers. Pro unlocks unlimited servers, workspaces, simultaneous connections, and split panes."), Int64(FreeTierLimits.maxServers))
+                return String(
+                    format: String(localized: "You've reached the free limit of %@. Pro unlocks unlimited servers, workspaces, simultaneous connections, and split panes."),
+                    FreeTierLimits.serverLimitDescription(serverLimit)
+                )
             case .workspaces:
                 return String(format: String(localized: "You've reached the free limit of %lld workspace. Pro unlocks unlimited workspaces, servers, simultaneous connections, and split panes."), Int64(FreeTierLimits.maxWorkspaces))
             case .tabs:
@@ -120,9 +124,38 @@ struct LimitReachedAlert: ViewModifier {
                 .keyboardShortcut(.defaultAction)
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text(limitType.message)
+                Text(limitType.message(serverLimit: serverManager.freeServerLimit))
+            }
+            .onChangeCompat(of: isPresented) { presented in
+                if presented {
+                    trackLimitHit()
+                }
             }
             .proUpgradePresentation(isPresented: $showUpgrade, source: limitType.paywallSource)
+    }
+
+    private func trackLimitHit() {
+        let current: Int
+        let limit: Int
+
+        switch limitType {
+        case .servers:
+            current = serverManager.servers.count
+            limit = serverManager.freeServerLimit
+        case .workspaces:
+            current = serverManager.workspaces.count
+            limit = FreeTierLimits.maxWorkspaces
+        case .tabs, .fileTabs:
+            current = FreeTierLimits.maxTabs
+            limit = FreeTierLimits.maxTabs
+        }
+
+        AnalyticsTracker.shared.trackLimitHit(
+            source: limitType.paywallSource.rawValue,
+            generation: serverManager.freePlanGeneration.rawValue,
+            current: current,
+            limit: limit
+        )
     }
 }
 
@@ -259,6 +292,7 @@ struct LockedItemAlert: ViewModifier {
     let itemType: ItemType
     let itemName: String
     @Binding var isPresented: Bool
+    @ObservedObject private var serverManager = ServerManager.shared
     @State private var showUpgrade = false
 
     enum ItemType {
@@ -272,10 +306,13 @@ struct LockedItemAlert: ViewModifier {
             }
         }
 
-        var message: String {
+        func message(serverLimit: Int) -> String {
             switch self {
             case .server:
-                return String(format: String(localized: "This server exceeds your free plan limit of %lld servers. Renew your Pro subscription to access all your servers."), Int64(FreeTierLimits.maxServers))
+                return String(
+                    format: String(localized: "This server exceeds your free plan limit of %@. Renew your Pro subscription to access all your servers."),
+                    FreeTierLimits.serverLimitDescription(serverLimit)
+                )
             case .workspace:
                 return String(format: String(localized: "This workspace exceeds your free plan limit of %lld workspace. Renew your Pro subscription to access all your workspaces."), Int64(FreeTierLimits.maxWorkspaces))
             }
@@ -297,7 +334,7 @@ struct LockedItemAlert: ViewModifier {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text(String(format: String(localized: "\"%@\" %@"), itemName, itemType.message))
+                Text(String(format: String(localized: "\"%@\" %@"), itemName, itemType.message(serverLimit: serverManager.freeServerLimit)))
             }
             .proUpgradePresentation(isPresented: $showUpgrade, source: itemType.paywallSource)
     }
