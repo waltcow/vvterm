@@ -83,8 +83,8 @@ struct ZenModeFloatingOverlay<Panel: View>: View {
                 )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Zen controls")
-        .accessibilityValue(isPanelPresented ? "Expanded" : "Collapsed")
+        .accessibilityLabel(String(localized: "Zen controls"))
+        .accessibilityValue(isPanelPresented ? String(localized: "Expanded") : String(localized: "Collapsed"))
     }
 
     private func closePanel() {
@@ -470,7 +470,7 @@ struct MacOSZenModePanel: View {
 
         ZenModeSection("Window") {
             ZenModeActionButton(
-                title: isSidebarVisible ? "Hide Sidebar" : "Show Sidebar",
+                title: LocalizedStringKey(isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"),
                 systemImage: "sidebar.left"
             ) {
                 onToggleSidebar()

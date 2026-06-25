@@ -29,7 +29,7 @@ struct SplitCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Terminal") {
-            Button(isZenModeEnabled == true ? "Exit Zen Mode" : "Enter Zen Mode") {
+            Button(isZenModeEnabled == true ? String(localized: "Exit Zen Mode") : String(localized: "Enter Zen Mode")) {
                 toggleZenMode?()
             }
             .keyboardShortcut("z", modifiers: [.command, .control])

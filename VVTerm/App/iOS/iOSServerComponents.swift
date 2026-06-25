@@ -431,16 +431,19 @@ struct iOSWorkspacePickerView: View {
 
     private func deleteWarningText(for workspace: Workspace?) -> String {
         guard let workspace else {
-            return "This will delete the workspace and all servers in it. This cannot be undone."
+            return String(localized: "This will delete the workspace and all servers in it. This cannot be undone.")
         }
         let count = serverManager.servers(in: workspace, environment: nil).count
         if count == 0 {
-            return "This will delete the workspace. This cannot be undone."
+            return String(localized: "This will delete the workspace. This cannot be undone.")
         }
         if count == 1 {
-            return "This will delete the workspace and its 1 server. This cannot be undone."
+            return String(localized: "This will delete the workspace and its 1 server. This cannot be undone.")
         }
-        return "This will delete the workspace and all \(count) servers in it. This cannot be undone."
+        return String(
+            format: String(localized: "This will delete the workspace and all %lld servers in it. This cannot be undone."),
+            Int64(count)
+        )
     }
 }
 #endif

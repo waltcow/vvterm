@@ -366,7 +366,7 @@ private struct ReviewModeSheet: View {
                     reviewError = nil
                     reviewCode = ""
                 } else {
-                    reviewError = "Invalid review code."
+                    reviewError = String(localized: "Invalid review code.")
                 }
             }
             .buttonStyle(.borderedProminent)

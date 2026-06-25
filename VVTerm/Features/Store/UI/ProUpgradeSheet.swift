@@ -617,7 +617,7 @@ struct ProUpgradeSheet: View {
         }
     }
 
-    private func legalLink(title: String, url: String) -> some View {
+    private func legalLink(title: LocalizedStringKey, url: String) -> some View {
         Link(destination: URL(string: url)!) {
             Text(title)
                 .underline()

@@ -404,7 +404,7 @@ struct ServerSidebarView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help(serverSearchVisible ? "Hide search" : "Search servers")
+            .help(serverSearchVisible ? String(localized: "Hide search") : String(localized: "Search servers"))
         }
     }
 
