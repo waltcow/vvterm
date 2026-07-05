@@ -1,12 +1,12 @@
 import Foundation
 import zlib
 
-struct DoubaoServerEvent: Equatable {
+nonisolated struct DoubaoServerEvent: Equatable, Sendable {
     let text: String?
     let isFinal: Bool
 }
 
-enum DoubaoStreamingProtocol {
+nonisolated enum DoubaoStreamingProtocol {
     static let version: UInt8 = 0x1
     static let headerSize: UInt8 = 0x1
     static let messageTypeFullClientRequest: UInt8 = 0x1
@@ -51,14 +51,15 @@ enum DoubaoStreamingProtocol {
         sequence: Int32,
         isLast: Bool
     ) throws -> Data {
-        let compressedPayload = try gzipPayload(payload)
+        let compression = payload.isEmpty ? compressionNone : compressionGzip
+        let encodedPayload = payload.isEmpty ? payload : try gzipPayload(payload)
         return makePacket(
             messageType: messageTypeAudioOnlyClientRequest,
             messageFlags: isLast ? flagNegativeAudioPacket : flagPositiveSequence,
             serialization: serializationNone,
-            compression: compressionGzip,
+            compression: compression,
             sequence: isLast ? -abs(sequence) : sequence,
-            payload: compressedPayload
+            payload: encodedPayload
         )
     }
 
