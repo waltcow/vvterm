@@ -38,6 +38,7 @@ final class DoubaoStreamingProtocolTests: XCTestCase {
         XCTAssertEqual(request["enable_punc"] as? Bool, true)
         XCTAssertEqual(request["enable_ddc"] as? Bool, true)
         XCTAssertEqual(request["show_utterances"] as? Bool, true)
+        XCTAssertEqual(request["enable_nonstream"] as? Bool, true)
     }
 
     func testAudioPacketUsesNegativeSequenceForLastPacket() throws {

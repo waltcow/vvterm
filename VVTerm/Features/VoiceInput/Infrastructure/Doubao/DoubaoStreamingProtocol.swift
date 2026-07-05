@@ -330,7 +330,8 @@ nonisolated enum DoubaoStreamingProtocol {
                 "enable_itn": true,
                 "enable_punc": true,
                 "enable_ddc": true,
-                "show_utterances": true
+                "show_utterances": true,
+                "enable_nonstream": true
             ]
         ]
     }
