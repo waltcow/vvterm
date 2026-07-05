@@ -196,6 +196,19 @@ class AudioService: NSObject, ObservableObject {
                 return String(localized: "Doubao ASR connection failed: \(message)")
             }
         }
+
+        var recoverySuggestion: String? {
+            switch self {
+            case .permissionDenied, .speechRecognitionUnavailable, .recordingFailed:
+                return String(localized: "Enable Microphone and Speech Recognition in System Settings.")
+            case .mlxUnavailable,
+                 .missingDoubaoCredentials,
+                 .invalidDoubaoEndpoint,
+                 .doubaoNetworkUnavailable,
+                 .doubaoConnectionFailed:
+                return nil
+            }
+        }
     }
 
     // MARK: - Provider Resolution
