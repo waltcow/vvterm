@@ -378,9 +378,12 @@ struct TerminalTabView: View {
                 }
                 voiceProcessing = false
                 if let recordingError = error as? AudioService.RecordingError {
-                    permissionErrorMessage = recordingError.localizedDescription
-                        + "\n\n"
-                        + String(localized: "Enable Microphone and Speech Recognition in System Settings.")
+                    permissionErrorMessage = [
+                        recordingError.localizedDescription,
+                        recordingError.recoverySuggestion
+                    ]
+                    .compactMap { $0 }
+                    .joined(separator: "\n\n")
                 } else {
                     permissionErrorMessage = error.localizedDescription
                 }

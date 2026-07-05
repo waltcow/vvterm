@@ -12,12 +12,18 @@ struct TranscriptionSettingsView: View {
     @AppStorage(TranscriptionSettingsKeys.mlxWhisperModelId) private var whisperModelId = TranscriptionSettingsDefaults.mlxWhisperModelId
     @AppStorage(TranscriptionSettingsKeys.mlxParakeetModelId) private var parakeetModelId = TranscriptionSettingsDefaults.mlxParakeetModelId
     @AppStorage(TranscriptionSettingsKeys.language) private var language = TranscriptionSettingsDefaults.language
+    @AppStorage(TranscriptionSettingsKeys.doubaoModelId) private var doubaoModelId = TranscriptionSettingsDefaults.doubaoModelId
+    @AppStorage(TranscriptionSettingsKeys.doubaoEndpoint) private var doubaoEndpoint = TranscriptionSettingsDefaults.doubaoEndpoint
+    @AppStorage(TranscriptionSettingsKeys.doubaoAppID) private var doubaoAppID = ""
     @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
 
     @StateObject private var whisperManager: MLXModelManager
     @StateObject private var parakeetManager: MLXModelManager
+    @State private var doubaoAccessToken = ""
+    @State private var doubaoCredentialStatus: String?
 
     private let mlxAvailable = MLXAudioSupport.isSupported
+    private let doubaoCredentialStore = DoubaoASRCredentialStore()
 
     private let languages = [
         ("en", String(localized: "English")),
@@ -52,6 +58,7 @@ struct TranscriptionSettingsView: View {
             Section {
                 Picker("Engine", selection: $provider) {
                     Text("System (Apple)").tag(TranscriptionProvider.system.rawValue)
+                    Text("Doubao ASR").tag(TranscriptionProvider.doubaoASR.rawValue)
                     #if arch(arm64)
                     if mlxAvailable {
                         Text("Whisper (MLX)").tag(TranscriptionProvider.mlxWhisper.rawValue)
@@ -65,7 +72,9 @@ struct TranscriptionSettingsView: View {
                 Text(providerDescription)
             }
 
-            if provider == TranscriptionProvider.system.rawValue || provider == TranscriptionProvider.mlxWhisper.rawValue {
+            if provider == TranscriptionProvider.system.rawValue ||
+                provider == TranscriptionProvider.doubaoASR.rawValue ||
+                provider == TranscriptionProvider.mlxWhisper.rawValue {
                 Section {
                     Picker("Language", selection: $language) {
                         ForEach(languages, id: \.0) { code, name in
@@ -78,11 +87,20 @@ struct TranscriptionSettingsView: View {
                     if language == TranscriptionSettingsDefaults.autoLanguageCode {
                         if provider == TranscriptionProvider.system.rawValue {
                             Text("Auto-detect uses your device language.")
+                        } else if provider == TranscriptionProvider.doubaoASR.rawValue {
+                            Text("Auto-detect lets Doubao ASR infer the spoken language.")
                         } else {
                             Text("Auto-detect identifies the spoken language before transcribing.")
                         }
+                    } else if provider == TranscriptionProvider.doubaoASR.rawValue,
+                              DoubaoASRConfiguration.languageParameter(for: language) == nil {
+                        Text("This language is not sent to Doubao ASR; the request will use automatic language detection.")
                     }
                 }
+            }
+
+            if provider == TranscriptionProvider.doubaoASR.rawValue {
+                doubaoSection
             }
 
             #if arch(arm64)
@@ -118,6 +136,7 @@ struct TranscriptionSettingsView: View {
         .formStyle(.grouped)
         .onAppear {
             migrateLegacySettings()
+            loadDoubaoAccessToken()
             whisperManager.refreshStatus()
             parakeetManager.refreshStatus()
         }
@@ -127,12 +146,61 @@ struct TranscriptionSettingsView: View {
         switch provider {
         case TranscriptionProvider.system.rawValue:
             return String(localized: "Uses Apple's built-in speech recognition. Requires network for best results.")
+        case TranscriptionProvider.doubaoASR.rawValue:
+            return String(localized: "Streams microphone audio to Doubao ASR. Requires a Volcengine App ID and Access Token.")
         case TranscriptionProvider.mlxWhisper.rawValue:
             return String(localized: "OpenAI Whisper runs locally using MLX. Works offline after download.")
         case TranscriptionProvider.mlxParakeet.rawValue:
             return String(localized: "NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription.")
         default:
             return ""
+        }
+    }
+
+    @ViewBuilder
+    private var doubaoSection: some View {
+        Section {
+            Picker("Model", selection: $doubaoModelId) {
+                Text("SeedASR streaming").tag(DoubaoASRConfiguration.modelV2)
+                Text("BigASR streaming").tag(DoubaoASRConfiguration.modelV1)
+            }
+
+            TextField("Endpoint Override", text: $doubaoEndpoint)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                #endif
+
+            TextField("App ID", text: $doubaoAppID)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                #endif
+
+            SecureField("Access Token", text: $doubaoAccessToken)
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                #endif
+
+            HStack {
+                Button("Save Access Token") {
+                    saveDoubaoAccessToken()
+                }
+                Button("Remove Access Token", role: .destructive) {
+                    removeDoubaoAccessToken()
+                }
+            }
+
+            if let doubaoCredentialStatus {
+                Text(doubaoCredentialStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Doubao ASR")
+        } footer: {
+            Text("Leave endpoint empty to use the model default. Custom endpoints must use Volcengine's allowlisted wss://openspeech.bytedance.com streaming URLs. Audio is sent to Doubao ASR only when this provider is selected.")
         }
     }
 
@@ -304,15 +372,7 @@ struct TranscriptionSettingsView: View {
 
     private func migrateLegacySettings() {
         let defaults = UserDefaults.standard
-        if let legacyProvider = defaults.string(forKey: TranscriptionSettingsKeys.provider) {
-            if legacyProvider == "whisper" {
-                defaults.set(TranscriptionProvider.mlxWhisper.rawValue, forKey: TranscriptionSettingsKeys.provider)
-                provider = TranscriptionProvider.mlxWhisper.rawValue
-            } else if legacyProvider == "parakeet" {
-                defaults.set(TranscriptionProvider.mlxParakeet.rawValue, forKey: TranscriptionSettingsKeys.provider)
-                provider = TranscriptionProvider.mlxParakeet.rawValue
-            }
-        }
+        provider = TranscriptionSettingsStore.currentProvider().rawValue
 
         if defaults.string(forKey: TranscriptionSettingsKeys.mlxWhisperModelId) == nil,
            let legacy = defaults.string(forKey: "whisperModelId") {
@@ -330,6 +390,37 @@ struct TranscriptionSettingsView: View {
            provider != TranscriptionProvider.system.rawValue {
             provider = TranscriptionProvider.system.rawValue
             defaults.set(provider, forKey: TranscriptionSettingsKeys.provider)
+        }
+    }
+
+    private func loadDoubaoAccessToken() {
+        do {
+            doubaoAccessToken = try doubaoCredentialStore.accessToken() ?? ""
+        } catch {
+            doubaoAccessToken = ""
+            doubaoCredentialStatus = String(localized: "Failed to read Doubao ASR Access Token.")
+        }
+    }
+
+    private func saveDoubaoAccessToken() {
+        do {
+            try doubaoCredentialStore.saveAccessToken(doubaoAccessToken)
+            doubaoCredentialStatus = doubaoAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? String(localized: "Doubao ASR Access Token removed.")
+                : String(localized: "Doubao ASR Access Token saved.")
+            loadDoubaoAccessToken()
+        } catch {
+            doubaoCredentialStatus = String(localized: "Failed to save Doubao ASR Access Token.")
+        }
+    }
+
+    private func removeDoubaoAccessToken() {
+        do {
+            try doubaoCredentialStore.deleteAccessToken()
+            doubaoAccessToken = ""
+            doubaoCredentialStatus = String(localized: "Doubao ASR Access Token removed.")
+        } catch {
+            doubaoCredentialStatus = String(localized: "Failed to remove Doubao ASR Access Token.")
         }
     }
 }
