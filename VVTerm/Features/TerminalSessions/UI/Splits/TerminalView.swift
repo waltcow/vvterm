@@ -117,6 +117,11 @@ struct TerminalTabView: View {
         } message: {
             Text(permissionErrorMessage)
         }
+        .onChange(of: audioService.runtimeRecordingError) { error in
+            guard let error else { return }
+            permissionErrorMessage = AudioService.formattedRecordingErrorMessage(error)
+            showingPermissionError = true
+        }
         .splitPaneProFeatureAlert(isPresented: $showingSplitPaneUpgradeAlert)
         .onAppear {
             updateKeyMonitor()
@@ -378,12 +383,7 @@ struct TerminalTabView: View {
                 }
                 voiceProcessing = false
                 if let recordingError = error as? AudioService.RecordingError {
-                    permissionErrorMessage = [
-                        recordingError.localizedDescription,
-                        recordingError.recoverySuggestion
-                    ]
-                    .compactMap { $0 }
-                    .joined(separator: "\n\n")
+                    permissionErrorMessage = AudioService.formattedRecordingErrorMessage(recordingError)
                 } else {
                     permissionErrorMessage = error.localizedDescription
                 }

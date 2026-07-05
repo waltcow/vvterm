@@ -7,9 +7,13 @@ final class DoubaoASRProviderTests: XCTestCase {
         let provider = DoubaoASRProvider(webSocketFactory: FakeDoubaoWebSocketFactory(client: client))
         let updates = DoubaoUpdateRecorder()
 
-        try await provider.start(configuration: configuration) { event in
-            await updates.append(event)
-        }
+        try await provider.start(
+            configuration: configuration,
+            onServerEvent: { event in
+                await updates.append(event)
+            },
+            onRuntimeFailure: { _ in }
+        )
 
         let sent = await client.sentPackets()
         XCTAssertEqual(sent.count, 1)
@@ -30,7 +34,11 @@ final class DoubaoASRProviderTests: XCTestCase {
         let client = FakeDoubaoWebSocketClient()
         let provider = DoubaoASRProvider(webSocketFactory: FakeDoubaoWebSocketFactory(client: client))
 
-        try await provider.start(configuration: configuration) { _ in }
+        try await provider.start(
+            configuration: configuration,
+            onServerEvent: { _ in },
+            onRuntimeFailure: { _ in }
+        )
         try await provider.appendPCMData(Data(repeating: 1, count: 6_399))
         let initialSentCount = await client.sentPackets().count
         XCTAssertEqual(initialSentCount, 1)
@@ -49,7 +57,11 @@ final class DoubaoASRProviderTests: XCTestCase {
         let client = FakeDoubaoWebSocketClient()
         let provider = DoubaoASRProvider(webSocketFactory: FakeDoubaoWebSocketFactory(client: client))
 
-        try await provider.start(configuration: configuration) { _ in }
+        try await provider.start(
+            configuration: configuration,
+            onServerEvent: { _ in },
+            onRuntimeFailure: { _ in }
+        )
         try await provider.appendPCMData(Data(repeating: 1, count: 128))
 
         let finishTask = Task {

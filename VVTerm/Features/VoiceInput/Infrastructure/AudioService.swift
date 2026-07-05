@@ -12,6 +12,7 @@ class AudioService: NSObject, ObservableObject {
     @Published var audioLevel: Float = 0.0
     @Published var recordingDuration: TimeInterval = 0
     @Published var permissionStatus: AudioPermissionManager.PermissionStatus = .notDetermined
+    @Published private(set) var runtimeRecordingError: RecordingError?
 
     // Services
     private let permissionManager = AudioPermissionManager()
@@ -76,6 +77,7 @@ class AudioService: NSObject, ObservableObject {
         }
 
         // Reset state
+        runtimeRecordingError = nil
         speechRecognitionService.resetTranscriptions()
         audioCaptureService.cancel()
 
@@ -92,6 +94,7 @@ class AudioService: NSObject, ObservableObject {
 
     func stopRecording() async -> String {
         isRecording = false
+        audioCaptureService.bufferHandler = nil
 
         _ = audioCaptureService.stop()
 
@@ -118,6 +121,8 @@ class AudioService: NSObject, ObservableObject {
 
     func cancelRecording() {
         isRecording = false
+        runtimeRecordingError = nil
+        audioCaptureService.bufferHandler = nil
 
         audioCaptureService.cancel()
         speechRecognitionService.cancelRecognition()
@@ -131,7 +136,7 @@ class AudioService: NSObject, ObservableObject {
 
     // MARK: - Errors
 
-    enum RecordingError: LocalizedError {
+    enum RecordingError: LocalizedError, Equatable {
         case permissionDenied
         case speechRecognitionUnavailable
         case recordingFailed
@@ -139,6 +144,8 @@ class AudioService: NSObject, ObservableObject {
         case invalidDoubaoEndpoint
         case doubaoNetworkUnavailable
         case doubaoConnectionFailed(String)
+        case doubaoConnectionLost
+        case doubaoServerError(String)
 
         var errorDescription: String? {
             switch self {
@@ -156,6 +163,10 @@ class AudioService: NSObject, ObservableObject {
                 return String(localized: "Doubao ASR requires a network connection.")
             case .doubaoConnectionFailed(let message):
                 return String(localized: "Doubao ASR connection failed: \(message)")
+            case .doubaoConnectionLost:
+                return String(localized: "Doubao ASR connection was lost during recording.")
+            case .doubaoServerError(let message):
+                return String(localized: "Doubao ASR server error: \(message)")
             }
         }
 
@@ -163,10 +174,14 @@ class AudioService: NSObject, ObservableObject {
             switch self {
             case .permissionDenied, .speechRecognitionUnavailable, .recordingFailed:
                 return String(localized: "Enable Microphone and Speech Recognition in System Settings.")
-            case .missingDoubaoCredentials,
-                 .invalidDoubaoEndpoint,
-                 .doubaoNetworkUnavailable,
-                 .doubaoConnectionFailed:
+            case .missingDoubaoCredentials:
+                return String(localized: "Open Transcription settings and enter your Doubao ASR App ID and Access Token.")
+            case .invalidDoubaoEndpoint:
+                return String(localized: "Use a wss://openspeech.bytedance.com endpoint or leave the endpoint field empty.")
+            case .doubaoNetworkUnavailable,
+                 .doubaoConnectionFailed,
+                 .doubaoConnectionLost,
+                 .doubaoServerError:
                 return nil
             }
         }
@@ -229,9 +244,15 @@ class AudioService: NSObject, ObservableObject {
         }
 
         do {
-            try await doubaoProvider.start(configuration: configuration) { [weak self] event in
-                await self?.handleDoubaoServerEvent(event)
-            }
+            try await doubaoProvider.start(
+                configuration: configuration,
+                onServerEvent: { [weak self] event in
+                    await self?.handleDoubaoServerEvent(event)
+                },
+                onRuntimeFailure: { [weak self] error in
+                    await self?.handleDoubaoRuntimeFailure(error)
+                }
+            )
             try audioCaptureService.start()
         } catch let error as RecordingError {
             audioCaptureService.bufferHandler = nil
@@ -297,6 +318,34 @@ class AudioService: NSObject, ObservableObject {
         } else {
             partialTranscription = text
         }
+    }
+
+    private func handleDoubaoRuntimeFailure(_ error: Error) async {
+        guard isRecording, activeProvider == .doubaoASR else { return }
+
+        isRecording = false
+        audioCaptureService.bufferHandler = nil
+        audioCaptureService.cancel()
+        await doubaoProvider.cancel()
+        runtimeRecordingError = mapDoubaoRuntimeFailure(error)
+    }
+
+    private func mapDoubaoRuntimeFailure(_ error: Error) -> RecordingError {
+        if let recordingError = error as? RecordingError {
+            return recordingError
+        }
+
+        let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if message.isEmpty {
+            return .doubaoConnectionLost
+        }
+        return .doubaoServerError(message)
+    }
+
+    static func formattedRecordingErrorMessage(_ error: RecordingError) -> String {
+        [error.localizedDescription, error.recoverySuggestion]
+            .compactMap { $0 }
+            .joined(separator: "\n\n")
     }
 
     private static func int16PCMData(from buffer: AVAudioPCMBuffer) -> Data? {

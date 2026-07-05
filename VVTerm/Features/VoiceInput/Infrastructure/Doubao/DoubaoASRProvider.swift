@@ -89,6 +89,7 @@ actor DoubaoASRProvider {
     private var pendingPCMData = Data()
     private var nextAudioSequence: Int32 = 2
     private var onServerEvent: (@Sendable (DoubaoServerEvent) async -> Void)?
+    private var onRuntimeFailure: (@Sendable (Error) async -> Void)?
 
     init(webSocketFactory: any DoubaoASRWebSocketFactory = URLSessionDoubaoASRWebSocketFactory()) {
         self.webSocketFactory = webSocketFactory
@@ -96,7 +97,8 @@ actor DoubaoASRProvider {
 
     func start(
         configuration: DoubaoASRProviderConfiguration,
-        onServerEvent: @escaping @Sendable (DoubaoServerEvent) async -> Void
+        onServerEvent: @escaping @Sendable (DoubaoServerEvent) async -> Void,
+        onRuntimeFailure: @escaping @Sendable (Error) async -> Void
     ) async throws {
         await cancel()
 
@@ -110,6 +112,7 @@ actor DoubaoASRProvider {
         self.pendingPCMData.removeAll(keepingCapacity: true)
         self.nextAudioSequence = 2
         self.onServerEvent = onServerEvent
+        self.onRuntimeFailure = onRuntimeFailure
         self.receiveTask = Task { [weak self] in
             await self?.receiveLoop()
         }
@@ -160,6 +163,7 @@ actor DoubaoASRProvider {
         pendingPCMData.removeAll(keepingCapacity: false)
         nextAudioSequence = 2
         onServerEvent = nil
+        onRuntimeFailure = nil
     }
 
     private func flushBufferedAudio(includeTrailingPartial: Bool) async throws {
@@ -198,9 +202,16 @@ actor DoubaoASRProvider {
             } catch is CancellationError {
                 return
             } catch {
-                await responseState?.markCompletedWithError(error)
+                await handleReceiveFailure(error)
                 return
             }
+        }
+    }
+
+    private func handleReceiveFailure(_ error: Error) async {
+        await responseState?.markCompletedWithError(error)
+        if let onRuntimeFailure {
+            await onRuntimeFailure(error)
         }
     }
 
