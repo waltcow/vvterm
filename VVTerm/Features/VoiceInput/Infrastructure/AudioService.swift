@@ -87,6 +87,8 @@ class AudioService: NSObject, ObservableObject {
         switch effectiveProvider {
         case .system:
             try await startAppleSpeech()
+        case .doubaoASR:
+            throw RecordingError.recordingFailed
         case .mlxWhisper, .mlxParakeet:
             try startMLXCapture()
         }
@@ -104,6 +106,8 @@ class AudioService: NSObject, ObservableObject {
             let finalText = await speechRecognitionService.stopRecognition()
             speechRecognitionService.resetTranscriptions()
             return finalText
+        case .doubaoASR:
+            return ""
         case .mlxWhisper:
             do {
                 let text = try await mlxWhisperProvider.transcribe(samples: samples)
@@ -171,6 +175,8 @@ class AudioService: NSObject, ObservableObject {
         switch requested {
         case .system:
             return .system
+        case .doubaoASR:
+            return .doubaoASR
         case .mlxWhisper:
             guard MLXWhisperProvider.isSupported else { return .system }
             let modelId = TranscriptionSettingsStore.currentWhisperModelId()
