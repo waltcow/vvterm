@@ -12,7 +12,6 @@
 		8E5D7C9695EF4C72AD9AB276 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A089872E7F6345088D2FA637 /* AppIntents.framework */; };
 		D1A7B0C12EAB100100A00001 /* MoshCore in Frameworks */ = {isa = PBXBuildFile; productRef = D1A7B0C12EAB100100A00011 /* MoshCore */; };
 		D1A7B0C12EAB100100A00002 /* MoshBootstrap in Frameworks */ = {isa = PBXBuildFile; productRef = D1A7B0C12EAB100100A00012 /* MoshBootstrap */; };
-		D2C4F00131AA100100B00001 /* Cloudflared in Frameworks */ = {isa = PBXBuildFile; productRef = D2C4F00131AA100100B00011 /* Cloudflared */; };
 		E7C4A10031BB100100C00001 /* Umami in Frameworks */ = {isa = PBXBuildFile; productRef = E7C4A10031BB100100C00011 /* Umami */; };
 /* End PBXBuildFile section */
 
@@ -128,7 +127,6 @@
 			files = (
 				8E5D7C9695EF4C72AD9AB276 /* AppIntents.framework in Frameworks */,
 				82B734D4923B7DD325984127 /* ZIPFoundation in Frameworks */,
-				D2C4F00131AA100100B00001 /* Cloudflared in Frameworks */,
 				D1A7B0C12EAB100100A00001 /* MoshCore in Frameworks */,
 				D1A7B0C12EAB100100A00002 /* MoshBootstrap in Frameworks */,
 				E7C4A10031BB100100C00001 /* Umami in Frameworks */,
@@ -230,7 +228,6 @@
 			name = VVTerm;
 			packageProductDependencies = (
 				1853ABB6CF8195DF93B55895 /* ZIPFoundation */,
-				D2C4F00131AA100100B00011 /* Cloudflared */,
 				D1A7B0C12EAB100100A00011 /* MoshCore */,
 				D1A7B0C12EAB100100A00012 /* MoshBootstrap */,
 				E7C4A10031BB100100C00011 /* Umami */,
@@ -335,7 +332,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				8BEE7D9B1BB9C3D15D55C283 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
-				D2C4F00131AA100100B00021 /* XCRemoteSwiftPackageReference "swift-cloudflared" */,
 				D1A7B0C12EAB100100A00021 /* XCRemoteSwiftPackageReference "swift-mosh" */,
 				E7C4A10031BB100100C00021 /* XCRemoteSwiftPackageReference "swift-umami" */,
 			);
@@ -1075,14 +1071,6 @@
 				version = 0.1.6;
 			};
 		};
-		D2C4F00131AA100100B00021 /* XCRemoteSwiftPackageReference "swift-cloudflared" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/wiedymi/swift-cloudflared.git";
-			requirement = {
-				kind = exactVersion;
-				version = 0.1.2;
-			};
-		};
 		E7C4A10031BB100100C00021 /* XCRemoteSwiftPackageReference "swift-umami" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/wiedymi/swift-umami";
@@ -1108,11 +1096,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D1A7B0C12EAB100100A00021 /* XCRemoteSwiftPackageReference "swift-mosh" */;
 			productName = MoshBootstrap;
-		};
-		D2C4F00131AA100100B00011 /* Cloudflared */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D2C4F00131AA100100B00021 /* XCRemoteSwiftPackageReference "swift-cloudflared" */;
-			productName = Cloudflared;
 		};
 		E7C4A10031BB100100C00011 /* Umami */ = {
 			isa = XCSwiftPackageProductDependency;

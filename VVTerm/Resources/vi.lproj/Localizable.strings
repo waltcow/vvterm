@@ -722,28 +722,6 @@
 "root" = "root";
 "Required" = "Bắt buộc";
 "Optional" = "Tùy chọn";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "Sử dụng chính sách Tailscale SSH phía máy chủ. Không cần mật khẩu hoặc khóa SSH.";
-"Tailscale SSH authentication was not accepted by the server." = "Máy chủ không chấp nhận xác thực Tailscale SSH.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "Hiện tại ứng dụng này chỉ hỗ trợ kết nối tailnet trực tiếp (không có phương án dự phòng userspace proxy).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "Đăng nhập OAuth sẽ mở trong trình duyệt. Giá trị miền nhóm/ứng dụng được tự động phát hiện từ máy chủ.";
-"Team Domain Override" = "Ghi đè miền nhóm";
-"Set Team Domain Override" = "Đặt ghi đè miền nhóm";
-"App Domain Override" = "Ghi đè miền ứng dụng";
-"Hide Overrides" = "Ẩn ghi đè";
-"Set Team/App Domain Override" = "Đặt ghi đè miền nhóm/ứng dụng";
-"Service Token Client ID" = "ID máy khách mã thông báo dịch vụ";
-"Service Token Client Secret" = "Bí mật máy khách mã thông báo dịch vụ";
-"Cloudflare configuration error: %@" = "Lỗi cấu hình Cloudflare: %@";
-"Cloudflare authentication failed: %@" = "Xác thực Cloudflare thất bại: %@";
-"Cloudflare tunnel failed: %@" = "Đường hầm Cloudflare thất bại: %@";
-"Cloudflare transport requires a valid hostname." = "Transport Cloudflare yêu cầu tên máy chủ hợp lệ.";
-"Cloudflare service token client ID is required." = "Cần ID máy khách mã thông báo dịch vụ Cloudflare.";
-"Cloudflare service token client secret is required." = "Cần bí mật máy khách mã thông báo dịch vụ Cloudflare.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Cung cấp cả ghi đè miền nhóm và miền ứng dụng cho Cloudflare OAuth.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Không thể phát hiện siêu dữ liệu Cloudflare. Thêm ghi đè miền nhóm và miền ứng dụng trong cài đặt máy chủ.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "Chọn phiên tmux";
@@ -1077,7 +1055,6 @@
 "Clear" = "Xóa";
 "Clear Filters" = "Xóa bộ lọc";
 "Close Preview" = "Đóng bản xem trước";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Đường hầm Cloudflare được kết nối, nhưng quá trình bắt tay SSH đã bị mục tiêu ngược dòng đóng lại. Xác minh chính sách truy cập và phạm vi mã thông báo dịch vụ.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M luôn hoạt động, ngay cả khi nút bị ẩn.";
 "Collapsed" = "Đã thu gọn";
 "Compare plans" = "So sánh các kế hoạch";
@@ -1090,7 +1067,6 @@
 "Copy Names" = "Sao chép tên";
 "Copy Path" = "Sao chép đường dẫn";
 "Copy Paths" = "Sao chép đường dẫn";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Không thể tự động khám phá Tên miền nhóm Cloudflare (\\(describeFailure(error))). Thêm ghi đè miền nhóm (ví dụ: team.cloudflareaccess.com).";
 "Create Workspace" = "Tạo không gian làm việc";
 "Create a folder in the current remote directory." = "Tạo một thư mục trong thư mục từ xa hiện tại.";
 "Create a workspace before adding servers" = "Tạo không gian làm việc trước khi thêm máy chủ";
@@ -1238,7 +1214,6 @@
 "No valid files or folders were dropped." = "Không có tập tin hoặc thư mục hợp lệ nào bị loại bỏ.";
 "No valid remote items were dropped." = "Không có mục từ xa hợp lệ nào bị loại bỏ.";
 "No workspaces available." = "Không có không gian làm việc có sẵn.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "Một giao dịch mua Pro hoạt động trên iPhone, iPad và Mac có cùng ID Apple.";
 "One-time purchase" = "Mua một lần";
 "One-time purchase. No subscription renewal." = "Mua một lần. Không gia hạn đăng ký.";
@@ -1321,7 +1296,6 @@
 "Server stats" = "Thống kê máy chủ";
 "Server stats included on Free" = "Số liệu thống kê máy chủ được bao gồm trong Miễn phí";
 "Server stats included on Pro" = "Số liệu thống kê máy chủ được bao gồm trên Pro";
-"Service Token" = "Mã thông báo dịch vụ";
 "Share" = "Chia sẻ";
 "Share sheet ready." = "Bảng chia sẻ đã sẵn sàng.";
 "Share…" = "Chia sẻ…";
@@ -1346,7 +1320,6 @@
 "Symlink" = "Liên kết tượng trưng";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "Đồng bộ hóa máy chủ, không gian làm việc, chủ đề và cài đặt phụ kiện bàn phím trên tất cả các thiết bị Apple của bạn.";
 "Tab \\(number)" = "Tab \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "Điều khoản";
 "Terms of Use (EULA)" = "Điều khoản sử dụng (EULA)";
 "Text Document" = "Tài liệu văn bản";

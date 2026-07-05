@@ -60,10 +60,6 @@ extension Server {
 
         let connectionModeRaw = record["connectionMode"] as? String
         let connectionMode = connectionModeRaw.flatMap(SSHConnectionMode.init(rawValue:)) ?? .standard
-        let cloudflareAccessModeRaw = record["cloudflareAccessMode"] as? String
-        let cloudflareAccessMode = cloudflareAccessModeRaw.flatMap(CloudflareAccessMode.init(rawValue:))
-        let cloudflareTeamDomainOverride = record["cloudflareTeamDomainOverride"] as? String
-        let cloudflareAppDomainOverride = record["cloudflareAppDomainOverride"] as? String
 
         logger.info("Successfully decoded server: \(name) (id: \(id), workspaceId: \(workspaceId))")
 
@@ -75,9 +71,6 @@ extension Server {
         self.username = username
         self.connectionMode = connectionMode
         self.authMethod = authMethod
-        self.cloudflareAccessMode = cloudflareAccessMode
-        self.cloudflareTeamDomainOverride = cloudflareTeamDomainOverride
-        self.cloudflareAppDomainOverride = cloudflareAppDomainOverride
         self.tags = record["tags"] as? [String] ?? []
         self.notes = record["notes"] as? String
         self.lastConnected = record["lastConnected"] as? Date
@@ -116,21 +109,6 @@ extension Server {
             record["connectionMode"] = nil
         }
         record["authMethod"] = authMethod.rawValue
-        if let cloudflareAccessMode {
-            record["cloudflareAccessMode"] = cloudflareAccessMode.rawValue
-        } else {
-            record["cloudflareAccessMode"] = nil
-        }
-        if let cloudflareTeamDomainOverride, !cloudflareTeamDomainOverride.isEmpty {
-            record["cloudflareTeamDomainOverride"] = cloudflareTeamDomainOverride
-        } else {
-            record["cloudflareTeamDomainOverride"] = nil
-        }
-        if let cloudflareAppDomainOverride, !cloudflareAppDomainOverride.isEmpty {
-            record["cloudflareAppDomainOverride"] = cloudflareAppDomainOverride
-        } else {
-            record["cloudflareAppDomainOverride"] = nil
-        }
         // CloudKit rejects empty arrays for new fields - only set if non-empty
         if !tags.isEmpty {
             record["tags"] = tags

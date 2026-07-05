@@ -6,9 +6,8 @@
     "eyebrow": "Built for everyday remote work",
     "eyebrowSequence": [
       "Built for everyday remote work",
-      "SSH, Mosh, and Tailscale",
+      "SSH and Mosh",
       "Built-in SFTP remote files",
-      "Cloudflare Tunnel SSH included",
       "Built on Ghostty terminal emulation",
       "iCloud-synced server metadata",
       "Keychain-secured credentials",
@@ -29,7 +28,7 @@
     },
     "modern": {
       "title": "Modern SSH included",
-      "desc": "Use standard SSH, Mosh, Tailscale SSH, or Cloudflare Tunnel SSH without juggling separate tools."
+      "desc": "Use standard SSH or Mosh without juggling separate tools."
     },
     "sync": {
       "title": "iCloud sync without pain",
@@ -49,7 +48,7 @@
     },
     "connect": {
       "title": "Connect your way",
-      "desc": "Standard SSH when you want it, modern transports when you need them, with less setup friction."
+      "desc": "Standard SSH when you want it, Mosh when you need a more resilient session, with less setup friction."
     },
     "files": {
       "title": "Built-in SFTP file browser",
@@ -100,7 +99,7 @@
         "1 workspace",
         "1 server",
         "1 connection tab",
-        "SSH, Mosh, Tailscale SSH, and Cloudflare Tunnel SSH",
+        "SSH and Mosh",
         "Ghostty-powered terminal rendering",
         "iCloud sync",
         "Voice-to-command",
@@ -158,7 +157,7 @@
     },
     "q3": {
       "question": "Which connection methods are supported?",
-      "answer": "VVTerm supports standard SSH plus Mosh, Tailscale SSH, and Cloudflare Tunnel SSH. Credentials stay secured in Apple Keychain when required."
+      "answer": "VVTerm supports standard SSH and Mosh. Credentials stay secured in Apple Keychain when required."
     },
     "q4": {
       "question": "Does VVTerm work on iPad?",

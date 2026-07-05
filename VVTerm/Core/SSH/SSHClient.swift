@@ -65,7 +65,6 @@ actor SSHClient {
     private var resolvedRemoteEnvironment: RemoteEnvironment?
     private var resolvedRemoteTerminalType: RemoteTerminalType?
     private var moshShells: [UUID: MoshShellRuntime] = [:]
-    private let cloudflareTransportManager = CloudflareTransportManager()
     private let moshStartupTimeout: Duration = .seconds(8)
     private let connectTimeout: Duration = .seconds(30)
     private let disconnectTimeout: Duration = .seconds(4)
@@ -96,7 +95,7 @@ actor SSHClient {
         _isAborted = false
         try Task.checkCancellation()
 
-        let key = "\(server.host):\(server.port):\(server.username):\(server.connectionMode):\(server.authMethod):\(server.cloudflareAccessMode?.rawValue ?? "none"):\(server.cloudflareTeamDomainOverride ?? "")"
+        let key = "\(server.host):\(server.port):\(server.username):\(server.connectionMode):\(server.authMethod)"
 
         if let session = session, await session.isConnected, connectionKey == key {
             connectedServer = server
@@ -116,23 +115,11 @@ actor SSHClient {
         logger.info("Connecting to \(server.host):\(server.port) [mode: \(server.connectionMode.rawValue)]")
         logger.info("Auth method: \(String(describing: server.authMethod)), password present: \(credentials.password != nil)")
 
-        var dialHost = server.host
-        var dialPort = server.port
-
-        if server.connectionMode == .cloudflare {
-            let localPort = try await cloudflareTransportManager.connect(server: server, credentials: credentials)
-            dialHost = "127.0.0.1"
-            dialPort = Int(localPort)
-            logger.info("Using Cloudflare local tunnel endpoint \(dialHost):\(dialPort)")
-        } else {
-            await disconnectCloudflareTransport(reason: "pre-connect cleanup")
-        }
-
         let config = SSHSessionConfig(
             host: server.host,
             port: server.port,
-            dialHost: dialHost,
-            dialPort: dialPort,
+            dialHost: server.host,
+            dialPort: server.port,
             hostKeyHost: server.host,
             hostKeyPort: server.port,
             username: server.username,
@@ -173,7 +160,6 @@ actor SSHClient {
                 self.session = nil
                 self._sessionForAbort = nil
                 self.connectedServer = nil
-                await disconnectCloudflareTransport(reason: "connect cancellation")
                 throw CancellationError()
             }
             self.session = session
@@ -194,16 +180,6 @@ actor SSHClient {
             self.connectedServer = nil
             self.resolvedRemoteEnvironment = nil
             self.resolvedRemoteTerminalType = nil
-            await disconnectCloudflareTransport(reason: "connect failure")
-            if server.connectionMode == .cloudflare,
-               case SSHError.connectionFailed(let message) = error,
-               message.contains("SSH handshake failed: -13") {
-                throw SSHError.cloudflareTunnelFailed(
-                    String(
-                        localized: "Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope."
-                    )
-                )
-            }
             throw error
         }
     }
@@ -233,7 +209,6 @@ actor SSHClient {
         resolvedRemoteTerminalType = nil
         activeSession?.abort()
         await disconnectSSHSession(activeSession)
-        await disconnectCloudflareTransport(reason: "client disconnect")
 
         logger.info("Disconnected")
     }
@@ -567,16 +542,6 @@ actor SSHClient {
         } catch {
             logger.warning("Timed out while disconnecting SSH session; aborting socket")
             activeSession.abort()
-        }
-    }
-
-    private func disconnectCloudflareTransport(reason: String) async {
-        do {
-            try await SSHClient.runWithTimeout(disconnectTimeout) { [cloudflareTransportManager] in
-                await cloudflareTransportManager.disconnect()
-            }
-        } catch {
-            logger.warning("Timed out while disconnecting Cloudflare transport (\(reason, privacy: .public))")
         }
     }
 
@@ -1067,15 +1032,6 @@ actor SSHSession {
             logger.info("Server auth methods [mode: \(self.config.connectionMode.rawValue)]: \(methods)")
         } else {
             logger.warning("Could not get auth methods list")
-        }
-
-        if config.connectionMode == .tailscale {
-            if libssh2_userauth_authenticated(session) != 0 {
-                logger.info("Tailscale SSH authentication accepted by server policy")
-                return
-            }
-            logger.error("Tailscale SSH auth not accepted by server")
-            throw SSHError.tailscaleAuthenticationNotAccepted
         }
 
         // If authList is nil, check if already authenticated
@@ -2815,10 +2771,6 @@ enum SSHError: LocalizedError {
     case notConnected
     case connectionFailed(String)
     case authenticationFailed
-    case tailscaleAuthenticationNotAccepted
-    case cloudflareConfigurationRequired(String)
-    case cloudflareAuthenticationFailed(String)
-    case cloudflareTunnelFailed(String)
     case moshServerMissing
     case moshBootstrapFailed(String)
     case moshSessionFailed(String)
@@ -2834,14 +2786,6 @@ enum SSHError: LocalizedError {
         case .notConnected: return "Not connected to server"
         case .connectionFailed(let msg): return "Connection failed: \(msg)"
         case .authenticationFailed: return "Authentication failed"
-        case .tailscaleAuthenticationNotAccepted:
-            return "\(String(localized: "Tailscale SSH authentication was not accepted by the server.")) \(String(localized: "This app currently supports direct tailnet connections only (no userspace proxy fallback)."))"
-        case .cloudflareConfigurationRequired(let message):
-            return String(format: String(localized: "Cloudflare configuration error: %@"), message)
-        case .cloudflareAuthenticationFailed(let message):
-            return String(format: String(localized: "Cloudflare authentication failed: %@"), message)
-        case .cloudflareTunnelFailed(let message):
-            return String(format: String(localized: "Cloudflare tunnel failed: %@"), message)
         case .moshServerMissing:
             return String(localized: "mosh-server is not installed on the remote host")
         case .moshBootstrapFailed(let msg):

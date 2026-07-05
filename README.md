@@ -30,7 +30,7 @@ VVTerm is a cross-platform SSH terminal app for Apple platforms. The current cod
 
 - GPU-accelerated terminal rendering via `GhosttyKit`
 - SSH authentication with password, SSH key, and SSH key + passphrase
-- Connection modes for standard SSH, Tailscale, Mosh, and Cloudflare Access
+- Connection modes for standard SSH and Mosh
 - Multi-session connection management with tabs, split panes, reconnect handling, and persisted session state
 - tmux-aware startup, attach, install, and recovery flows
 - Rich paste and clipboard helpers for terminal input
@@ -53,7 +53,7 @@ VVTerm is a cross-platform SSH terminal app for Apple platforms. The current cod
 
 ### Security and sync
 
-- Keychain-backed storage for SSH credentials and Cloudflare service tokens
+- Keychain-backed storage for SSH credentials
 - CloudKit sync for servers, workspaces, terminal theme preferences, and terminal accessory profile data
 - Full-app lock and per-server biometric unlock
 - Privacy-mode support
@@ -169,7 +169,6 @@ Native/vendor dependencies:
 
 Swift package dependencies currently resolved by the Xcode project:
 
-- [Cloudflared](https://github.com/wiedymi/swift-cloudflared)
 - [swift-mosh](https://github.com/wiedymi/swift-mosh)
 - [mlx-swift](https://github.com/ml-explore/mlx-swift)
 - [ZIPFoundation](https://github.com/weichsel/ZIPFoundation)

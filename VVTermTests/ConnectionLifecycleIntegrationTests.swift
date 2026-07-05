@@ -9,7 +9,7 @@ struct ConnectionLifecycleIntegrationTests {
         id: UUID = UUID(),
         workspaceId: UUID = UUID(),
         name: String = "Test",
-        connectionMode: SSHConnectionMode = .cloudflare
+        connectionMode: SSHConnectionMode = .standard
     ) -> Server {
         Server(
             id: id,
@@ -27,9 +27,7 @@ struct ConnectionLifecycleIntegrationTests {
             password: nil,
             privateKey: nil,
             publicKey: nil,
-            passphrase: nil,
-            cloudflareClientID: nil,
-            cloudflareClientSecret: nil
+            passphrase: nil
         )
     }
 
