@@ -1,6 +1,6 @@
 import Foundation
 
-enum DoubaoASRConfigurationError: LocalizedError, Equatable {
+nonisolated enum DoubaoASRConfigurationError: LocalizedError, Equatable {
     case invalidEndpoint
 
     var errorDescription: String? {
@@ -11,7 +11,7 @@ enum DoubaoASRConfigurationError: LocalizedError, Equatable {
     }
 }
 
-enum DoubaoASRConfiguration {
+nonisolated enum DoubaoASRConfiguration {
     static let modelV2 = "volc.seedasr.sauc.duration"
     static let modelV1 = "volc.bigasr.sauc.duration"
     static let defaultStreamingEndpointV2 = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
