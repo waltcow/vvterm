@@ -372,8 +372,6 @@
 /* Transcription */
 "Engine" = "Bộ máy";
 "System (Apple)" = "Hệ thống (Apple)";
-"Whisper (MLX)" = "Whisper (MLX)";
-"Parakeet (MLX)" = "Parakeet (MLX)";
 "Provider" = "Nhà cung cấp";
 "Language" = "Ngôn ngữ";
 "Model" = "Mô hình";
@@ -385,10 +383,7 @@
 "Failed" = "Thất bại";
 "Storage" = "Lưu trữ";
 "Model Storage" = "Lưu trữ mô hình";
-"Total MLX Models" = "Tổng mô hình MLX";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "Dùng nhận dạng giọng nói tích hợp của Apple. Cần mạng để có kết quả tốt nhất.";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI Whisper chạy cục bộ bằng MLX. Hoạt động ngoại tuyến sau khi tải xuống.";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA Parakeet chạy cục bộ bằng MLX. Tối ưu cho phiên âm thời gian thực.";
 "English" = "Tiếng Anh";
 "Spanish" = "Tiếng Tây Ban Nha";
 "French" = "Tiếng Pháp";
@@ -400,7 +395,6 @@
 "Russian" = "Tiếng Nga";
 "Auto-detect" = "Tự động phát hiện";
 
-/* MLX Models */
 "Tiny" = "Rất nhỏ";
 "Fastest, smallest" = "Nhanh nhất, nhỏ nhất";
 "Full precision" = "Độ chính xác đầy đủ";
@@ -419,9 +413,7 @@
 "Large v3 4-bit" = "Lớn v3 4-bit";
 "Smaller download" = "Tải xuống nhỏ hơn";
 "4-bit quantized" = "Lượng tử 4-bit";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "Mô hình lớn, độ chính xác cao";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "Wi‑Fi";
@@ -571,7 +563,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "Cần quyền dùng micro. Quyền sẽ được yêu cầu tự động khi bắt đầu ghi.";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "Nhận dạng giọng nói không khả dụng. Vui lòng bật Siri trong System Settings > Siri & Spotlight.";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "Không thể bắt đầu ghi. Vui lòng kiểm tra quyền micro trong System Settings > Privacy & Security > Microphone.";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "Phiên âm MLX không khả dụng trên Mac này. Chuyển sang Apple Speech.";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "Nâng cấp Pro để dùng máy chủ không giới hạn";
@@ -610,8 +601,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "Hệ thống (Apple Speech)";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Model Errors */
 "Failed to remove model" = "Không thể xóa mô hình";
@@ -1264,7 +1253,6 @@
 "Organize servers with your own environments." = "Tổ chức các máy chủ với môi trường của riêng bạn.";
 "Other" = "Khác";
 "Owner" = "chủ sở hữu";
-"Parakeet supports English only." = "Parakeet chỉ hỗ trợ tiếng Anh.";
 "Parent" = "cha mẹ";
 "Path copied to clipboard." = "Đã sao chép đường dẫn vào bảng nhớ tạm.";
 "Pay once and keep Pro access forever." = "Thanh toán một lần và giữ quyền truy cập Pro mãi mãi.";

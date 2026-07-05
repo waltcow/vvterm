@@ -336,8 +336,6 @@
 /* Transcription */
 "Engine" = "Engine";
 "System (Apple)" = "System (Apple)";
-"Whisper (MLX)" = "Whisper (MLX)";
-"Parakeet (MLX)" = "Parakeet (MLX)";
 "Provider" = "Provider";
 "Language" = "Language";
 "Model" = "Model";
@@ -349,10 +347,7 @@
 "Failed" = "Failed";
 "Storage" = "Storage";
 "Model Storage" = "Model Storage";
-"Total MLX Models" = "Total MLX Models";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "Uses Apple's built-in speech recognition. Requires network for best results.";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI Whisper runs locally using MLX. Works offline after download.";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription.";
 "English" = "English";
 "Spanish" = "Spanish";
 "French" = "French";
@@ -364,7 +359,6 @@
 "Russian" = "Russian";
 "Auto-detect" = "Auto-detect";
 
-/* MLX Models */
 "Tiny" = "Tiny";
 "Fastest, smallest" = "Fastest, smallest";
 "Full precision" = "Full precision";
@@ -383,9 +377,7 @@
 "Large v3 4-bit" = "Large v3 4-bit";
 "Smaller download" = "Smaller download";
 "4-bit quantized" = "4-bit quantized";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "Large, high-accuracy model";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "WiFi";
@@ -534,7 +526,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "Microphone permission is required. The microphone will be automatically requested when recording starts.";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight.";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone.";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "MLX transcription is not available on this Mac. Switching to Apple Speech.";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "Upgrade to Pro for unlimited servers";
@@ -567,8 +558,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "System (Apple Speech)";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Model Errors */
 "Failed to remove model" = "Failed to remove model";
@@ -1218,7 +1207,6 @@
 "Organize servers with your own environments." = "Organize servers with your own environments.";
 "Other" = "Other";
 "Owner" = "Owner";
-"Parakeet supports English only." = "Parakeet supports English only.";
 "Parent" = "Parent";
 "Path copied to clipboard." = "Path copied to clipboard.";
 "Pay once and keep Pro access forever." = "Pay once and keep Pro access forever.";
