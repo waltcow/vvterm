@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import os.log
+import AVFoundation
 
 @MainActor
 class AudioService: NSObject, ObservableObject {
@@ -11,13 +12,14 @@ class AudioService: NSObject, ObservableObject {
     @Published var audioLevel: Float = 0.0
     @Published var recordingDuration: TimeInterval = 0
     @Published var permissionStatus: AudioPermissionManager.PermissionStatus = .notDetermined
+    @Published private(set) var runtimeRecordingError: RecordingError?
 
     // Services
     private let permissionManager = AudioPermissionManager()
     private let speechRecognitionService = SpeechRecognitionService()
     private let audioCaptureService = AudioCaptureService()
-    private let mlxWhisperProvider = MLXWhisperProvider.shared
-    private let mlxParakeetProvider = MLXParakeetProvider.shared
+    private let doubaoProvider = DoubaoASRProvider()
+    private let doubaoCredentialStore = DoubaoASRCredentialStore()
 
     private var activeProvider: TranscriptionProvider = .system
 
@@ -63,11 +65,6 @@ class AudioService: NSObject, ObservableObject {
     func startRecording() async throws {
         let requestedProvider = TranscriptionSettingsStore.currentProvider()
         let effectiveProvider = resolveProvider(for: requestedProvider)
-        if requestedProvider == .mlxWhisper && effectiveProvider == .system {
-            logger.warning("MLX Whisper not available; falling back to Apple Speech")
-        } else if requestedProvider == .mlxParakeet && effectiveProvider == .system {
-            logger.warning("MLX Parakeet not available; falling back to Apple Speech")
-        }
         activeProvider = effectiveProvider
 
         let needsSpeech = effectiveProvider == .system
@@ -80,6 +77,7 @@ class AudioService: NSObject, ObservableObject {
         }
 
         // Reset state
+        runtimeRecordingError = nil
         speechRecognitionService.resetTranscriptions()
         audioCaptureService.cancel()
 
@@ -87,8 +85,8 @@ class AudioService: NSObject, ObservableObject {
         switch effectiveProvider {
         case .system:
             try await startAppleSpeech()
-        case .mlxWhisper, .mlxParakeet:
-            try startMLXCapture()
+        case .doubaoASR:
+            try await startDoubaoASR()
         }
 
         isRecording = true
@@ -96,48 +94,41 @@ class AudioService: NSObject, ObservableObject {
 
     func stopRecording() async -> String {
         isRecording = false
+        audioCaptureService.bufferHandler = nil
 
-        let samples = audioCaptureService.stop()
+        _ = audioCaptureService.stop()
 
         switch activeProvider {
         case .system:
             let finalText = await speechRecognitionService.stopRecognition()
             speechRecognitionService.resetTranscriptions()
             return finalText
-        case .mlxWhisper:
+        case .doubaoASR:
             do {
-                let text = try await mlxWhisperProvider.transcribe(samples: samples)
-                transcribedText = text
-                return text
+                let finalText = try await doubaoProvider.finishAndWaitForFinal(timeoutSeconds: 2.0)
+                transcribedText = finalText
+                partialTranscription = ""
+                return finalText
             } catch {
-                logger.error("MLX Whisper failed: \(error.localizedDescription)")
-                if let fallback = await fallbackToAppleSpeech(samples: samples) {
-                    transcribedText = fallback
-                    return fallback
-                }
-                return ""
-            }
-        case .mlxParakeet:
-            do {
-                let text = try await mlxParakeetProvider.transcribe(samples: samples)
-                transcribedText = text
-                return text
-            } catch {
-                logger.error("MLX Parakeet failed: \(error.localizedDescription)")
-                if let fallback = await fallbackToAppleSpeech(samples: samples) {
-                    transcribedText = fallback
-                    return fallback
-                }
-                return ""
+                logger.error("Doubao ASR finalization failed: \(error.localizedDescription)")
+                await doubaoProvider.cancel()
+                let bestEffortText = transcribedText.isEmpty ? partialTranscription : transcribedText
+                partialTranscription = ""
+                return bestEffortText
             }
         }
     }
 
     func cancelRecording() {
         isRecording = false
+        runtimeRecordingError = nil
+        audioCaptureService.bufferHandler = nil
 
         audioCaptureService.cancel()
         speechRecognitionService.cancelRecognition()
+        Task { [doubaoProvider] in
+            await doubaoProvider.cancel()
+        }
         speechRecognitionService.resetTranscriptions()
         transcribedText = ""
         partialTranscription = ""
@@ -145,11 +136,16 @@ class AudioService: NSObject, ObservableObject {
 
     // MARK: - Errors
 
-    enum RecordingError: LocalizedError {
+    enum RecordingError: LocalizedError, Equatable {
         case permissionDenied
         case speechRecognitionUnavailable
         case recordingFailed
-        case mlxUnavailable
+        case missingDoubaoCredentials
+        case invalidDoubaoEndpoint
+        case doubaoNetworkUnavailable
+        case doubaoConnectionFailed(String)
+        case doubaoConnectionLost
+        case doubaoServerError(String)
 
         var errorDescription: String? {
             switch self {
@@ -159,8 +155,34 @@ class AudioService: NSObject, ObservableObject {
                 return String(localized: "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight.")
             case .recordingFailed:
                 return String(localized: "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone.")
-            case .mlxUnavailable:
-                return String(localized: "MLX transcription is not available on this Mac. Switching to Apple Speech.")
+            case .missingDoubaoCredentials:
+                return String(localized: "Doubao ASR App ID and Access Token are required.")
+            case .invalidDoubaoEndpoint:
+                return String(localized: "Doubao ASR endpoint must be a wss://openspeech.bytedance.com streaming URL.")
+            case .doubaoNetworkUnavailable:
+                return String(localized: "Doubao ASR requires a network connection.")
+            case .doubaoConnectionFailed(let message):
+                return String(localized: "Doubao ASR connection failed: \(message)")
+            case .doubaoConnectionLost:
+                return String(localized: "Doubao ASR connection was lost during recording.")
+            case .doubaoServerError(let message):
+                return String(localized: "Doubao ASR server error: \(message)")
+            }
+        }
+
+        var recoverySuggestion: String? {
+            switch self {
+            case .permissionDenied, .speechRecognitionUnavailable, .recordingFailed:
+                return String(localized: "Enable Microphone and Speech Recognition in System Settings.")
+            case .missingDoubaoCredentials:
+                return String(localized: "Open Transcription settings and enter your Doubao ASR App ID and Access Token.")
+            case .invalidDoubaoEndpoint:
+                return String(localized: "Use a wss://openspeech.bytedance.com endpoint or leave the endpoint field empty.")
+            case .doubaoNetworkUnavailable,
+                 .doubaoConnectionFailed,
+                 .doubaoConnectionLost,
+                 .doubaoServerError:
+                return nil
             }
         }
     }
@@ -171,16 +193,8 @@ class AudioService: NSObject, ObservableObject {
         switch requested {
         case .system:
             return .system
-        case .mlxWhisper:
-            guard MLXWhisperProvider.isSupported else { return .system }
-            let modelId = TranscriptionSettingsStore.currentWhisperModelId()
-            guard MLXModelManager.isModelAvailable(kind: .whisper, modelId: modelId) else { return .system }
-            return .mlxWhisper
-        case .mlxParakeet:
-            guard MLXParakeetProvider.isSupported else { return .system }
-            let modelId = TranscriptionSettingsStore.currentParakeetModelId()
-            guard MLXModelManager.isModelAvailable(kind: .parakeetTDT, modelId: modelId) else { return .system }
-            return .mlxParakeet
+        case .doubaoASR:
+            return .doubaoASR
         }
     }
 
@@ -203,36 +217,146 @@ class AudioService: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - MLX
+    // MARK: - Doubao ASR
 
-    private func startMLXCapture() throws {
-        audioCaptureService.bufferHandler = nil
+    private func startDoubaoASR() async throws {
+        guard NetworkMonitor.shared.isConnected else {
+            throw RecordingError.doubaoNetworkUnavailable
+        }
+
+        let configuration = try doubaoConfiguration()
+        audioCaptureService.bufferHandler = { [weak self] buffer in
+            guard let self,
+                  let pcmData = Self.int16PCMData(from: buffer),
+                  !pcmData.isEmpty else {
+                return
+            }
+
+            Task { [weak self, doubaoProvider] in
+                do {
+                    try await doubaoProvider.appendPCMData(pcmData)
+                } catch {
+                    await MainActor.run {
+                        self?.logger.error("Doubao ASR audio send failed: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
         do {
+            try await doubaoProvider.start(
+                configuration: configuration,
+                onServerEvent: { [weak self] event in
+                    await self?.handleDoubaoServerEvent(event)
+                },
+                onRuntimeFailure: { [weak self] error in
+                    await self?.handleDoubaoRuntimeFailure(error)
+                }
+            )
             try audioCaptureService.start()
+        } catch let error as RecordingError {
+            audioCaptureService.bufferHandler = nil
+            await doubaoProvider.cancel()
+            throw error
         } catch {
-            throw RecordingError.recordingFailed
+            audioCaptureService.bufferHandler = nil
+            await doubaoProvider.cancel()
+            throw RecordingError.doubaoConnectionFailed(error.localizedDescription)
         }
     }
 
-    private func fallbackToAppleSpeech(samples: [Float]) async -> String? {
-        guard !samples.isEmpty else { return nil }
-        guard speechRecognitionService.isAvailable else { return nil }
-
-        let hasPermissions = await checkPermissions(includeSpeech: true)
-        if !hasPermissions {
-            let granted = await requestPermissions(includeSpeech: true)
-            guard granted else { return nil }
+    private func doubaoConfiguration() throws -> DoubaoASRProviderConfiguration {
+        let appID = TranscriptionSettingsStore.currentDoubaoAppID()
+        guard !appID.isEmpty else {
+            throw RecordingError.missingDoubaoCredentials
         }
 
+        let accessToken: String
         do {
-            let text = try await speechRecognitionService.transcribe(
-                samples: samples,
-                sampleRate: audioCaptureService.sampleRate
-            )
-            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let token = try doubaoCredentialStore.accessToken() else {
+                throw RecordingError.missingDoubaoCredentials
+            }
+            accessToken = token
+        } catch let error as RecordingError {
+            throw error
         } catch {
-            logger.error("Apple Speech fallback failed: \(error.localizedDescription)")
+            throw RecordingError.doubaoConnectionFailed(error.localizedDescription)
+        }
+
+        let resourceID = DoubaoASRConfiguration.resolvedResourceID(
+            TranscriptionSettingsStore.currentDoubaoModelId()
+        )
+        let endpointString: String
+        do {
+            endpointString = try DoubaoASRConfiguration.resolvedStreamingEndpoint(
+                TranscriptionSettingsStore.currentDoubaoEndpoint(),
+                model: resourceID
+            )
+        } catch {
+            throw RecordingError.invalidDoubaoEndpoint
+        }
+        guard let endpoint = URL(string: endpointString) else {
+            throw RecordingError.invalidDoubaoEndpoint
+        }
+
+        return DoubaoASRProviderConfiguration(
+            endpoint: endpoint,
+            appID: appID,
+            accessToken: accessToken,
+            resourceID: resourceID,
+            language: DoubaoASRConfiguration.languageParameter(
+                for: TranscriptionSettingsStore.currentLanguageCode()
+            )
+        )
+    }
+
+    private func handleDoubaoServerEvent(_ event: DoubaoServerEvent) {
+        guard let text = event.text else { return }
+        if event.isFinal {
+            transcribedText = text
+            partialTranscription = ""
+        } else {
+            partialTranscription = text
+        }
+    }
+
+    private func handleDoubaoRuntimeFailure(_ error: Error) async {
+        guard isRecording, activeProvider == .doubaoASR else { return }
+
+        isRecording = false
+        audioCaptureService.bufferHandler = nil
+        audioCaptureService.cancel()
+        await doubaoProvider.cancel()
+        runtimeRecordingError = mapDoubaoRuntimeFailure(error)
+    }
+
+    private func mapDoubaoRuntimeFailure(_ error: Error) -> RecordingError {
+        if let recordingError = error as? RecordingError {
+            return recordingError
+        }
+
+        let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if message.isEmpty {
+            return .doubaoConnectionLost
+        }
+        return .doubaoServerError(message)
+    }
+
+    static func formattedRecordingErrorMessage(_ error: RecordingError) -> String {
+        [error.localizedDescription, error.recoverySuggestion]
+            .compactMap { $0 }
+            .joined(separator: "\n\n")
+    }
+
+    private static func int16PCMData(from buffer: AVAudioPCMBuffer) -> Data? {
+        let frameLength = Int(buffer.frameLength)
+        guard frameLength > 0,
+              let channelData = buffer.floatChannelData?[0] else {
             return nil
         }
+
+        let samples = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
+        return DoubaoASRConfiguration.int16PCMData(from: samples)
     }
+
 }

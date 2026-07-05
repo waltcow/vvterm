@@ -336,8 +336,6 @@
 /* Transcription */
 "Engine" = "引擎";
 "System (Apple)" = "系统（Apple）";
-"Whisper (MLX)" = "Whisper（MLX）";
-"Parakeet (MLX)" = "Parakeet（MLX）";
 "Provider" = "提供方";
 "Language" = "语言";
 "Model" = "模型";
@@ -349,10 +347,7 @@
 "Failed" = "失败";
 "Storage" = "存储";
 "Model Storage" = "模型存储";
-"Total MLX Models" = "MLX 模型总占用";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "使用 Apple 内置语音识别。最佳效果需要联网。";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI Whisper 使用 MLX 在本地运行。下载后可离线使用。";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA Parakeet 使用 MLX 在本地运行，针对实时转写优化。";
 "English" = "英语";
 "Spanish" = "西班牙语";
 "French" = "法语";
@@ -364,7 +359,6 @@
 "Russian" = "俄语";
 "Auto-detect" = "自动检测";
 
-/* MLX Models */
 "Tiny" = "超小";
 "Fastest, smallest" = "最快、最小";
 "Full precision" = "全精度";
@@ -383,9 +377,7 @@
 "Large v3 4-bit" = "大 v3 4 位";
 "Smaller download" = "下载更小";
 "4-bit quantized" = "4 位量化";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "大型高精度模型";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "Wi‑Fi";
@@ -534,7 +526,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "需要麦克风权限。录音开始时会自动请求。";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "语音识别不可用。请在系统设置 > Siri 与聚焦中启用 Siri。";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "无法开始录音。请在系统设置 > 隐私与安全 > 麦克风中检查权限。";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "此 Mac 不支持 MLX 转写，已切换到 Apple 语音识别。";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "升级到 Pro 以解锁无限服务器";
@@ -566,8 +557,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "系统（Apple 语音）";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Store errors */
 "Failed to remove model" = "删除模型失败";
@@ -1216,7 +1205,6 @@
 "Organize servers with your own environments." = "使用自定义环境组织服务器。";
 "Other" = "其他";
 "Owner" = "业主";
-"Parakeet supports English only." = "Parakeet 仅支持英语。";
 "Parent" = "家长";
 "Path copied to clipboard." = "路径已复制到剪贴板。";
 "Pay once and keep Pro access forever." = "支付一次并永久保留 Pro 访问权限。";
