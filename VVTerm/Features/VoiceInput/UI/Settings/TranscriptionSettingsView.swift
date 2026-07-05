@@ -16,6 +16,7 @@ struct TranscriptionSettingsView: View {
     @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
 
     @State private var doubaoAccessToken = ""
+    @State private var hasDoubaoAccessToken = false
     @State private var doubaoCredentialStatus: String?
 
     private let doubaoCredentialStore = DoubaoASRCredentialStore()
@@ -126,14 +127,19 @@ struct TranscriptionSettingsView: View {
                 .autocorrectionDisabled()
                 #endif
 
-            HStack {
-                Button("Save Access Token") {
-                    saveDoubaoAccessToken()
-                }
-                Button("Remove Access Token", role: .destructive) {
-                    removeDoubaoAccessToken()
-                }
+            Button {
+                saveDoubaoAccessToken()
+            } label: {
+                Label("Save Access Token", systemImage: "key.fill")
             }
+            .disabled(trimmedDoubaoAccessToken.isEmpty)
+
+            Button(role: .destructive) {
+                removeDoubaoAccessToken()
+            } label: {
+                Label("Remove Access Token", systemImage: "trash")
+            }
+            .disabled(!hasDoubaoAccessToken && trimmedDoubaoAccessToken.isEmpty)
 
             if let doubaoCredentialStatus {
                 Text(doubaoCredentialStatus)
@@ -147,15 +153,22 @@ struct TranscriptionSettingsView: View {
         }
     }
 
+    private var trimmedDoubaoAccessToken: String {
+        doubaoAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func migrateLegacySettings() {
         provider = TranscriptionSettingsStore.currentProvider().rawValue
     }
 
     private func loadDoubaoAccessToken() {
         do {
-            doubaoAccessToken = try doubaoCredentialStore.accessToken() ?? ""
+            let token = try doubaoCredentialStore.accessToken()
+            doubaoAccessToken = token ?? ""
+            hasDoubaoAccessToken = token?.isEmpty == false
         } catch {
             doubaoAccessToken = ""
+            hasDoubaoAccessToken = false
             doubaoCredentialStatus = String(localized: "Failed to read Doubao ASR Access Token.")
         }
     }
@@ -163,7 +176,8 @@ struct TranscriptionSettingsView: View {
     private func saveDoubaoAccessToken() {
         do {
             try doubaoCredentialStore.saveAccessToken(doubaoAccessToken)
-            doubaoCredentialStatus = doubaoAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            hasDoubaoAccessToken = !trimmedDoubaoAccessToken.isEmpty
+            doubaoCredentialStatus = trimmedDoubaoAccessToken.isEmpty
                 ? String(localized: "Doubao ASR Access Token removed.")
                 : String(localized: "Doubao ASR Access Token saved.")
             loadDoubaoAccessToken()
@@ -176,6 +190,7 @@ struct TranscriptionSettingsView: View {
         do {
             try doubaoCredentialStore.deleteAccessToken()
             doubaoAccessToken = ""
+            hasDoubaoAccessToken = false
             doubaoCredentialStatus = String(localized: "Doubao ASR Access Token removed.")
         } catch {
             doubaoCredentialStatus = String(localized: "Failed to remove Doubao ASR Access Token.")
