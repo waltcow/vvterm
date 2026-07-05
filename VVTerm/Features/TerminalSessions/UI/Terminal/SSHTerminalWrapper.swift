@@ -284,7 +284,7 @@ extension SSHTerminalCoordinator {
                             excluding: sessionId
                         )
                         return !hasOtherRegistrations
-                    case .authenticationFailed, .tailscaleAuthenticationNotAccepted, .cloudflareConfigurationRequired, .cloudflareAuthenticationFailed, .cloudflareTunnelFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
+                    case .authenticationFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
                         return false
                     }
                 },

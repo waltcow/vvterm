@@ -677,28 +677,6 @@
 "root" = "root";
 "Required" = "필수";
 "Optional" = "선택사항";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "서버 측 Tailscale SSH 정책을 사용합니다. 비밀번호나 SSH 키가 필요 없습니다.";
-"Tailscale SSH authentication was not accepted by the server." = "서버에서 Tailscale SSH 인증을 수락하지 않았습니다.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "이 앱은 현재 직접 tailnet 연결만 지원합니다 (유저스페이스 프록시 폴백 없음).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "OAuth 로그인이 브라우저에서 열립니다. 팀/앱 도메인 값은 호스트에서 자동 검색됩니다.";
-"Team Domain Override" = "팀 도메인 재정의";
-"Set Team Domain Override" = "팀 도메인 재정의 설정";
-"App Domain Override" = "앱 도메인 재정의";
-"Hide Overrides" = "재정의 숨기기";
-"Set Team/App Domain Override" = "팀/앱 도메인 재정의 설정";
-"Service Token Client ID" = "서비스 토큰 클라이언트 ID";
-"Service Token Client Secret" = "서비스 토큰 클라이언트 시크릿";
-"Cloudflare configuration error: %@" = "Cloudflare 설정 오류: %@";
-"Cloudflare authentication failed: %@" = "Cloudflare 인증 실패: %@";
-"Cloudflare tunnel failed: %@" = "Cloudflare 터널 실패: %@";
-"Cloudflare transport requires a valid hostname." = "Cloudflare 전송에는 유효한 호스트 이름이 필요합니다.";
-"Cloudflare service token client ID is required." = "Cloudflare 서비스 토큰 클라이언트 ID가 필요합니다.";
-"Cloudflare service token client secret is required." = "Cloudflare 서비스 토큰 클라이언트 시크릿이 필요합니다.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Cloudflare OAuth를 위해 팀 도메인과 앱 도메인 재정의를 모두 제공하세요.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Cloudflare 메타데이터 검색에 실패했습니다. 서버 설정에서 팀 도메인과 앱 도메인 재정의를 추가하세요.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "tmux 세션 선택";
@@ -1031,7 +1009,6 @@
 "Clear" = "지우기";
 "Clear Filters" = "필터 지우기";
 "Close Preview" = "미리보기 닫기";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Cloudflare 터널이 연결되었지만 업스트림 대상에 의해 SSH 핸드셰이크가 닫혔습니다. 액세스 정책 및 서비스 토큰 범위를 확인합니다.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M은 버튼이 숨겨져 있어도 항상 작동합니다.";
 "Collapsed" = "축소됨";
 "Compare plans" = "요금제 비교";
@@ -1044,7 +1021,6 @@
 "Copy Names" = "이름 복사";
 "Copy Path" = "경로 복사";
 "Copy Paths" = "경로 복사";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Cloudflare 팀 도메인(\\(describeFailure(error)))을 자동으로 검색할 수 없습니다. 팀 도메인 재정의를 추가합니다(예: team.cloudflareaccess.com).";
 "Create Workspace" = "작업공간 만들기";
 "Create a folder in the current remote directory." = "현재 원격 디렉터리에 폴더를 만듭니다.";
 "Create a workspace before adding servers" = "서버를 추가하기 전에 작업공간 만들기";
@@ -1192,7 +1168,6 @@
 "No valid files or folders were dropped." = "유효한 파일이나 폴더가 삭제되지 않았습니다.";
 "No valid remote items were dropped." = "유효한 원격 항목이 삭제되지 않았습니다.";
 "No workspaces available." = "사용 가능한 작업공간이 없습니다.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "One Pro 구매는 동일한 Apple ID를 사용하는 iPhone, iPad, Mac에서 작동됩니다.";
 "One-time purchase" = "일회성 구매";
 "One-time purchase. No subscription renewal." = "일회성 구매. 구독 갱신이 없습니다.";
@@ -1275,7 +1250,6 @@
 "Server stats" = "서버 통계";
 "Server stats included on Free" = "무료에 포함된 서버 통계";
 "Server stats included on Pro" = "Pro에 포함된 서버 통계";
-"Service Token" = "서비스 토큰";
 "Share" = "공유";
 "Share sheet ready." = "공유 시트가 준비되었습니다.";
 "Share…" = "공유…";
@@ -1300,7 +1274,6 @@
 "Symlink" = "심링크";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "모든 Apple 기기에서 서버, 작업 공간, 테마 및 키보드 액세서리 설정을 동기화하세요.";
 "Tab \\(number)" = "탭 \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "용어";
 "Terms of Use (EULA)" = "이용약관(EULA)";
 "Text Document" = "텍스트 문서";

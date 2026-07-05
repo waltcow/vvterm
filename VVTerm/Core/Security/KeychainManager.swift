@@ -90,11 +90,6 @@ final class KeychainManager {
 
         logger.info("Getting credentials for server \(server.id.uuidString), authMethod: \(String(describing: server.authMethod))")
 
-        if server.connectionMode == .tailscale {
-            logger.info("Server \(server.id.uuidString) uses tailscale mode; skipping keychain credential lookup")
-            return credentials
-        }
-
         switch server.authMethod {
         case .password:
             credentials.password = try getPassword(for: server.id)
@@ -112,48 +107,7 @@ final class KeychainManager {
             }
         }
 
-        if server.connectionMode == .cloudflare, server.cloudflareAccessMode == .serviceToken,
-           let cloudflareToken = try getCloudflareServiceToken(for: server.id) {
-            credentials.cloudflareClientID = cloudflareToken.clientID
-            credentials.cloudflareClientSecret = cloudflareToken.clientSecret
-        }
-
         return credentials
-    }
-
-    // MARK: - Cloudflare Service Token
-
-    func storeCloudflareServiceToken(for serverId: UUID, clientID: String, clientSecret: String) throws {
-        let idKey = cloudflareClientIDKey(for: serverId)
-        let secretKey = cloudflareClientSecretKey(for: serverId)
-
-        guard let idData = clientID.data(using: .utf8),
-              let secretData = clientSecret.data(using: .utf8) else {
-            throw KeychainError.encodingFailed
-        }
-
-        try store.set(idData, forKey: idKey, iCloudSync: isSyncEnabled)
-        try store.set(secretData, forKey: secretKey, iCloudSync: isSyncEnabled)
-        logger.info("Stored Cloudflare service token for server \(serverId.uuidString)")
-    }
-
-    func getCloudflareServiceToken(for serverId: UUID) throws -> (clientID: String, clientSecret: String)? {
-        let idKey = cloudflareClientIDKey(for: serverId)
-        let secretKey = cloudflareClientSecretKey(for: serverId)
-
-        guard let idData = try store.get(idKey),
-              let secretData = try store.get(secretKey),
-              let clientID = String(data: idData, encoding: .utf8),
-              let clientSecret = String(data: secretData, encoding: .utf8) else {
-            return nil
-        }
-
-        return (clientID: clientID, clientSecret: clientSecret)
-    }
-
-    func deleteCloudflareServiceToken(for serverId: UUID) {
-        try? store.delete(cloudflareClientIDKey(for: serverId))
-        try? store.delete(cloudflareClientSecretKey(for: serverId))
     }
 
     // MARK: - Delete Operations
@@ -163,15 +117,15 @@ final class KeychainManager {
         let keyKey = sshKeyKey(for: serverId)
         let passphraseKey = sshPassphraseKey(for: serverId)
         let publicKeyKey = sshPublicKeyKey(for: serverId)
-        let cloudflareIDKey = cloudflareClientIDKey(for: serverId)
-        let cloudflareSecretKey = cloudflareClientSecretKey(for: serverId)
+        let legacyCloudflareIDKey = "server.\(serverId.uuidString).cloudflare.clientid"
+        let legacyCloudflareSecretKey = "server.\(serverId.uuidString).cloudflare.clientsecret"
 
         try? store.delete(passwordKey)
         try? store.delete(keyKey)
         try? store.delete(passphraseKey)
         try? store.delete(publicKeyKey)
-        try? store.delete(cloudflareIDKey)
-        try? store.delete(cloudflareSecretKey)
+        try? store.delete(legacyCloudflareIDKey)
+        try? store.delete(legacyCloudflareSecretKey)
 
         logger.info("Deleted credentials for server \(serverId.uuidString)")
     }
@@ -199,14 +153,6 @@ final class KeychainManager {
 
     private func sshPublicKeyKey(for serverId: UUID) -> String {
         "server.\(serverId.uuidString).publickey"
-    }
-
-    private func cloudflareClientIDKey(for serverId: UUID) -> String {
-        "server.\(serverId.uuidString).cloudflare.clientid"
-    }
-
-    private func cloudflareClientSecretKey(for serverId: UUID) -> String {
-        "server.\(serverId.uuidString).cloudflare.clientsecret"
     }
 
     // MARK: - Reusable SSH Keys (Keychain Library)
