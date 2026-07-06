@@ -87,13 +87,22 @@ private struct StatsVisualStyle {
 
         switch surface {
         case .dashboard:
-            pageBackground = Color.black
+            #if os(macOS)
+            pageBackground = .clear
+            #else
+            pageBackground = Self.nativeGroupedBackground
+            #endif
             if preferencesStyle == .classic {
                 cardFill = Color.white.opacity(0.08)
                 cardStroke = Color.white.opacity(0.06)
             } else {
+                #if os(macOS)
+                cardFill = Color.white.opacity(0.045)
+                cardStroke = Color.white.opacity(0.075)
+                #else
                 cardFill = Color(red: 0.11, green: 0.11, blue: 0.12)
                 cardStroke = Color.white.opacity(0.04)
+                #endif
             }
             primaryText = Color.white
             secondaryText = Color.white.opacity(0.58)
@@ -112,6 +121,14 @@ private struct StatsVisualStyle {
 
     var cardSpacing: CGFloat {
         density == .detailed ? 18 : 14
+    }
+
+    var gridMinimumColumnWidth: CGFloat {
+        density == .detailed ? 320 : 292
+    }
+
+    var gridMaximumWidth: CGFloat {
+        density == .detailed ? 1_360 : 1_180
     }
 
     var horizontalPadding: CGFloat {
@@ -427,7 +444,11 @@ private struct StatsBlocksContent: View {
         if preferencesStyle == .classic {
             return ClassicStatsCardSurfaceStyle.make(for: backgroundColor).pageBackground
         }
+        #if os(macOS)
+        return backgroundColor
+        #else
         return StatsVisualStyle(preferencesStyle: preferencesStyle).pageBackground
+        #endif
     }
 
     var body: some View {
@@ -453,8 +474,8 @@ private struct StatsBlocksContent: View {
             .drawingGroup()
             .frame(maxWidth: constrainsWidth ? nil : .infinity)
         } else {
-            LazyVStack(alignment: .leading, spacing: style.cardSpacing) {
-                ForEach(preferences.visibleBlocks, id: \.self) { blockID in
+            LazyVGrid(columns: gridColumns(for: style), alignment: .leading, spacing: style.cardSpacing) {
+                ForEach(renderedBlocks, id: \.self) { blockID in
                     statsBlock(blockID, style: style)
                 }
 
@@ -465,8 +486,33 @@ private struct StatsBlocksContent: View {
             .padding(.horizontal, usesPagePadding ? style.horizontalPadding : 0)
             .padding(.top, usesPagePadding ? style.topPadding : 0)
             .padding(.bottom, usesPagePadding ? style.bottomPadding : 0)
-            .frame(maxWidth: constrainsWidth ? 820 : .infinity)
+            .frame(maxWidth: constrainsWidth ? style.gridMaximumWidth : .infinity)
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var renderedBlocks: [StatsPreferences.BlockID] {
+        preferences.visibleBlocks.filter(shouldRenderBlock)
+    }
+
+    private func gridColumns(for style: StatsVisualStyle) -> [GridItem] {
+        [
+            GridItem(
+                .adaptive(minimum: style.gridMinimumColumnWidth),
+                spacing: style.cardSpacing,
+                alignment: .top
+            )
+        ]
+    }
+
+    private func shouldRenderBlock(_ blockID: StatsPreferences.BlockID) -> Bool {
+        switch blockID {
+        case .gpu:
+            return shouldShowGPU
+        case .docker:
+            return isDockerUnlocked || dockerUpgradeAction != nil
+        case .system, .cpu, .memory, .network, .storage, .processes:
+            return true
         }
     }
 
@@ -775,7 +821,7 @@ private struct AppleCard<Content: View>: View {
 
     var body: some View {
         content()
-            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .topLeading)
             .background(style.cardFill, in: RoundedRectangle(cornerRadius: style.cardCornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: style.cardCornerRadius, style: .continuous)
@@ -1407,7 +1453,7 @@ private struct ClassicProcessesCard: View {
                 .classicStatsCardSurface(surfaceStyle)
             }
             .buttonStyle(.plain)
-            .sheet(isPresented: $showingProcesses) {
+            .statsDetailPresentation(isPresented: $showingProcesses, size: StatsPresentationSize.large) {
                 ProcessesSheet(
                     processes: processes,
                     processCount: processes.count,
@@ -1524,7 +1570,7 @@ private struct ClassicDockerStatsCard: View {
             .classicStatsCardSurface(surfaceStyle)
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetails) {
+        .statsDetailPresentation(isPresented: $showingDetails, size: StatsPresentationSize.large) {
             DockerDetailsSheet(
                 docker: docker,
                 loadDockerStats: loadDockerStats,
@@ -1646,7 +1692,7 @@ private struct SystemOverviewCard: View {
             }
             .padding(style.cardPadding)
         }
-        .sheet(isPresented: $showingDetails) {
+        .statsDetailPresentation(isPresented: $showingDetails) {
             SystemDetailsSheet(stats: stats)
         }
     }
@@ -1707,7 +1753,7 @@ private struct CPUCard: View {
             }
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetails) {
+        .statsDetailPresentation(isPresented: $showingDetails) {
             CPUDetailsSheet(stats: stats)
         }
     }
@@ -1868,7 +1914,7 @@ private struct GPUCard: View {
             }
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetails) {
+        .statsDetailPresentation(isPresented: $showingDetails) {
             GPUDetailsSheet(stats: stats, devices: devices)
         }
     }
@@ -2269,7 +2315,13 @@ private struct StorageCard: View {
                 )
 
                 if volumes.isEmpty {
-                    EmptyCardState(title: String(localized: "No volumes reported"), style: style)
+                    EmptyCardState(
+                        icon: "internaldrive",
+                        title: String(localized: "No Data"),
+                        message: String(localized: "No volumes reported"),
+                        color: .orange,
+                        style: style
+                    )
                 } else {
                     VStack(spacing: 14) {
                         ForEach(volumes.prefix(style.volumeLimit)) { volume in
@@ -2312,7 +2364,13 @@ private struct ProcessesCard: View {
                     )
 
                     if processes.isEmpty {
-                        EmptyCardState(title: String(localized: "No processes reported"), style: style)
+                        EmptyCardState(
+                            icon: "list.bullet.rectangle",
+                            title: String(localized: "No Data"),
+                            message: String(localized: "No processes reported"),
+                            color: .purple,
+                            style: style
+                        )
                     } else {
                         VStack(spacing: 16) {
                             ForEach(processes.prefix(style.processLimit)) { process in
@@ -2325,7 +2383,7 @@ private struct ProcessesCard: View {
             }
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingProcesses) {
+        .statsDetailPresentation(isPresented: $showingProcesses, size: StatsPresentationSize.large) {
             ProcessesSheet(
                 processes: processes,
                 processCount: processCount,
@@ -2407,7 +2465,7 @@ private struct DockerCard: View {
             }
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingDetails) {
+        .statsDetailPresentation(isPresented: $showingDetails, size: StatsPresentationSize.large) {
             DockerDetailsSheet(
                 docker: docker,
                 loadDockerStats: loadDockerStats,
@@ -2744,79 +2802,7 @@ private struct ProcessesSheet: View {
     @State private var showingError = false
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section(footer: ProcessListFooter(
-                    visibleCount: visibleProcesses.count,
-                    totalCount: loadedProcesses.count,
-                    processCount: processCount,
-                    isFiltered: isFiltered
-                )) {
-                    if isLoadingProcesses {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(String(localized: "Loading processes"))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if visibleProcesses.isEmpty, !isLoadingProcesses {
-                        EmptyProcessListRow(isFiltered: isFiltered)
-                    }
-
-                    ForEach(visibleProcesses) { process in
-                        Button {
-                            selectedProcess = process
-                        } label: {
-                            ProcessSheetRow(
-                                process: process,
-                                isKilling: killingPID == process.pid
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            if terminateProcess != nil {
-                                Button(role: .destructive) {
-                                    pendingKill = process
-                                } label: {
-                                    Label(String(localized: "Kill"), systemImage: "xmark.octagon")
-                                }
-                                .disabled(killingPID == process.pid)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle(Text("Processes"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .searchable(text: $searchText, prompt: Text("Search Processes"))
-            .toolbar {
-                ToolbarItem(placement: controlsPlacement) {
-                    Menu {
-                        Picker(String(localized: "Sort By"), selection: $sortOption) {
-                            ForEach(ProcessSortOption.allCases) { option in
-                                Label(option.title, systemImage: option.systemImage)
-                                    .tag(option)
-                            }
-                        }
-
-                        Picker(String(localized: "Filter"), selection: $filterOption) {
-                            ForEach(ProcessFilterOption.allCases) { option in
-                                Label(option.title, systemImage: option.systemImage)
-                                    .tag(option)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .accessibilityLabel(Text("Sort and Filter"))
-                }
-            }
-            .statsSheetCloseToolbar()
+        sheetContent
             .confirmationDialog(
                 String(localized: "Kill Process?"),
                 isPresented: Binding(
@@ -2838,23 +2824,120 @@ private struct ProcessesSheet: View {
             } message: {
                 Text(errorMessage)
             }
-            .sheet(item: $selectedProcess) { process in
+            .statsDetailPresentation(item: $selectedProcess) { process in
                 ProcessDetailsSheet(process: process)
             }
-        }
-        .onAppear {
-            if loadedProcesses.isEmpty {
+            .onAppear {
+                if loadedProcesses.isEmpty {
+                    loadedProcesses = processes
+                }
+                Task {
+                    await loadFullProcessesIfNeeded()
+                }
+            }
+            .onChange(of: processes.map(\.pid)) { _ in
+                guard !isLoadingProcesses else { return }
                 loadedProcesses = processes
             }
-            Task {
-                await loadFullProcessesIfNeeded()
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "Processes")) {
+            processControlsMenu
+        } content: {
+            VStack(spacing: 0) {
+                StatsMacSearchField(prompt: String(localized: "Search Processes"), text: $searchText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                Divider()
+                processList
             }
         }
-        .onChange(of: processes.map(\.pid)) { _ in
-            guard !isLoadingProcesses else { return }
-            loadedProcesses = processes
+        #else
+        NavigationStack {
+            processList
+            .navigationTitle(Text("Processes"))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: Text("Search Processes"))
+            .toolbar {
+                ToolbarItem(placement: controlsPlacement) {
+                    processControlsMenu
+                }
+            }
+            .statsSheetCloseToolbar()
         }
-        .adaptiveSoftScrollEdges()
+        #endif
+    }
+
+    private var processList: some View {
+        List {
+            Section(footer: ProcessListFooter(
+                visibleCount: visibleProcesses.count,
+                totalCount: loadedProcesses.count,
+                processCount: processCount,
+                isFiltered: isFiltered
+            )) {
+                if isLoadingProcesses {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(String(localized: "Loading processes"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if visibleProcesses.isEmpty, !isLoadingProcesses {
+                    EmptyProcessListRow(isFiltered: isFiltered)
+                }
+
+                ForEach(visibleProcesses) { process in
+                    Button {
+                        selectedProcess = process
+                    } label: {
+                        ProcessSheetRow(
+                            process: process,
+                            isKilling: killingPID == process.pid
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if terminateProcess != nil {
+                            Button(role: .destructive) {
+                                pendingKill = process
+                            } label: {
+                                Label(String(localized: "Kill"), systemImage: "xmark.octagon")
+                            }
+                            .disabled(killingPID == process.pid)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var processControlsMenu: some View {
+        Menu {
+            Picker(String(localized: "Sort By"), selection: $sortOption) {
+                ForEach(ProcessSortOption.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+
+            Picker(String(localized: "Filter"), selection: $filterOption) {
+                ForEach(ProcessFilterOption.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 16, weight: .semibold))
+        }
+        .accessibilityLabel(Text("Sort and Filter"))
     }
 
     private var controlsPlacement: ToolbarItemPlacement {
@@ -3074,7 +3157,7 @@ private struct StatsSheetCloseToolbarModifier: ViewModifier {
         #else
         switch placement {
         case .automatic, .trailing:
-            return .confirmationAction
+            return .automatic
         case .leading:
             return .cancellationAction
         }
@@ -3102,6 +3185,130 @@ private struct StatsSheetCloseToolbarModifier: ViewModifier {
 private extension View {
     func statsSheetCloseToolbar(placement: StatsSheetClosePlacement = .automatic) -> some View {
         modifier(StatsSheetCloseToolbarModifier(placement: placement))
+    }
+}
+
+private enum StatsPresentationSize {
+    static let standard = CGSize(width: 560, height: 600)
+    static let large = CGSize(width: 640, height: 680)
+}
+
+#if os(macOS)
+private struct StatsMacDetailShell<Controls: View, Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let controls: () -> Controls
+    let content: () -> Content
+
+    init(
+        _ title: String,
+        @ViewBuilder controls: @escaping () -> Controls,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.controls = controls
+        self.content = content
+    }
+
+    init(
+        _ title: String,
+        @ViewBuilder content: @escaping () -> Content
+    ) where Controls == EmptyView {
+        self.title = title
+        self.controls = { EmptyView() }
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+
+                Spacer(minLength: 12)
+
+                controls()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.primary.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Close"))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.bar)
+
+            Divider()
+
+            content()
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+private struct StatsMacSearchField: View {
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField(prompt, text: $text)
+                .textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+}
+#endif
+
+private extension View {
+    @ViewBuilder
+    func statsDetailPresentation<Content: View>(
+        isPresented: Binding<Bool>,
+        size: CGSize = StatsPresentationSize.standard,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        #if os(macOS)
+        popover(isPresented: isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) {
+            content()
+                .frame(width: size.width, height: size.height)
+        }
+        #else
+        sheet(isPresented: isPresented) {
+            content()
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    func statsDetailPresentation<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        size: CGSize = StatsPresentationSize.standard,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        #if os(macOS)
+        popover(item: item, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) { value in
+            content(value)
+                .frame(width: size.width, height: size.height)
+        }
+        #else
+        sheet(item: item) { value in
+            content(value)
+        }
+        #endif
     }
 }
 
@@ -3171,38 +3378,51 @@ private struct ProcessDetailsSheet: View {
     let process: ProcessInfo
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section(String(localized: "Overview")) {
-                    InfoRow(title: String(localized: "Name"), value: process.name)
-                    InfoRow(title: String(localized: "PID"), value: "\(process.pid)")
-                    if !process.user.isEmpty {
-                        InfoRow(title: String(localized: "User"), value: process.user)
-                    }
-                }
-
-                Section(String(localized: "Usage")) {
-                    InfoRow(title: String(localized: "CPU"), value: formatPercent(process.cpuPercent))
-                    InfoRow(title: String(localized: "Memory"), value: formatPercent(process.memoryPercent))
-                }
-
-                Section(String(localized: "Command")) {
-                    Text(process.command)
-                        .font(.system(.body, design: .monospaced))
-                        .textSelection(.enabled)
-                        .lineLimit(nil)
-                }
-            }
-            .navigationTitle(Text("Process Details"))
+        sheetContent
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .presentationDetents([.medium, .large])
             #endif
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "Process Details")) {
+            processDetailsList
+        }
+        #else
+        NavigationStack {
+            processDetailsList
+            .navigationTitle(Text("Process Details"))
+            .navigationBarTitleDisplayMode(.inline)
             .statsSheetCloseToolbar()
         }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
         #endif
-        .adaptiveSoftScrollEdges()
+    }
+
+    private var processDetailsList: some View {
+        List {
+            Section(String(localized: "Overview")) {
+                InfoRow(title: String(localized: "Name"), value: process.name)
+                InfoRow(title: String(localized: "PID"), value: "\(process.pid)")
+                if !process.user.isEmpty {
+                    InfoRow(title: String(localized: "User"), value: process.user)
+                }
+            }
+
+            Section(String(localized: "Usage")) {
+                InfoRow(title: String(localized: "CPU"), value: formatPercent(process.cpuPercent))
+                InfoRow(title: String(localized: "Memory"), value: formatPercent(process.memoryPercent))
+            }
+
+            Section(String(localized: "Command")) {
+                Text(process.command)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(nil)
+            }
+        }
     }
 }
 
@@ -3273,83 +3493,13 @@ private struct DockerDetailsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    DockerSummaryRows(docker: docker)
-                }
-
-                if !docker.isAvailable {
-                    Section {
-                        Text(docker.availability.message)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section(footer: DockerContainerListFooter(
-                    visibleCount: visibleContainers.count,
-                    totalCount: docker.containers.count,
-                    isFiltered: isFiltered
-                )) {
-                    if isLoading {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(String(localized: "Loading containers"))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if visibleContainers.isEmpty, !isLoading {
-                        EmptyDockerContainerRow(isFiltered: isFiltered, isAvailable: docker.isAvailable)
-                    }
-
-                    ForEach(visibleContainers) { container in
-                        Button {
-                            selectedContainer = container
-                        } label: {
-                            DockerContainerSheetRow(container: container)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle(Text("Docker"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .searchable(text: $searchText, prompt: Text("Search Containers"))
-            .toolbar {
-                ToolbarItem(placement: controlsPlacement) {
-                    Menu {
-                        Picker(String(localized: "Sort By"), selection: $sortOption) {
-                            ForEach(DockerContainerSortOption.allCases) { option in
-                                Label(option.title, systemImage: option.systemImage)
-                                    .tag(option)
-                            }
-                        }
-
-                        Picker(String(localized: "Filter"), selection: $filterOption) {
-                            ForEach(DockerContainerFilterOption.allCases) { option in
-                                Label(option.title, systemImage: option.systemImage)
-                                    .tag(option)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .accessibilityLabel(Text("Sort and Filter"))
-                }
-            }
-            .statsSheetCloseToolbar()
+        sheetContent
             .alert(String(localized: "Could Not Load Containers"), isPresented: $showingError) {
                 Button(String(localized: "OK"), role: .cancel) {}
             } message: {
                 Text(errorMessage)
             }
-            .sheet(item: $selectedContainer) { container in
+            .statsDetailPresentation(item: $selectedContainer) { container in
                 DockerContainerDetailsSheet(
                     container: container,
                     performAction: performDockerAction
@@ -3357,11 +3507,106 @@ private struct DockerDetailsSheet: View {
                     docker = updatedDocker
                 }
             }
+            .task {
+                await refresh()
+            }
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "Docker")) {
+            dockerControlsMenu
+        } content: {
+            VStack(spacing: 0) {
+                StatsMacSearchField(prompt: String(localized: "Search Containers"), text: $searchText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                Divider()
+                dockerList
+            }
         }
-        .task {
-            await refresh()
+        #else
+        NavigationStack {
+            dockerList
+            .navigationTitle(Text("Docker"))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: Text("Search Containers"))
+            .toolbar {
+                ToolbarItem(placement: controlsPlacement) {
+                    dockerControlsMenu
+                }
+            }
+            .statsSheetCloseToolbar()
         }
-        .adaptiveSoftScrollEdges()
+        #endif
+    }
+
+    private var dockerList: some View {
+        List {
+            Section {
+                DockerSummaryRows(docker: docker)
+            }
+
+            if !docker.isAvailable {
+                Section {
+                    Text(docker.availability.message)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section(footer: DockerContainerListFooter(
+                visibleCount: visibleContainers.count,
+                totalCount: docker.containers.count,
+                isFiltered: isFiltered
+            )) {
+                if isLoading {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(String(localized: "Loading containers"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if visibleContainers.isEmpty, !isLoading {
+                    EmptyDockerContainerRow(isFiltered: isFiltered, isAvailable: docker.isAvailable)
+                }
+
+                ForEach(visibleContainers) { container in
+                    Button {
+                        selectedContainer = container
+                    } label: {
+                        DockerContainerSheetRow(container: container)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var dockerControlsMenu: some View {
+        Menu {
+            Picker(String(localized: "Sort By"), selection: $sortOption) {
+                ForEach(DockerContainerSortOption.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+
+            Picker(String(localized: "Filter"), selection: $filterOption) {
+                ForEach(DockerContainerFilterOption.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 16, weight: .semibold))
+        }
+        .accessibilityLabel(Text("Sort and Filter"))
     }
 
     private var controlsPlacement: ToolbarItemPlacement {
@@ -3598,90 +3843,103 @@ private struct DockerContainerDetailsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section(String(localized: "Overview")) {
-                    InfoRow(title: String(localized: "Name"), value: container.displayName)
-                    InfoRow(title: String(localized: "Container ID"), value: container.shortID)
-                    InfoRow(title: String(localized: "Image"), value: container.image)
-                    InfoRow(title: String(localized: "State"), value: dockerStateTitle(container.state))
-                    InfoRow(title: String(localized: "Health"), value: dockerHealthTitle(container.health))
-                    InfoRow(title: String(localized: "Status"), value: container.status)
-                    InfoRow(title: String(localized: "Running For"), value: container.runningFor)
-                }
-
-                if performAction != nil {
-                    Section(String(localized: "Actions")) {
-                        ForEach(availableActions, id: \.self) { action in
-                            Button(role: dockerActionRole(action)) {
-                                run(action)
-                            } label: {
-                                HStack {
-                                    Label(dockerActionTitle(action), systemImage: dockerActionSystemImage(action))
-                                    Spacer()
-                                    if activeAction == action {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    }
-                                }
-                            }
-                            .disabled(activeAction != nil)
-                        }
-                    }
-                }
-
-                Section(String(localized: "Usage")) {
-                    InfoRow(title: String(localized: "CPU"), value: formatPercent(container.cpuPercent))
-                    InfoRow(title: String(localized: "Memory"), value: formatDockerMemory(container))
-                    InfoRow(title: String(localized: "PIDs"), value: optionalInteger(container.pids))
-                }
-
-                Section(String(localized: "Network")) {
-                    InfoRow(title: String(localized: "Received"), value: optionalBytes(container.networkRx))
-                    InfoRow(title: String(localized: "Sent"), value: optionalBytes(container.networkTx))
-                }
-
-                Section(String(localized: "Storage")) {
-                    InfoRow(title: String(localized: "Read"), value: optionalBytes(container.blockRead))
-                    InfoRow(title: String(localized: "Write"), value: optionalBytes(container.blockWrite))
-                }
-
-                if !container.ports.isEmpty {
-                    Section(String(localized: "Ports")) {
-                        Text(container.ports)
-                            .textSelection(.enabled)
-                    }
-                }
-
-                if !container.command.isEmpty {
-                    Section(String(localized: "Command")) {
-                        Text(container.command)
-                            .font(.system(.body, design: .monospaced))
-                            .textSelection(.enabled)
-                            .lineLimit(nil)
-                    }
-                }
-            }
-            .navigationTitle(Text("Container Details"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .statsSheetCloseToolbar()
+        sheetContent
             .alert(String(localized: "Could Not Update Container"), isPresented: $showingError) {
                 Button(String(localized: "OK"), role: .cancel) {}
             } message: {
                 Text(errorMessage)
             }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #endif
+            .onDisappear {
+                actionTask?.cancel()
+                actionTask = nil
+                activeAction = nil
+            }
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "Container Details")) {
+            containerDetailsList
         }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
+        #else
+        NavigationStack {
+            containerDetailsList
+            .navigationTitle(Text("Container Details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .statsSheetCloseToolbar()
+        }
         #endif
-        .onDisappear {
-            actionTask?.cancel()
-            actionTask = nil
-            activeAction = nil
+    }
+
+    private var containerDetailsList: some View {
+        List {
+            Section(String(localized: "Overview")) {
+                InfoRow(title: String(localized: "Name"), value: container.displayName)
+                InfoRow(title: String(localized: "Container ID"), value: container.shortID)
+                InfoRow(title: String(localized: "Image"), value: container.image)
+                InfoRow(title: String(localized: "State"), value: dockerStateTitle(container.state))
+                InfoRow(title: String(localized: "Health"), value: dockerHealthTitle(container.health))
+                InfoRow(title: String(localized: "Status"), value: container.status)
+                InfoRow(title: String(localized: "Running For"), value: container.runningFor)
+            }
+
+            if performAction != nil {
+                Section(String(localized: "Actions")) {
+                    ForEach(availableActions, id: \.self) { action in
+                        Button(role: dockerActionRole(action)) {
+                            run(action)
+                        } label: {
+                            HStack {
+                                Label(dockerActionTitle(action), systemImage: dockerActionSystemImage(action))
+                                Spacer()
+                                if activeAction == action {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            }
+                        }
+                        .disabled(activeAction != nil)
+                    }
+                }
+            }
+
+            Section(String(localized: "Usage")) {
+                InfoRow(title: String(localized: "CPU"), value: formatPercent(container.cpuPercent))
+                InfoRow(title: String(localized: "Memory"), value: formatDockerMemory(container))
+                InfoRow(title: String(localized: "PIDs"), value: optionalInteger(container.pids))
+            }
+
+            Section(String(localized: "Network")) {
+                InfoRow(title: String(localized: "Received"), value: optionalBytes(container.networkRx))
+                InfoRow(title: String(localized: "Sent"), value: optionalBytes(container.networkTx))
+            }
+
+            Section(String(localized: "Storage")) {
+                InfoRow(title: String(localized: "Read"), value: optionalBytes(container.blockRead))
+                InfoRow(title: String(localized: "Write"), value: optionalBytes(container.blockWrite))
+            }
+
+            if !container.ports.isEmpty {
+                Section(String(localized: "Ports")) {
+                    Text(container.ports)
+                        .textSelection(.enabled)
+                }
+            }
+
+            if !container.command.isEmpty {
+                Section(String(localized: "Command")) {
+                    Text(container.command)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
+                }
+            }
         }
-        .adaptiveSoftScrollEdges()
     }
 
     private var availableActions: [DockerContainerAction] {
@@ -3831,14 +4089,35 @@ private extension ProcessInfo {
 }
 
 private struct EmptyCardState: View {
+    let icon: String
     let title: String
+    let message: String
+    let color: Color
     let style: StatsVisualStyle
 
     var body: some View {
-        Text(title)
-            .font(.title3.weight(.bold))
-            .foregroundStyle(style.primaryText)
-            .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 23, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 48, height: 48)
+                .background(color.opacity(0.14), in: Circle())
+
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(style.primaryText)
+
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(style.secondaryText)
+            }
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, minHeight: 142, maxHeight: .infinity, alignment: .center)
+        .padding(.vertical, style.density == .detailed ? 18 : 12)
     }
 }
 
@@ -3848,49 +4127,62 @@ private struct CPUDetailsSheet: View {
     let stats: ServerStats
 
     var body: some View {
+        sheetContent
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "CPU Details")) {
+            cpuDetailsList
+        }
+        #else
         NavigationStack {
-            List {
-                Section(String(localized: "Overview")) {
-                    InfoRow(title: String(localized: "Usage"), value: formatPercent(stats.cpuUsage))
-                    InfoRow(title: String(localized: "User"), value: formatPercent(stats.cpuUser))
-                    InfoRow(title: String(localized: "System"), value: formatPercent(stats.cpuSystem))
-                    InfoRow(title: String(localized: "I/O Wait"), value: formatPercent(stats.cpuIowait))
-                    InfoRow(title: String(localized: "Steal"), value: formatPercent(stats.cpuSteal))
-                    InfoRow(title: String(localized: "Idle"), value: formatPercent(stats.cpuIdle))
-                    InfoRow(title: String(localized: "Load Average"), value: loadAverageLabel)
-                }
+            cpuDetailsList
+            .navigationTitle(Text("CPU Details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .statsSheetCloseToolbar()
+        }
+        #endif
+    }
 
-                Section(String(localized: "Processor")) {
-                    InfoRow(title: String(localized: "Model"), value: stats.hardware.cpuModel)
-                    InfoRow(title: String(localized: "Vendor"), value: stats.hardware.cpuVendor)
-                    InfoRow(title: String(localized: "Physical Cores"), value: integerLabel(stats.hardware.cpuCores))
-                    InfoRow(title: String(localized: "Logical Cores"), value: integerLabel(stats.hardware.cpuThreads > 0 ? stats.hardware.cpuThreads : stats.cpuCores))
-                }
+    private var cpuDetailsList: some View {
+        List {
+            Section(String(localized: "Overview")) {
+                InfoRow(title: String(localized: "Usage"), value: formatPercent(stats.cpuUsage))
+                InfoRow(title: String(localized: "User"), value: formatPercent(stats.cpuUser))
+                InfoRow(title: String(localized: "System"), value: formatPercent(stats.cpuSystem))
+                InfoRow(title: String(localized: "I/O Wait"), value: formatPercent(stats.cpuIowait))
+                InfoRow(title: String(localized: "Steal"), value: formatPercent(stats.cpuSteal))
+                InfoRow(title: String(localized: "Idle"), value: formatPercent(stats.cpuIdle))
+                InfoRow(title: String(localized: "Load Average"), value: loadAverageLabel)
+            }
 
-                Section(String(localized: "Cores")) {
-                    if stats.cpuCoreSamples.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if stats.cpuCores > 1 {
-                                Text(String(format: String(localized: "%lld logical cores detected"), Int64(stats.cpuCores)))
-                                    .font(.headline)
-                            }
-                            Text(String(localized: "Per-core usage samples unavailable"))
-                                .foregroundStyle(.secondary)
+            Section(String(localized: "Processor")) {
+                InfoRow(title: String(localized: "Model"), value: stats.hardware.cpuModel)
+                InfoRow(title: String(localized: "Vendor"), value: stats.hardware.cpuVendor)
+                InfoRow(title: String(localized: "Physical Cores"), value: integerLabel(stats.hardware.cpuCores))
+                InfoRow(title: String(localized: "Logical Cores"), value: integerLabel(stats.hardware.cpuThreads > 0 ? stats.hardware.cpuThreads : stats.cpuCores))
+            }
+
+            Section(String(localized: "Cores")) {
+                if stats.cpuCoreSamples.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if stats.cpuCores > 1 {
+                            Text(String(format: String(localized: "%lld logical cores detected"), Int64(stats.cpuCores)))
+                                .font(.headline)
                         }
-                    } else {
-                        ForEach(stats.cpuCoreSamples) { sample in
-                            CPUCoreDetailRow(sample: sample)
-                        }
+                        Text(String(localized: "Per-core usage samples unavailable"))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    ForEach(stats.cpuCoreSamples) { sample in
+                        CPUCoreDetailRow(sample: sample)
                     }
                 }
             }
-            .navigationTitle(Text("CPU Details"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .statsSheetCloseToolbar()
         }
-        .adaptiveSoftScrollEdges()
     }
 
     private var loadAverageLabel: String {
@@ -3939,31 +4231,44 @@ private struct GPUDetailsSheet: View {
     let devices: [GPUDevice]
 
     var body: some View {
+        sheetContent
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "GPU Details")) {
+            gpuDetailsList
+        }
+        #else
         NavigationStack {
-            List {
-                if devices.isEmpty {
-                    Section {
-                        Text(String(localized: "No GPU reported"))
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    ForEach(devices) { device in
-                        Section(device.displayName) {
-                            GPUDeviceDetailRows(
-                                device: device,
-                                sample: sample(for: device)
-                            )
-                        }
+            gpuDetailsList
+            .navigationTitle(Text("GPU Details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .statsSheetCloseToolbar()
+        }
+        #endif
+    }
+
+    private var gpuDetailsList: some View {
+        List {
+            if devices.isEmpty {
+                Section {
+                    Text(String(localized: "No GPU reported"))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(devices) { device in
+                    Section(device.displayName) {
+                        GPUDeviceDetailRows(
+                            device: device,
+                            sample: sample(for: device)
+                        )
                     }
                 }
             }
-            .navigationTitle(Text("GPU Details"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .statsSheetCloseToolbar()
         }
-        .adaptiveSoftScrollEdges()
     }
 
     private func sample(for device: GPUDevice) -> GPUSample? {
@@ -4088,52 +4393,65 @@ private struct SystemDetailsSheet: View {
     }
 
     var body: some View {
+        sheetContent
+            .adaptiveSoftScrollEdges()
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(String(localized: "System Details")) {
+            systemDetailsList
+        }
+        #else
         NavigationStack {
-            List {
-                Section(String(localized: "System")) {
-                    InfoRow(title: String(localized: "Hostname"), value: nonEmpty(profile.hostname, fallback: stats.hostname))
-                    InfoRow(title: String(localized: "OS"), value: nonEmpty(profile.osInfo, fallback: stats.osInfo))
-                    InfoRow(title: String(localized: "Architecture"), value: profile.architecture)
-                    InfoRow(title: String(localized: "Kernel"), value: profile.kernelVersion)
-                    InfoRow(title: String(localized: "Uptime"), value: formatUptimeDetail(stats.uptime))
-                }
+            systemDetailsList
+            .navigationTitle(Text("System Details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .statsSheetCloseToolbar()
+        }
+        #endif
+    }
 
-                Section(String(localized: "Processor")) {
-                    InfoRow(title: String(localized: "Model"), value: profile.cpuModel)
-                    InfoRow(title: String(localized: "Vendor"), value: profile.cpuVendor)
-                    InfoRow(title: String(localized: "Cores"), value: integerLabel(profile.cpuCores))
-                    InfoRow(title: String(localized: "Threads"), value: integerLabel(profile.cpuThreads > 0 ? profile.cpuThreads : stats.cpuCores))
-                    InfoRow(title: String(localized: "Current Load"), value: formatPercent(stats.cpuUsage))
-                }
+    private var systemDetailsList: some View {
+        List {
+            Section(String(localized: "System")) {
+                InfoRow(title: String(localized: "Hostname"), value: nonEmpty(profile.hostname, fallback: stats.hostname))
+                InfoRow(title: String(localized: "OS"), value: nonEmpty(profile.osInfo, fallback: stats.osInfo))
+                InfoRow(title: String(localized: "Architecture"), value: profile.architecture)
+                InfoRow(title: String(localized: "Kernel"), value: profile.kernelVersion)
+                InfoRow(title: String(localized: "Uptime"), value: formatUptimeDetail(stats.uptime))
+            }
 
-                Section(String(localized: "Memory")) {
-                    InfoRow(title: String(localized: "Installed"), value: formatBytes(max(profile.memoryTotal, stats.memoryTotal)))
-                    InfoRow(title: String(localized: "Used"), value: formatBytes(stats.memoryUsed))
-                    InfoRow(title: String(localized: "Cached"), value: formatBytes(stats.memoryCached))
-                }
+            Section(String(localized: "Processor")) {
+                InfoRow(title: String(localized: "Model"), value: profile.cpuModel)
+                InfoRow(title: String(localized: "Vendor"), value: profile.cpuVendor)
+                InfoRow(title: String(localized: "Cores"), value: integerLabel(profile.cpuCores))
+                InfoRow(title: String(localized: "Threads"), value: integerLabel(profile.cpuThreads > 0 ? profile.cpuThreads : stats.cpuCores))
+                InfoRow(title: String(localized: "Current Load"), value: formatPercent(stats.cpuUsage))
+            }
 
-                if !profile.gpus.isEmpty {
-                    Section(String(localized: "GPU")) {
-                        ForEach(profile.gpus) { gpu in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(gpu.displayName)
-                                    .font(.headline)
-                                InfoRow(title: String(localized: "Vendor"), value: gpu.vendor)
-                                InfoRow(title: String(localized: "Driver"), value: gpu.driverVersion)
-                                InfoRow(title: String(localized: "VRAM"), value: gpu.memoryTotal > 0 ? formatBytes(gpu.memoryTotal) : "")
-                            }
-                            .padding(.vertical, 4)
+            Section(String(localized: "Memory")) {
+                InfoRow(title: String(localized: "Installed"), value: formatBytes(max(profile.memoryTotal, stats.memoryTotal)))
+                InfoRow(title: String(localized: "Used"), value: formatBytes(stats.memoryUsed))
+                InfoRow(title: String(localized: "Cached"), value: formatBytes(stats.memoryCached))
+            }
+
+            if !profile.gpus.isEmpty {
+                Section(String(localized: "GPU")) {
+                    ForEach(profile.gpus) { gpu in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(gpu.displayName)
+                                .font(.headline)
+                            InfoRow(title: String(localized: "Vendor"), value: gpu.vendor)
+                            InfoRow(title: String(localized: "Driver"), value: gpu.driverVersion)
+                            InfoRow(title: String(localized: "VRAM"), value: gpu.memoryTotal > 0 ? formatBytes(gpu.memoryTotal) : "")
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }
-            .navigationTitle(Text("System Details"))
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .statsSheetCloseToolbar()
         }
-        .adaptiveSoftScrollEdges()
     }
 
     private func nonEmpty(_ value: String, fallback: String) -> String {

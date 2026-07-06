@@ -25,7 +25,7 @@ struct LinuxStatsCollector: PlatformStatsCollector {
     }
 
     func collectProfile(client: SSHClient) async throws -> HardwareProfile {
-        let cmd = """
+        let profileScript = """
             LC_ALL=C LANG=C; \
             hostname 2>/dev/null; echo '---SEP---'; \
             uname -srm 2>/dev/null; echo '---SEP---'; \
@@ -36,6 +36,7 @@ struct LinuxStatsCollector: PlatformStatsCollector {
             (nvidia-smi --query-gpu=index,name,driver_version,memory.total --format=csv,noheader,nounits 2>/dev/null || true); echo '---SEP---'; \
             (lspci -mm 2>/dev/null | grep -Ei 'VGA|3D|Display' || true)
             """
+        let cmd = RemoteTerminalBootstrap.wrapPOSIXShellCommand(profileScript)
         let output = try await client.execute(cmd, timeout: .seconds(5))
         let sections = output.components(separatedBy: "---SEP---")
         let hostname = sections[safe: 0]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -188,7 +189,7 @@ struct LinuxStatsCollector: PlatformStatsCollector {
                 \(processCommand(limit: periodicProcessLimit)); echo '---SEP---'; \
                 (ps -e 2>/dev/null | wc -l)
                 """
-            let fallbackOutput = try await client.execute(fallbackCmd)
+            let fallbackOutput = try await client.execute(RemoteTerminalBootstrap.wrapPOSIXShellCommand(fallbackCmd))
             fallbackSections = fallbackOutput.components(separatedBy: "---SEP---")
 
             let topOutput = fallbackSections.count > 0 ? fallbackSections[0] : ""
@@ -260,7 +261,9 @@ struct LinuxStatsCollector: PlatformStatsCollector {
         }
 
         // Volumes (separate command for reliability)
-        let dfOutput = try await client.execute("LC_ALL=C LANG=C df -BM -P -x tmpfs -x devtmpfs -x squashfs 2>/dev/null")
+        let dfOutput = try await client.execute(
+            RemoteTerminalBootstrap.wrapPOSIXShellCommand("LC_ALL=C LANG=C df -BM -P -x tmpfs -x devtmpfs -x squashfs 2>/dev/null")
+        )
         stats.volumes = parseDfVolumes(dfOutput)
 
         // Top processes

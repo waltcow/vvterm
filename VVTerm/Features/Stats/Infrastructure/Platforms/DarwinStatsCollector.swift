@@ -114,7 +114,7 @@ struct DarwinStatsCollector: PlatformStatsCollector {
     }
 
     func collectProfile(client: SSHClient) async throws -> HardwareProfile {
-        let cmd = """
+        let profileScript = """
             LC_ALL=C LANG=C; \
             hostname 2>/dev/null; echo '---SEP---'; \
             uname -srm 2>/dev/null; echo '---SEP---'; \
@@ -126,6 +126,7 @@ struct DarwinStatsCollector: PlatformStatsCollector {
             sysctl -n hw.logicalcpu 2>/dev/null; echo '---SEP---'; \
             sysctl -n hw.memsize 2>/dev/null
             """
+        let cmd = RemoteTerminalBootstrap.wrapPOSIXShellCommand(profileScript)
         let output = try await client.execute(cmd, timeout: .seconds(5))
         let sections = output.components(separatedBy: "---SEP---")
         let displayJSON = (try? await client.execute(

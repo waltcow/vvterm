@@ -336,13 +336,16 @@ private struct MainWindowChromeBridge: NSViewRepresentable {
         view.applyIfPossible()
     }
 
-    private func configure(_ window: NSWindow, title: String, backgroundColor: Color) {
+    private static func configure(_ window: NSWindow, title: String, backgroundColor: Color) {
         let nsBackgroundColor = NSColor(backgroundColor)
         if window.title != title {
             window.title = title
         }
         window.backgroundColor = nsBackgroundColor
-        window.titleVisibility = .hidden
+        window.titleVisibility = title.isEmpty ? .hidden : .visible
+        if title.isEmpty {
+            window.subtitle = ""
+        }
         window.titlebarAppearsTransparent = true
         // Keep the content area interactive. Enabling background dragging here
         // causes terminal clicks and drag-to-select gestures to start moving the window.
@@ -374,11 +377,7 @@ private struct MainWindowChromeBridge: NSViewRepresentable {
 
         func applyIfPossible() {
             guard let window else { return }
-            MainWindowChromeBridge(
-                windowTitle: windowTitle,
-                backgroundColor: backgroundColor
-            )
-            .configure(
+            MainWindowChromeBridge.configure(
                 window,
                 title: windowTitle,
                 backgroundColor: backgroundColor
