@@ -51,6 +51,10 @@ final class ServerStatsDomainTests: XCTestCase {
         XCTAssertEqual(ServerStatsCollector.resolvedCPUCoreCount(existing: 0, collected: 8), 8)
     }
 
+    func testStatsPreferencesDefaultStyleIsCardsDetailed() {
+        XCTAssertEqual(StatsPreferences.defaultValue.style, .cardsDetailed)
+    }
+
     func testStatsPreferencesNormalizeDeduplicatesAndReindexesBlocks() {
         let olderCPUBlock = StatsPreferences.Block(
             id: .cpu,

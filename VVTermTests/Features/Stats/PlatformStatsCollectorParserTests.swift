@@ -153,18 +153,98 @@ final class PlatformStatsCollectorParserTests: XCTestCase {
         XCTAssertEqual(processes[0].command, "python server.py")
     }
 
-    func testWindowsGPUParserUsesVideoControllerRows() {
+    func testWindowsGPUParserFiltersVirtualAdaptersAndAvoidsCappedVRAM() {
         let output = """
-        NVIDIA RTX 4090|NVIDIA|25757220864|555.42
-        Intel UHD Graphics|Intel Corporation|1073741824|31.0
+        GameViewer Virtual Display Adapter|GameViewer|0|1.0|ROOT\\DISPLAY\\0000|OK
+        SudoMaker Virtual Display Adapter|SudoMaker|0|1.0|ROOT\\DISPLAY\\0001|OK
+        NVIDIA GeForce RTX 3060|NVIDIA|4293918720|555.42|PCI\\VEN_10DE&DEV_2504|OK
+        Intel UHD Graphics|Intel Corporation|1073741824|31.0|PCI\\VEN_8086&DEV_9A49|OK
         """
 
         let devices = WindowsStatsCollector().parseWindowsGPUs(output)
 
         XCTAssertEqual(devices.count, 2)
         XCTAssertEqual(devices[0].kind, .nvidia)
-        XCTAssertEqual(devices[0].memoryTotal, 25_757_220_864)
+        XCTAssertEqual(devices[0].memoryTotal, 0)
         XCTAssertEqual(devices[1].kind, .intel)
+        XCTAssertEqual(devices[1].memoryTotal, 1_073_741_824)
+    }
+
+    func testWindowsNvidiaParserUsesSMIForRealVRAM() {
+        let output = "0, NVIDIA GeForce RTX 3060, GPU-abc, 45, 2048, 12288, 63, 120.5, 555.42"
+
+        let devices = WindowsStatsCollector().parseWindowsNvidiaGPUs(output)
+        let samples = WindowsStatsCollector().parseWindowsNvidiaSamples(
+            output,
+            timestamp: Date(timeIntervalSince1970: 1)
+        )
+
+        XCTAssertEqual(devices.count, 1)
+        XCTAssertEqual(devices[0].id, "nvidia-0")
+        XCTAssertEqual(devices[0].memoryTotal, 12_288 * 1_048_576)
+        XCTAssertEqual(samples[0].utilizationPercent, 45)
+        XCTAssertEqual(samples[0].memoryUsed, 2_048 * 1_048_576)
+        XCTAssertEqual(samples[0].memoryTotal, 12_288 * 1_048_576)
+    }
+
+    func testWindowsGPUCounterParserReadsPerfRows() {
+        let samples = WindowsStatsCollector().parseWindowsGPUCounterSamples(
+            "PERF|windows-phys-0|125.4|2147483648|8589934592",
+            timestamp: Date(timeIntervalSince1970: 1)
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertEqual(samples[0].deviceID, "windows-phys-0")
+        XCTAssertEqual(samples[0].utilizationPercent, 100)
+        XCTAssertEqual(samples[0].memoryUsed, 2_147_483_648)
+        XCTAssertEqual(samples[0].memoryTotal, 8_589_934_592)
+    }
+
+    func testWindowsGPUCounterParserTreatsZeroMemoryLimitAsMissing() {
+        let samples = WindowsStatsCollector().parseWindowsGPUCounterSamples(
+            "PERF|windows-phys-0|25.0|2147483648|0",
+            timestamp: Date(timeIntervalSince1970: 1)
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertEqual(samples[0].deviceID, "windows-phys-0")
+        XCTAssertEqual(samples[0].utilizationPercent, 25)
+        XCTAssertEqual(samples[0].memoryUsed, 2_147_483_648)
+        XCTAssertNil(samples[0].memoryTotal)
+    }
+
+    func testWindowsCPUParserReadsPerCoreCounters() {
+        let output = """
+        TOTAL|24.5|18.0|6.5
+        CORE|0|12.0|8.0|4.0
+        CORE|1|88.5|70.0|18.5
+        """
+
+        let usage = WindowsStatsCollector().parseWindowsCPUUsage(output)
+
+        XCTAssertEqual(usage.usagePercent, 24.5)
+        XCTAssertEqual(usage.userPercent, 18.0)
+        XCTAssertEqual(usage.systemPercent, 6.5)
+        XCTAssertEqual(usage.coreSamples.count, 2)
+        XCTAssertEqual(usage.coreSamples[1].displayName, "CPU 2")
+        XCTAssertEqual(usage.coreSamples[1].usagePercent, 88.5)
+    }
+
+    func testWindowsCPUParserReadsLocalizedDecimalCommas() {
+        let output = """
+        TOTAL|24,5|18,0|6,5
+        CORE|0|12,0|8,0|4,0
+        CORE|1|88,5|70,0|18,5
+        """
+
+        let usage = WindowsStatsCollector().parseWindowsCPUUsage(output)
+
+        XCTAssertEqual(usage.usagePercent, 24.5)
+        XCTAssertEqual(usage.userPercent, 18.0)
+        XCTAssertEqual(usage.systemPercent, 6.5)
+        XCTAssertEqual(usage.coreSamples.count, 2)
+        XCTAssertEqual(usage.coreSamples[1].usagePercent, 88.5)
+        XCTAssertEqual(usage.coreSamples[1].systemPercent, 18.5)
     }
 
     func testWindowsProcessParserReturnsAllRows() {
@@ -178,6 +258,42 @@ final class PlatformStatsCollectorParserTests: XCTestCase {
 
         XCTAssertEqual(processes.count, 3)
         XCTAssertEqual(processes[1].name, "Terminal")
+    }
+
+    func testWindowsWMICProcessParserNormalizesCPUAndMemoryPercent() {
+        let output = """
+        Node,IDProcess,Name,PercentProcessorTime,WorkingSetPrivate
+        HOST,100,python,320,1073741824
+        HOST,200,code,40,536870912
+        """
+
+        let processes = WindowsStatsCollector().parseWMICProcesses(
+            output,
+            memoryTotal: 4_294_967_296,
+            logicalProcessorCount: 8
+        )
+
+        XCTAssertEqual(processes.count, 2)
+        XCTAssertEqual(processes[0].cpuPercent, 40)
+        XCTAssertEqual(processes[0].memoryPercent, 25)
+        XCTAssertEqual(processes[1].cpuPercent, 5)
+        XCTAssertEqual(processes[1].memoryPercent, 12.5)
+    }
+
+    func testWindowsWMICProcessParserReadsLocalizedDecimalCommaCPU() {
+        let output = """
+        Node,IDProcess,Name,PercentProcessorTime,WorkingSetPrivate
+        HOST,100,python,"320,0",1073741824
+        """
+
+        let processes = WindowsStatsCollector().parseWMICProcesses(
+            output,
+            memoryTotal: 4_294_967_296,
+            logicalProcessorCount: 8
+        )
+
+        XCTAssertEqual(processes.count, 1)
+        XCTAssertEqual(processes[0].cpuPercent, 40)
     }
 
     func testWindowsWMICVolumeParserHandlesDriveRows() {

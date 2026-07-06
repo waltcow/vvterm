@@ -33,9 +33,7 @@ struct iOSContentView: View {
     }
 
     private var preferredConnectViewId: String {
-        viewTabConfig.isTabVisible(ConnectionViewTab.terminal.id)
-            ? ConnectionViewTab.terminal.id
-            : viewTabConfig.effectiveDefaultTab()
+        viewTabConfig.effectiveDefaultTab()
     }
 
     var body: some View {
@@ -190,9 +188,7 @@ struct iOSServerListView: View {
     }
 
     private var preferredConnectViewId: String {
-        viewTabConfig.isTabVisible(ConnectionViewTab.terminal.id)
-            ? ConnectionViewTab.terminal.id
-            : viewTabConfig.effectiveDefaultTab()
+        viewTabConfig.effectiveDefaultTab()
     }
 
     var body: some View {

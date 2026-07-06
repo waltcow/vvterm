@@ -62,7 +62,7 @@ extension StatsPreferences {
 
     static var defaultValue: StatsPreferences {
         StatsPreferences(
-            style: .cardsCompact,
+            style: .cardsDetailed,
             blocks: defaultBlocks,
             updatedAt: .distantPast,
             lastWriterDeviceId: DeviceIdentity.id

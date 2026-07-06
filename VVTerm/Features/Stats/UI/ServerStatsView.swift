@@ -225,8 +225,9 @@ struct ServerStatsView: View {
     let backgroundColor: Color
     var sharedClientProvider: () -> SSHClient? = { nil }
 
-    @StateObject private var statsCollector: ServerStatsCollector
     @StateObject private var preferences = PreferencesStore.shared
+    @State private var statsCollector: ServerStatsCollector
+    @State private var isShowingAppearanceSettings = false
 
     init(
         server: Server,
@@ -239,12 +240,52 @@ struct ServerStatsView: View {
         self.isVisible = isVisible
         self.backgroundColor = backgroundColor
         self.sharedClientProvider = sharedClientProvider
-        _statsCollector = StateObject(wrappedValue: statsCollector)
+        _statsCollector = State(initialValue: statsCollector)
     }
 
     var body: some View {
         let currentPreferences = preferences.preferences
-        let style = StatsVisualStyle(preferencesStyle: currentPreferences.style)
+
+        ServerStatsDashboard(
+            server: server,
+            isVisible: isVisible,
+            backgroundColor: backgroundColor,
+            sharedClientProvider: sharedClientProvider,
+            statsCollector: statsCollector,
+            preferences: currentPreferences
+        ) {
+            isShowingAppearanceSettings = true
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(StatsBlocksContent.pageBackground(for: currentPreferences.style, backgroundColor: backgroundColor))
+        .sheet(isPresented: $isShowingAppearanceSettings) {
+            NavigationStack {
+                AppearanceSettings()
+                    .navigationTitle(Text("Stats Appearance"))
+                    #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .statsSheetCloseToolbar(placement: .leading)
+            }
+            #if os(iOS)
+            .presentationDetents([.large])
+            #endif
+            .adaptiveSoftScrollEdges()
+        }
+    }
+}
+
+private struct ServerStatsDashboard: View {
+    let server: Server
+    let isVisible: Bool
+    let backgroundColor: Color
+    var sharedClientProvider: () -> SSHClient?
+    @ObservedObject var statsCollector: ServerStatsCollector
+    let preferences: StatsPreferences
+    let showAppearanceSettings: () -> Void
+
+    var body: some View {
+        let style = StatsVisualStyle(preferencesStyle: preferences.style)
 
         ZStack {
             ScrollView {
@@ -256,11 +297,13 @@ struct ServerStatsView: View {
                     gpuHistories: statsCollector.gpuUtilizationHistoryByDeviceID,
                     networkRxHistory: statsCollector.networkRxHistory,
                     networkTxHistory: statsCollector.networkTxHistory,
-                    preferences: currentPreferences,
+                    preferences: preferences,
                     backgroundColor: backgroundColor,
                     surface: .dashboard,
                     constrainsWidth: true,
                     usesPagePadding: true,
+                    showsCustomizationEntryPoint: true,
+                    customizeAction: showAppearanceSettings,
                     terminateProcess: { process in
                         try await statsCollector.terminateProcess(process)
                     },
@@ -279,8 +322,6 @@ struct ServerStatsView: View {
                 .padding()
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(StatsBlocksContent.pageBackground(for: currentPreferences.style, backgroundColor: backgroundColor))
         .task(id: makeTaskKey()) {
             if isVisible {
                 await statsCollector.startCollecting(for: server, using: sharedClientProvider())
@@ -316,6 +357,8 @@ struct StatsAppearancePreviewContent: View {
             surface: .grouped,
             constrainsWidth: false,
             usesPagePadding: false,
+            showsCustomizationEntryPoint: false,
+            customizeAction: nil,
             terminateProcess: nil,
             loadProcesses: nil
         )
@@ -337,6 +380,8 @@ private struct StatsBlocksContent: View {
     let surface: StatsVisualStyle.Surface
     let constrainsWidth: Bool
     let usesPagePadding: Bool
+    let showsCustomizationEntryPoint: Bool
+    let customizeAction: (() -> Void)?
     let terminateProcess: ((ProcessInfo) async throws -> Void)?
     let loadProcesses: (() async throws -> [ProcessInfo])?
 
@@ -357,6 +402,8 @@ private struct StatsBlocksContent: View {
                 stats: stats,
                 visibleBlocks: preferences.visibleBlocks,
                 surfaceStyle: classicSurfaceStyle,
+                showsCustomizationEntryPoint: showsCustomizationEntryPoint,
+                customizeAction: customizeAction,
                 terminateProcess: terminateProcess,
                 loadProcesses: loadProcesses
             )
@@ -367,6 +414,10 @@ private struct StatsBlocksContent: View {
             LazyVStack(alignment: .leading, spacing: style.cardSpacing) {
                 ForEach(preferences.visibleBlocks, id: \.self) { blockID in
                     statsBlock(blockID, style: style)
+                }
+
+                if showsCustomizationEntryPoint, let customizeAction {
+                    StatsCustomizeCard(style: style, action: customizeAction)
                 }
             }
             .padding(.horizontal, usesPagePadding ? style.horizontalPadding : 0)
@@ -601,6 +652,55 @@ private struct AppleCard<Content: View>: View {
     }
 }
 
+private struct StatsCustomizeCard: View {
+    let style: StatsVisualStyle
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 42, height: 42)
+                    .background(Color.accentColor.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Customize Stats")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(style.primaryText)
+                    Text("Cards, order, visibility")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(style.secondaryText)
+                }
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(style.tertiaryText)
+            }
+            .padding(style.cardPadding)
+            .frame(maxWidth: .infinity, minHeight: style.density == .detailed ? 104 : 92, alignment: .leading)
+            .background(style.cardFill.opacity(0.38), in: RoundedRectangle(cornerRadius: style.cardCornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: style.cardCornerRadius, style: .continuous)
+                    .stroke(
+                        style: StrokeStyle(
+                            lineWidth: 1.5,
+                            lineCap: .round,
+                            lineJoin: .round,
+                            dash: [7, 7]
+                        )
+                    )
+                    .foregroundStyle(style.tertiaryText.opacity(0.7))
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Customize Stats"))
+    }
+}
+
 // MARK: - Classic Layout
 
 private struct ClassicStatsContent: View {
@@ -608,6 +708,8 @@ private struct ClassicStatsContent: View {
     let stats: ServerStats
     let visibleBlocks: [StatsPreferences.BlockID]
     let surfaceStyle: ClassicStatsCardSurfaceStyle
+    let showsCustomizationEntryPoint: Bool
+    let customizeAction: (() -> Void)?
     let terminateProcess: ((ProcessInfo) async throws -> Void)?
     let loadProcesses: (() async throws -> [ProcessInfo])?
 
@@ -615,6 +717,10 @@ private struct ClassicStatsContent: View {
         LazyVStack(spacing: 16) {
             ForEach(visibleBlocks, id: \.self) { blockID in
                 classicBlock(blockID)
+            }
+
+            if showsCustomizationEntryPoint, let customizeAction {
+                ClassicStatsCustomizeCard(surfaceStyle: surfaceStyle, action: customizeAction)
             }
         }
     }
@@ -676,6 +782,55 @@ private struct ClassicStatsContent: View {
                 loadProcesses: loadProcesses
             )
         }
+    }
+}
+
+private struct ClassicStatsCustomizeCard: View {
+    let surfaceStyle: ClassicStatsCardSurfaceStyle
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 36, height: 36)
+                    .background(Color.accentColor.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Customize Stats")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Cards, order, visibility")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 10)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .background(surfaceStyle.fill.opacity(0.45), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        style: StrokeStyle(
+                            lineWidth: 1.5,
+                            lineCap: .round,
+                            lineJoin: .round,
+                            dash: [6, 6]
+                        )
+                    )
+                    .foregroundStyle(Color.secondary.opacity(0.55))
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Customize Stats"))
     }
 }
 
@@ -1270,7 +1425,7 @@ private struct SystemOverviewCard: View {
 
     private var subtitle: String {
         if !stats.hostname.isEmpty, !stats.osInfo.isEmpty, stats.hostname != serverName {
-            return "\(stats.hostname) - \(stats.osInfo)"
+            return "\(stats.hostname)\n\(stats.osInfo)"
         }
         if !stats.osInfo.isEmpty {
             return stats.osInfo
@@ -1301,7 +1456,7 @@ private struct CPUCard: View {
                 trailing: cpuCountTitle,
                 value: formatPercent(stats.cpuUsage),
                 unit: "",
-                footer: compactFooter,
+                footer: footer,
                 detailItems: [
                     MetricDetailItem(title: String(localized: "User"), value: formatPercent(stats.cpuUser), color: .pink),
                     MetricDetailItem(title: String(localized: "System"), value: formatPercent(stats.cpuSystem), color: .orange),
@@ -1332,9 +1487,13 @@ private struct CPUCard: View {
         return String(format: String(localized: "%lld cores"), Int64(count))
     }
 
+    private var footer: String {
+        style.density == .detailed ? "" : compactFooter
+    }
+
     private var compactFooter: String {
         String(
-            format: String(localized: "User %@ - System %@ - Idle %@"),
+            format: String(localized: "User %@  System %@  Idle %@"),
             formatPercent(stats.cpuUser),
             formatPercent(stats.cpuSystem),
             formatPercent(stats.cpuIdle)
@@ -1355,7 +1514,7 @@ private struct MemoryCard: View {
             trailing: String(localized: "Today"),
             value: formatPercent(stats.memoryPercent),
             unit: "",
-            footer: String(format: String(localized: "%@ of %@ used"), formatBytes(stats.memoryUsed), formatBytes(stats.memoryTotal)),
+            footer: formatUsedCapacity(stats.memoryUsed, total: stats.memoryTotal),
             detailItems: [
                 MetricDetailItem(title: String(localized: "Used"), value: formatBytes(stats.memoryUsed), color: .blue),
                 MetricDetailItem(title: String(localized: "Free"), value: formatBytes(stats.memoryFree), color: .green),
@@ -1501,11 +1660,11 @@ private struct GPUCard: View {
 
     private func footerLabel(device: GPUDevice?, sample: GPUSample?) -> String {
         if let vram = aggregateVRAMUsage {
-            return String(format: String(localized: "VRAM %@ of %@ used"), formatBytes(vram.used), formatBytes(vram.total))
+            return formatUsedCapacity(vram.used, total: vram.total)
         }
         let memoryTotal = sample?.memoryTotal ?? device?.memoryTotal ?? 0
         if let memoryUsed = sample?.memoryUsed, memoryTotal > 0 {
-            return String(format: String(localized: "VRAM %@ of %@ used"), formatBytes(memoryUsed), formatBytes(memoryTotal))
+            return formatUsedCapacity(memoryUsed, total: memoryTotal)
         }
         if let temperature = sample?.temperatureCelsius {
             return String(format: String(localized: "%.0f C"), temperature)
@@ -1579,12 +1738,12 @@ private struct GPUDeviceRow: View {
 
     private var detail: String {
         if let power = sample?.powerWatts, let temp = sample?.temperatureCelsius {
-            return String(format: String(localized: "%.0f W - %.0f C"), power, temp)
+            return String(format: String(localized: "%.0f W  %.0f C"), power, temp)
         }
         if let memoryUsed = sample?.memoryUsed {
             let memoryTotal = sample?.memoryTotal ?? device.memoryTotal
             if memoryTotal > 0 {
-                return String(format: String(localized: "%@ of %@ VRAM"), formatBytes(memoryUsed), formatBytes(memoryTotal))
+                return formatUsedCapacity(memoryUsed, total: memoryTotal)
             }
             return String(format: String(localized: "%@ VRAM used"), formatBytes(memoryUsed))
         }
@@ -1740,11 +1899,13 @@ private struct AppleMetricCard<Preview: View>: View {
                             }
                         }
 
-                        Text(footer)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(style.secondaryText)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.78)
+                        if !footer.isEmpty {
+                            Text(footer)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(style.secondaryText)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.78)
+                        }
                     }
 
                     Spacer(minLength: 8)
@@ -2038,7 +2199,7 @@ private struct VolumeCardRow: View {
                 style: style
             )
 
-            Text(String(format: String(localized: "%@ of %@ used"), formatBytes(volume.used), formatBytes(volume.total)))
+            Text(formatUsedCapacity(volume.used, total: volume.total))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(style.secondaryText)
                 .lineLimit(1)
@@ -2099,14 +2260,18 @@ private struct ProcessBadge: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(String(format: "%.1f", value))
+                Text(formatPercent(value))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(style.primaryText)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
                 Text(title)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(style.secondaryText)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.68)
 
             MiniMeter(value: min(value / 100, 1), color: color, style: style)
                 .frame(width: 54)
@@ -2121,8 +2286,12 @@ private struct ProcessesSheet: View {
     let terminateProcess: ((ProcessInfo) async throws -> Void)?
     let loadProcesses: (() async throws -> [ProcessInfo])?
 
-    @State private var displayedProcesses: [ProcessInfo] = []
+    @State private var loadedProcesses: [ProcessInfo] = []
+    @State private var searchText = ""
+    @State private var sortOption: ProcessSortOption = .cpu
+    @State private var filterOption: ProcessFilterOption = .all
     @State private var isLoadingProcesses = false
+    @State private var selectedProcess: ProcessInfo?
     @State private var pendingKill: ProcessInfo?
     @State private var killingPID: Int?
     @State private var errorMessage = ""
@@ -2131,18 +2300,44 @@ private struct ProcessesSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
+                Section(footer: ProcessListFooter(
+                    visibleCount: visibleProcesses.count,
+                    totalCount: loadedProcesses.count,
+                    processCount: processCount,
+                    isFiltered: isFiltered
+                )) {
                     if isLoadingProcesses {
-                        ProgressView()
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(String(localized: "Loading processes"))
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
-                    ForEach(displayedProcesses) { process in
-                        ProcessSheetRow(
-                            process: process,
-                            isKilling: killingPID == process.pid,
-                            canKill: terminateProcess != nil
-                        ) {
-                            pendingKill = process
+                    if visibleProcesses.isEmpty, !isLoadingProcesses {
+                        EmptyProcessListRow(isFiltered: isFiltered)
+                    }
+
+                    ForEach(visibleProcesses) { process in
+                        Button {
+                            selectedProcess = process
+                        } label: {
+                            ProcessSheetRow(
+                                process: process,
+                                isKilling: killingPID == process.pid
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if terminateProcess != nil {
+                                Button(role: .destructive) {
+                                    pendingKill = process
+                                } label: {
+                                    Label(String(localized: "Kill"), systemImage: "xmark.octagon")
+                                }
+                                .disabled(killingPID == process.pid)
+                            }
                         }
                     }
                 }
@@ -2151,6 +2346,30 @@ private struct ProcessesSheet: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .searchable(text: $searchText, prompt: Text("Search Processes"))
+            .toolbar {
+                ToolbarItem(placement: controlsPlacement) {
+                    Menu {
+                        Picker(String(localized: "Sort By"), selection: $sortOption) {
+                            ForEach(ProcessSortOption.allCases) { option in
+                                Label(option.title, systemImage: option.systemImage)
+                                    .tag(option)
+                            }
+                        }
+
+                        Picker(String(localized: "Filter"), selection: $filterOption) {
+                            ForEach(ProcessFilterOption.allCases) { option in
+                                Label(option.title, systemImage: option.systemImage)
+                                    .tag(option)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .accessibilityLabel(Text("Sort and Filter"))
+                }
+            }
             .statsSheetCloseToolbar()
             .confirmationDialog(
                 String(localized: "Kill Process?"),
@@ -2173,10 +2392,13 @@ private struct ProcessesSheet: View {
             } message: {
                 Text(errorMessage)
             }
+            .sheet(item: $selectedProcess) { process in
+                ProcessDetailsSheet(process: process)
+            }
         }
         .onAppear {
-            if displayedProcesses.isEmpty {
-                displayedProcesses = processes
+            if loadedProcesses.isEmpty {
+                loadedProcesses = processes
             }
             Task {
                 await loadFullProcessesIfNeeded()
@@ -2184,9 +2406,42 @@ private struct ProcessesSheet: View {
         }
         .onChange(of: processes.map(\.pid)) { _ in
             guard !isLoadingProcesses else { return }
-            displayedProcesses = processes
+            loadedProcesses = processes
         }
         .adaptiveSoftScrollEdges()
+    }
+
+    private var controlsPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .automatic
+        #endif
+    }
+
+    private var isFiltered: Bool {
+        !normalizedSearchText.isEmpty || filterOption != .all
+    }
+
+    private var normalizedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var visibleProcesses: [ProcessInfo] {
+        let query = normalizedSearchText
+        var result = loadedProcesses.filter { process in
+            filterOption.includes(process)
+        }
+
+        if !query.isEmpty {
+            result = result.filter { process in
+                process.matches(query)
+            }
+        }
+
+        return result.sorted { lhs, rhs in
+            sortOption.areInIncreasingOrder(lhs, rhs)
+        }
     }
 
     private func loadFullProcessesIfNeeded() async {
@@ -2198,7 +2453,7 @@ private struct ProcessesSheet: View {
         do {
             let loadedProcesses = try await loadProcesses()
             if !loadedProcesses.isEmpty {
-                displayedProcesses = loadedProcesses
+                self.loadedProcesses = loadedProcesses
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -2215,7 +2470,7 @@ private struct ProcessesSheet: View {
 
         do {
             try await terminateProcess(process)
-            displayedProcesses.removeAll { $0.pid == process.pid }
+            loadedProcesses.removeAll { $0.pid == process.pid }
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
@@ -2223,14 +2478,160 @@ private struct ProcessesSheet: View {
     }
 }
 
+private enum ProcessSortOption: String, CaseIterable, Identifiable {
+    case cpu
+    case memory
+    case name
+    case pid
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cpu:
+            return String(localized: "CPU")
+        case .memory:
+            return String(localized: "Memory")
+        case .name:
+            return String(localized: "Name")
+        case .pid:
+            return String(localized: "PID")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .cpu:
+            return "cpu"
+        case .memory:
+            return "memorychip"
+        case .name:
+            return "textformat"
+        case .pid:
+            return "number"
+        }
+    }
+
+    func areInIncreasingOrder(_ lhs: ProcessInfo, _ rhs: ProcessInfo) -> Bool {
+        switch self {
+        case .cpu:
+            if lhs.cpuPercent == rhs.cpuPercent {
+                return lhs.memoryPercent > rhs.memoryPercent
+            }
+            return lhs.cpuPercent > rhs.cpuPercent
+        case .memory:
+            if lhs.memoryPercent == rhs.memoryPercent {
+                return lhs.cpuPercent > rhs.cpuPercent
+            }
+            return lhs.memoryPercent > rhs.memoryPercent
+        case .name:
+            let comparison = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+            if comparison == .orderedSame {
+                return lhs.pid < rhs.pid
+            }
+            return comparison == .orderedAscending
+        case .pid:
+            return lhs.pid < rhs.pid
+        }
+    }
+}
+
+private enum ProcessFilterOption: String, CaseIterable, Identifiable {
+    case all
+    case active
+    case highCPU
+    case highMemory
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return String(localized: "All")
+        case .active:
+            return String(localized: "Active")
+        case .highCPU:
+            return String(localized: "High CPU")
+        case .highMemory:
+            return String(localized: "High Memory")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all:
+            return "line.3.horizontal"
+        case .active:
+            return "waveform.path.ecg"
+        case .highCPU:
+            return "cpu"
+        case .highMemory:
+            return "memorychip"
+        }
+    }
+
+    func includes(_ process: ProcessInfo) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .active:
+            return process.cpuPercent > 0 || process.memoryPercent > 0
+        case .highCPU:
+            return process.cpuPercent >= 10
+        case .highMemory:
+            return process.memoryPercent >= 5
+        }
+    }
+}
+
+private struct ProcessListFooter: View {
+    let visibleCount: Int
+    let totalCount: Int
+    let processCount: Int
+    let isFiltered: Bool
+
+    var body: some View {
+        if isFiltered {
+            Text(String(
+                format: String(localized: "%lld of %lld processes"),
+                Int64(visibleCount),
+                Int64(max(totalCount, processCount))
+            ))
+        } else if processCount > totalCount {
+            Text(String(
+                format: String(localized: "%lld shown, %lld total"),
+                Int64(totalCount),
+                Int64(processCount)
+            ))
+        }
+    }
+}
+
+private enum StatsSheetClosePlacement {
+    case automatic
+    case leading
+    case trailing
+}
+
 private struct StatsSheetCloseToolbarModifier: ViewModifier {
     @Environment(\.dismiss) private var dismiss
+    let placement: StatsSheetClosePlacement
 
     private var closePlacement: ToolbarItemPlacement {
         #if os(iOS)
-        .topBarTrailing
+        switch placement {
+        case .automatic, .trailing:
+            return .topBarTrailing
+        case .leading:
+            return .topBarLeading
+        }
         #else
-        .confirmationAction
+        switch placement {
+        case .automatic, .trailing:
+            return .confirmationAction
+        case .leading:
+            return .cancellationAction
+        }
         #endif
     }
 
@@ -2253,16 +2654,14 @@ private struct StatsSheetCloseToolbarModifier: ViewModifier {
 }
 
 private extension View {
-    func statsSheetCloseToolbar() -> some View {
-        modifier(StatsSheetCloseToolbarModifier())
+    func statsSheetCloseToolbar(placement: StatsSheetClosePlacement = .automatic) -> some View {
+        modifier(StatsSheetCloseToolbarModifier(placement: placement))
     }
 }
 
 private struct ProcessSheetRow: View {
     let process: ProcessInfo
     let isKilling: Bool
-    let canKill: Bool
-    let kill: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -2293,30 +2692,129 @@ private struct ProcessSheetRow: View {
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(String(format: "%.1f CPU", process.cpuPercent))
-                    .font(.caption.weight(.bold))
-                    .monospacedDigit()
-                Text(String(format: "%.1f MEM", process.memoryPercent))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            HStack(spacing: 8) {
+                ProcessSheetMetric(
+                    title: String(localized: "CPU"),
+                    value: process.cpuPercent,
+                    color: .pink
+                )
+                ProcessSheetMetric(
+                    title: String(localized: "MEM"),
+                    value: process.memoryPercent,
+                    color: .blue
+                )
             }
-            .frame(width: 72, alignment: .trailing)
-
-            Button(role: .destructive, action: kill) {
+            .overlay(alignment: .trailing) {
                 if isKilling {
                     ProgressView()
                         .controlSize(.small)
-                } else {
-                    Image(systemName: "xmark.octagon")
+                        .padding(6)
+                        .background(.regularMaterial, in: Circle())
                 }
             }
-            .buttonStyle(.borderless)
-            .disabled(!canKill || isKilling)
-            .accessibilityLabel(Text("Kill Process"))
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct ProcessDetailsSheet: View {
+    let process: ProcessInfo
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(String(localized: "Overview")) {
+                    InfoRow(title: String(localized: "Name"), value: process.name)
+                    InfoRow(title: String(localized: "PID"), value: "\(process.pid)")
+                    if !process.user.isEmpty {
+                        InfoRow(title: String(localized: "User"), value: process.user)
+                    }
+                }
+
+                Section(String(localized: "Usage")) {
+                    InfoRow(title: String(localized: "CPU"), value: formatPercent(process.cpuPercent))
+                    InfoRow(title: String(localized: "Memory"), value: formatPercent(process.memoryPercent))
+                }
+
+                Section(String(localized: "Command")) {
+                    Text(process.command)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
+                }
+            }
+            .navigationTitle(Text("Process Details"))
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .statsSheetCloseToolbar()
+        }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        #endif
+        .adaptiveSoftScrollEdges()
+    }
+}
+
+private struct ProcessSheetMetric: View {
+    let title: String
+    let value: Double
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(formatPercent(value))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+
+                Text(title)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: min(max(value / 100, 0), 1))
+                .tint(color)
+                .frame(width: 58)
+        }
+        .frame(width: 66, alignment: .trailing)
+    }
+}
+
+private struct EmptyProcessListRow: View {
+    let isFiltered: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(isFiltered ? String(localized: "No Matching Processes") : String(localized: "No Processes"))
+                .font(.headline)
+            Text(isFiltered ? String(localized: "Try a different search or filter.") : String(localized: "No processes were reported by the remote host."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private extension ProcessInfo {
+    func matches(_ query: String) -> Bool {
+        let fields = [
+            name,
+            command,
+            user,
+            "\(pid)"
+        ]
+
+        return fields.contains { field in
+            field.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
     }
 }
 
@@ -2700,6 +3198,8 @@ private struct NetworkLineChart: View {
     let rxHistory: [StatsPoint]
     let txHistory: [StatsPoint]
     let style: StatsVisualStyle
+    private let minimumWindow: TimeInterval = 60
+    private let maximumWindow: TimeInterval = 300
 
     private var rxSamples: [StatsPoint] {
         Array(rxHistory.suffix(30)).sorted { $0.timestamp < $1.timestamp }
@@ -2717,49 +3217,142 @@ private struct NetworkLineChart: View {
         return max(maxValue * 1.15, 1)
     }
 
+    private var timeWindow: (start: Date, end: Date)? {
+        let timestamps = (rxSamples + txSamples).map(\.timestamp)
+        guard let first = timestamps.min(), let last = timestamps.max() else { return nil }
+        let span = min(max(last.timeIntervalSince(first), minimumWindow), maximumWindow)
+        return (last.addingTimeInterval(-span), last)
+    }
+
     var body: some View {
         if rxSamples.count < 2, txSamples.count < 2 {
             NetworkLinePlaceholder()
         } else {
             GeometryReader { proxy in
-                let plotRect = CGRect(origin: .zero, size: proxy.size).insetBy(dx: 2, dy: 8)
+                if let window = timeWindow {
+                    let rxPoints = points(for: rxSamples, in: proxy.size, window: window)
+                    let txPoints = points(for: txSamples, in: proxy.size, window: window)
 
-                ZStack {
-                    Path { path in
-                        let y = plotRect.midY
-                        path.move(to: CGPoint(x: plotRect.minX, y: y))
-                        path.addLine(to: CGPoint(x: plotRect.maxX, y: y))
+                    ZStack {
+                        Rectangle()
+                            .fill(style.tertiaryText.opacity(0.30))
+                            .frame(height: 1)
+                            .frame(maxHeight: .infinity, alignment: .center)
+
+                        NetworkAreaShape(points: txPoints)
+                            .fill(networkGradient(.orange, opacity: 0.14))
+                        NetworkAreaShape(points: rxPoints)
+                            .fill(networkGradient(.cyan, opacity: 0.22))
+
+                        NetworkLineShape(points: txPoints)
+                            .stroke(Color.orange, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        NetworkLineShape(points: rxPoints)
+                            .stroke(Color.cyan, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                     }
-                    .stroke(style.tertiaryText.opacity(0.30), lineWidth: 1)
-
-                    samplePath(for: rxSamples, in: plotRect, maxValue: chartMax)
-                        .stroke(Color.cyan, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-
-                    samplePath(for: txSamples, in: plotRect, maxValue: chartMax)
-                        .stroke(Color.orange, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                } else {
+                    NetworkLinePlaceholder()
                 }
             }
         }
     }
 
-    private func samplePath(for samples: [StatsPoint], in rect: CGRect, maxValue: Double) -> Path {
-        Path { path in
-            guard samples.count >= 2 else { return }
+    private func points(
+        for samples: [StatsPoint],
+        in size: CGSize,
+        window: (start: Date, end: Date)
+    ) -> [CGPoint] {
+        guard size.width > 0, size.height > 0 else { return [] }
+        let duration = max(window.end.timeIntervalSince(window.start), 1)
+        let topInset = max(size.height * 0.08, 4)
+        let bottomInset = max(size.height * 0.10, 5)
+        let plotHeight = max(size.height - topInset - bottomInset, 1)
 
-            for (index, point) in samples.enumerated() {
-                let progress = CGFloat(index) / CGFloat(max(samples.count - 1, 1))
-                let normalizedValue = max(0, min(point.value / maxValue, 1))
-                let x = rect.minX + (rect.width * progress)
-                let y = rect.maxY - (rect.height * CGFloat(normalizedValue))
-                let cgPoint = CGPoint(x: x, y: y)
-
-                if index == 0 {
-                    path.move(to: cgPoint)
-                } else {
-                    path.addLine(to: cgPoint)
-                }
-            }
+        return samples.compactMap { point in
+            guard point.timestamp >= window.start, point.timestamp <= window.end else { return nil }
+            let xProgress = point.timestamp.timeIntervalSince(window.start) / duration
+            let yProgress = min(max(point.value / chartMax, 0), 1)
+            return CGPoint(
+                x: size.width * xProgress,
+                y: topInset + plotHeight * (1 - yProgress)
+            )
         }
+    }
+
+    private func networkGradient(_ color: Color, opacity: Double) -> LinearGradient {
+        LinearGradient(
+            colors: [color.opacity(opacity), color.opacity(0.02)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+}
+
+private struct NetworkLineShape: Shape {
+    let points: [CGPoint]
+
+    func path(in rect: CGRect) -> Path {
+        NetworkPath.smoothLine(points)
+    }
+}
+
+private struct NetworkAreaShape: Shape {
+    let points: [CGPoint]
+
+    func path(in rect: CGRect) -> Path {
+        guard points.count >= 2 else { return Path() }
+        var path = NetworkPath.smoothLine(points)
+        if let first = points.first, let last = points.last {
+            path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+            path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
+            path.closeSubpath()
+        }
+        return path
+    }
+}
+
+private enum NetworkPath {
+    static func smoothLine(_ points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+
+        guard points.count > 2 else {
+            points.dropFirst().forEach { path.addLine(to: $0) }
+            return path
+        }
+
+        for index in 0..<(points.count - 1) {
+            let previous = points[max(index - 1, 0)]
+            let current = points[index]
+            let next = points[index + 1]
+            let following = points[min(index + 2, points.count - 1)]
+            let controlA = clampedControlPoint(
+                CGPoint(
+                    x: current.x + (next.x - previous.x) / 6,
+                    y: current.y + (next.y - previous.y) / 6
+                ),
+                between: current,
+                and: next
+            )
+            let controlB = clampedControlPoint(
+                CGPoint(
+                    x: next.x - (following.x - current.x) / 6,
+                    y: next.y - (following.y - current.y) / 6
+                ),
+                between: current,
+                and: next
+            )
+            path.addCurve(to: next, control1: controlA, control2: controlB)
+        }
+
+        return path
+    }
+
+    private static func clampedControlPoint(_ point: CGPoint, between start: CGPoint, and end: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(point.x, min(start.x, end.x)), max(start.x, end.x)),
+            y: min(max(point.y, min(start.y, end.y)), max(start.y, end.y))
+        )
     }
 }
 
@@ -2956,4 +3549,12 @@ private func formatBytes(_ bytes: UInt64) -> String {
     }
 
     return "\(bytes) B"
+}
+
+private func formatUsedCapacity(_ used: UInt64, total: UInt64) -> String {
+    guard total > 0 else {
+        return String(format: String(localized: "%@ used"), formatBytes(used))
+    }
+
+    return String(format: String(localized: "%@ / %@ used"), formatBytes(used), formatBytes(total))
 }

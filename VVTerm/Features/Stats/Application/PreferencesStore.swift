@@ -106,6 +106,35 @@ final class PreferencesStore: ObservableObject {
         }
     }
 
+    func setBlockOrder(_ orderedIDs: [StatsPreferences.BlockID]) {
+        applyMutation { preferences, now in
+            var normalized = preferences.normalized()
+            let currentBlocksByID = Dictionary(uniqueKeysWithValues: normalized.blocks.map { ($0.id, $0) })
+            let validIDs = orderedIDs.filter { currentBlocksByID[$0] != nil }
+            var finalIDs: [StatsPreferences.BlockID] = []
+
+            for id in validIDs where !finalIDs.contains(id) {
+                finalIDs.append(id)
+            }
+            for block in normalized.orderedBlocks where !finalIDs.contains(block.id) {
+                finalIDs.append(block.id)
+            }
+
+            var blocks: [StatsPreferences.Block] = []
+            for (index, id) in finalIDs.enumerated() {
+                guard var block = currentBlocksByID[id] else { continue }
+                block.order = index
+                block.updatedAt = now
+                blocks.append(block)
+            }
+
+            normalized.blocks = blocks
+            normalized.updatedAt = now
+            normalized.lastWriterDeviceId = DeviceIdentity.id
+            preferences = normalized
+        }
+    }
+
     private func applyMutation(_ mutate: (inout StatsPreferences, Date) -> Void) {
         var nextPreferences = preferences
         mutate(&nextPreferences, Date())

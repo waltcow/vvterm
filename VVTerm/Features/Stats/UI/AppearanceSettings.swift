@@ -2,6 +2,14 @@ import SwiftUI
 
 struct AppearanceSettings: View {
     @StateObject private var store = PreferencesStore.shared
+    @State private var preferences: StatsPreferences
+    #if os(iOS)
+    @State private var editMode: EditMode = .inactive
+    #endif
+
+    init() {
+        _preferences = State(initialValue: PreferencesStore.shared.preferences)
+    }
 
     var body: some View {
         Form {
@@ -15,53 +23,81 @@ struct AppearanceSettings: View {
             }
 
             Section(String(localized: "Layout")) {
-                ForEach(store.preferences.orderedBlocks) { block in
-                    Toggle(isOn: visibilityBinding(for: block.id)) {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(block.id.title)
-                                Text(visibilitySubtitle(for: block))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: block.id.systemImage)
-                                .foregroundStyle(block.id.tint)
-                        }
-                    }
-                    .disabled(block.id == .system)
+                ForEach(preferences.orderedBlocks) { block in
+                    StatsBlockLayoutRow(
+                        block: block,
+                        isVisible: visibilityBinding(for: block.id),
+                        subtitle: visibilitySubtitle(for: block)
+                    )
                 }
                 .onMove { source, destination in
-                    store.moveBlocks(fromOffsets: source, toOffset: destination)
+                    moveBlocks(fromOffsets: source, toOffset: destination)
                 }
             }
 
             Section(String(localized: "Preview")) {
-                StatsAppearancePreviewContent(preferences: store.preferences)
+                StatsAppearancePreviewContent(preferences: preferences)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
         }
         .formStyle(.grouped)
         #if os(iOS)
+        .environment(\.editMode, $editMode)
         .toolbar {
-            EditButton()
+            Button(editMode.isEditing ? String(localized: "Done") : String(localized: "Edit")) {
+                editMode = editMode.isEditing ? .inactive : .active
+            }
         }
         #endif
+        .onChange(of: store.preferences) { newPreferences in
+            preferences = newPreferences
+        }
     }
 
     private var styleBinding: Binding<StatsPreferences.Style> {
         Binding(
-            get: { store.preferences.style },
-            set: { store.setStyle($0) }
+            get: { preferences.style },
+            set: { style in
+                store.setStyle(style)
+                preferences = store.preferences
+            }
         )
     }
 
     private func visibilityBinding(for id: StatsPreferences.BlockID) -> Binding<Bool> {
         Binding(
-            get: { store.preferences.isBlockVisible(id) },
-            set: { store.setBlockVisibility(id, isVisible: $0) }
+            get: { preferences.isBlockVisible(id) },
+            set: { isVisible in
+                store.setBlockVisibility(id, isVisible: isVisible)
+                preferences = store.preferences
+            }
         )
+    }
+
+    private func moveBlocks(fromOffsets source: IndexSet, toOffset destination: Int) {
+        var blocks = preferences.orderedBlocks
+        moveLocalBlocks(&blocks, fromOffsets: source, toOffset: destination)
+        store.setBlockOrder(blocks.map(\.id))
+        preferences = store.preferences
+    }
+
+    private func moveLocalBlocks(
+        _ blocks: inout [StatsPreferences.Block],
+        fromOffsets source: IndexSet,
+        toOffset destination: Int
+    ) {
+        let validSource = IndexSet(source.filter { blocks.indices.contains($0) })
+        guard !validSource.isEmpty else { return }
+
+        let movingBlocks = validSource.map { blocks[$0] }
+        for index in validSource.sorted(by: >) {
+            blocks.remove(at: index)
+        }
+
+        let removedBeforeDestination = validSource.filter { $0 < destination }.count
+        let adjustedDestination = max(0, min(destination - removedBeforeDestination, blocks.count))
+        blocks.insert(contentsOf: movingBlocks, at: adjustedDestination)
     }
 
     private func visibilitySubtitle(for block: StatsPreferences.Block) -> String {
@@ -69,6 +105,37 @@ struct AppearanceSettings: View {
             return String(localized: "Required")
         }
         return block.isVisible ? String(localized: "Visible") : String(localized: "Hidden")
+    }
+}
+
+private struct StatsBlockLayoutRow: View {
+    let block: StatsPreferences.Block
+    @Binding var isVisible: Bool
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: block.id.systemImage)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(block.id.tint)
+                .frame(width: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(block.id.title)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Toggle(isOn: $isVisible) {
+                EmptyView()
+            }
+            .labelsHidden()
+            .disabled(block.id == .system)
+        }
+        .contentShape(Rectangle())
     }
 }
 
