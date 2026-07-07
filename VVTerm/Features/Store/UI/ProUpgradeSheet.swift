@@ -632,41 +632,13 @@ extension View {
     }
 }
 
-private struct ProUpgradePresentationModifier: ViewModifier {
+struct ProUpgradePresentationModifier: ViewModifier {
     @Binding var isPresented: Bool
     let source: PaywallSource
 
     func body(content: Content) -> some View {
-        #if os(macOS)
-        content
-            .onAppear {
-                if isPresented {
-                    presentWindow()
-                }
-            }
-            .onChangeCompat(of: isPresented) { shouldPresent in
-                if shouldPresent {
-                    presentWindow()
-                } else {
-                    ProUpgradeWindowPresenter.shared.close()
-                }
-            }
-        #else
-        content
-            .sheet(isPresented: $isPresented) {
-                ProUpgradeSheet(source: source)
-                    .adaptiveSoftScrollEdges()
-            }
-        #endif
+        platformBody(content: content)
     }
-
-    #if os(macOS)
-    private func presentWindow() {
-        ProUpgradeWindowPresenter.shared.show(storeManager: StoreManager.shared, source: source) {
-            isPresented = false
-        }
-    }
-    #endif
 }
 
 

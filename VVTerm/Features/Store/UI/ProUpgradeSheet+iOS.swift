@@ -12,6 +12,16 @@ extension ProUpgradeSheet {
     }
 }
 
+extension ProUpgradePresentationModifier {
+    func platformBody(content: Content) -> some View {
+        content
+            .sheet(isPresented: $isPresented) {
+                ProUpgradeSheet(source: source)
+                    .adaptiveSoftScrollEdges()
+            }
+    }
+}
+
 var paywallTableGridColor: Color {
     Color.primary.opacity(0.10)
 }

@@ -14,6 +14,30 @@ extension ProUpgradeSheet {
     }
 }
 
+extension ProUpgradePresentationModifier {
+    func platformBody(content: Content) -> some View {
+        content
+            .onAppear {
+                if isPresented {
+                    presentWindow()
+                }
+            }
+            .onChangeCompat(of: isPresented) { shouldPresent in
+                if shouldPresent {
+                    presentWindow()
+                } else {
+                    ProUpgradeWindowPresenter.shared.close()
+                }
+            }
+    }
+
+    private func presentWindow() {
+        ProUpgradeWindowPresenter.shared.show(storeManager: StoreManager.shared, source: source) {
+            isPresented = false
+        }
+    }
+}
+
 var paywallTableGridColor: Color {
     Color.primary.opacity(0.13)
 }
