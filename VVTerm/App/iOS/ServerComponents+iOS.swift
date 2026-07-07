@@ -6,9 +6,9 @@
 import SwiftUI
 
 #if os(iOS)
-// MARK: - iOS Server Row
+// MARK: - Server List Row
 
-struct iOSServerRow: View {
+struct ServerListRow: View {
     let server: Server
     let onTap: () -> Void
     let onEdit: () -> Void
@@ -146,9 +146,9 @@ struct iOSServerRow: View {
     }
 }
 
-// MARK: - iOS Active Connection Row
+// MARK: - Active Connection List Row
 
-struct iOSActiveConnectionRow: View {
+struct ActiveConnectionListRow: View {
     let session: ConnectionSession
     let title: String
     let tabCount: Int
@@ -224,9 +224,9 @@ struct iOSActiveConnectionRow: View {
     }
 }
 
-// MARK: - iOS Workspace Picker View
+// MARK: - Workspace Picker Sheet
 
-struct iOSWorkspacePickerView: View {
+struct WorkspacePickerSheet: View {
     @ObservedObject var serverManager: ServerManager
     @Binding var selectedWorkspace: Workspace?
     let onDismiss: () -> Void

@@ -38,7 +38,7 @@ struct iOSContentView: View {
 
     var body: some View {
         NavigationStack {
-            iOSServerListView(
+            ServerListScreen(
                 serverManager: serverManager,
                 sessionManager: sessionManager,
                 fileBrowser: fileBrowser,
@@ -89,7 +89,7 @@ struct iOSContentView: View {
                 }
             )
             .navigationDestination(isPresented: $showingTerminal) {
-                iOSTerminalView(
+                ServerTerminalScreen(
                     sessionManager: sessionManager,
                     serverManager: serverManager,
                     fileTabs: fileTabs,
@@ -156,7 +156,7 @@ struct iOSContentView: View {
     }
 }
 
-struct iOSServerListView: View {
+struct ServerListScreen: View {
     @ObservedObject var serverManager: ServerManager
     @ObservedObject var sessionManager: ConnectionSessionManager
     let fileBrowser: RemoteFileBrowserStore
@@ -264,7 +264,7 @@ struct iOSServerListView: View {
         }
         .sheet(isPresented: $showingWorkspacePicker) {
             NavigationStack {
-                iOSWorkspacePickerView(
+                WorkspacePickerSheet(
                     serverManager: serverManager,
                     selectedWorkspace: $selectedWorkspace,
                     onDismiss: { showingWorkspacePicker = false }
@@ -460,7 +460,7 @@ struct iOSServerListView: View {
                     .listRowSeparator(.hidden)
             } else {
                 ForEach(filteredServers) { server in
-                    iOSServerRow(
+                    ServerListRow(
                         server: server,
                         onTap: { onServerSelected(server) },
                         onEdit: { serverToEdit = server },
@@ -476,7 +476,7 @@ struct iOSServerListView: View {
                 Spacer()
 
                 if selectedWorkspace != nil {
-                    iOSEnvironmentFilterMenu(
+                    EnvironmentFilterMenu(
                         selected: $selectedEnvironment,
                         environments: environmentOptions,
                         serverCounts: serverCountsByEnvironment,
@@ -512,7 +512,7 @@ struct iOSServerListView: View {
         if !activeConnections.isEmpty && !filteredServers.isEmpty {
             Section {
                 ForEach(activeConnections) { connection in
-                    iOSActiveConnectionRow(
+                    ActiveConnectionListRow(
                         session: connection.session,
                         title: sessionManager.displayTitle(for: connection.session),
                         tabCount: connection.tabCount,
@@ -637,9 +637,9 @@ struct iOSServerListView: View {
     }
 }
 
-// MARK: - iOS Environment Filter Menu
+// MARK: - Environment Filter Menu
 
-struct iOSEnvironmentFilterMenu: View {
+struct EnvironmentFilterMenu: View {
     @Binding var selected: ServerEnvironment?
     let environments: [ServerEnvironment]
     let serverCounts: [UUID: Int]
@@ -750,9 +750,9 @@ struct iOSEnvironmentFilterMenu: View {
     }
 }
 
-// MARK: - iOS Terminal View
+// MARK: - Server Terminal Screen
 
-struct iOSTerminalView: View {
+struct ServerTerminalScreen: View {
     @ObservedObject var sessionManager: ConnectionSessionManager
     @ObservedObject var serverManager: ServerManager
     @ObservedObject var fileTabs: RemoteFileTabManager
