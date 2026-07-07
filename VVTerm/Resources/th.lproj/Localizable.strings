@@ -336,8 +336,6 @@
 /* Transcription */
 "Engine" = "เอนจิน";
 "System (Apple)" = "ระบบ (Apple)";
-"Whisper (MLX)" = "Whisper (MLX)";
-"Parakeet (MLX)" = "Parakeet (MLX)";
 "Provider" = "ผู้ให้บริการ";
 "Language" = "ภาษา";
 "Model" = "โมเดล";
@@ -349,10 +347,7 @@
 "Failed" = "ล้มเหลว";
 "Storage" = "ที่เก็บข้อมูล";
 "Model Storage" = "ที่เก็บโมเดล";
-"Total MLX Models" = "โมเดล MLX ทั้งหมด";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "ใช้การรู้จำเสียงในตัวของ Apple ต้องใช้เครือข่ายเพื่อผลลัพธ์ที่ดีที่สุด";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI Whisper ทำงานแบบโลคัลด้วย MLX ใช้งานออฟไลน์ได้หลังดาวน์โหลด";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA Parakeet ทำงานแบบโลคัลด้วย MLX ปรับให้เหมาะสำหรับการถอดเสียงแบบเรียลไทม์";
 "English" = "อังกฤษ";
 "Spanish" = "สเปน";
 "French" = "ฝรั่งเศส";
@@ -364,7 +359,6 @@
 "Russian" = "รัสเซีย";
 "Auto-detect" = "ตรวจจับอัตโนมัติ";
 
-/* MLX Models */
 "Tiny" = "เล็กมาก";
 "Fastest, smallest" = "เร็วที่สุด เล็กที่สุด";
 "Full precision" = "ความละเอียดเต็ม";
@@ -383,9 +377,7 @@
 "Large v3 4-bit" = "ใหญ่ v3 4 บิต";
 "Smaller download" = "ดาวน์โหลดเล็กลง";
 "4-bit quantized" = "ควอนไทซ์ 4 บิต";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "โมเดลใหญ่ความแม่นยำสูง";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "Wi‑Fi";
@@ -534,7 +526,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "ต้องได้รับอนุญาตให้ใช้ไมโครโฟน ระบบจะขออัตโนมัติเมื่อเริ่มบันทึกเสียง";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "การรู้จำเสียงไม่พร้อมใช้งาน โปรดเปิด Siri ใน System Settings > Siri & Spotlight";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "เริ่มบันทึกเสียงไม่สำเร็จ โปรดตรวจสอบสิทธิ์ไมโครโฟนใน System Settings > Privacy & Security > Microphone";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "การถอดเสียง MLX ไม่พร้อมใช้งานบน Mac นี้ กำลังสลับไปยัง Apple Speech";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "อัปเกรดเป็น Pro เพื่อใช้งานเซิร์ฟเวอร์ไม่จำกัด";
@@ -567,8 +558,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "ระบบ (Apple Speech)";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Model Errors */
 "Failed to remove model" = "ลบโมเดลไม่สำเร็จ";
@@ -1219,7 +1208,6 @@
 "Organize servers with your own environments." = "จัดระเบียบเซิร์ฟเวอร์ด้วยสภาพแวดล้อมของคุณเอง";
 "Other" = "อื่นๆ";
 "Owner" = "เจ้าของ";
-"Parakeet supports English only." = "Parakeet รองรับภาษาอังกฤษเท่านั้น";
 "Parent" = "ผู้ปกครอง";
 "Path copied to clipboard." = "คัดลอกเส้นทางไปยังคลิปบอร์ดแล้ว";
 "Pay once and keep Pro access forever." = "จ่ายเพียงครั้งเดียวและรักษาสิทธิ์การเข้าถึงแบบ Pro ตลอดไป";

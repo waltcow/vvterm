@@ -325,6 +325,11 @@ struct TerminalContainerView: View {
         .onChange(of: showingVoiceRecording) { isRecording in
             onVoiceRecordingChange?(isRecording)
         }
+        .onChange(of: audioService.runtimeRecordingError) { error in
+            guard let error else { return }
+            permissionErrorMessage = AudioService.formattedRecordingErrorMessage(error)
+            showingPermissionError = true
+        }
         #endif
         .alert("Install tmux?", isPresented: $showingTmuxInstallPrompt) {
             Button("Install") {
@@ -883,9 +888,7 @@ struct TerminalContainerView: View {
                 }
                 voiceProcessing = false
                 if let recordingError = error as? AudioService.RecordingError {
-                    permissionErrorMessage = recordingError.localizedDescription
-                        + "\n\n"
-                        + String(localized: "Enable Microphone and Speech Recognition in System Settings.")
+                    permissionErrorMessage = AudioService.formattedRecordingErrorMessage(recordingError)
                 } else {
                     permissionErrorMessage = error.localizedDescription
                 }

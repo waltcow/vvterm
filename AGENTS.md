@@ -117,7 +117,7 @@ Current architecture:
 - `Features/TerminalAccessories` owns keyboard accessory models, preferences, settings UI, and accessory validation flows.
 - `Features/TerminalPresets` owns terminal preset models, persistence, and preset form UI.
 - `Features/TerminalSessions` owns terminal session/tab domain models, session/tab managers, tmux prompt coordination, live activity support, and terminal session UI.
-- `Features/VoiceInput` owns transcription/audio capture infrastructure, MLX model management, and transcription settings UI.
+- `Features/VoiceInput` owns transcription/audio capture infrastructure, Doubao ASR integration, and transcription settings UI.
 - `Features/Welcome` owns welcome/onboarding copy and presentation.
 - New app code should land in `Features`, `Core`, or `App` based on ownership.
 - New work inside a feature should stay inside its `Features/<FeatureName>` subtree and should not reintroduce app-wide bucket folders.
@@ -265,4 +265,4 @@ struct ConnectionSession: Identifiable {
 3. **Pro limits enforced in**: `ServerManager.canAddServer`, `canAddWorkspace`, `ConnectionSessionManager.canOpenNewTab`
 4. **Keychain credentials** are NOT synced - only server metadata syncs via CloudKit
 5. **iOS keyboard toolbar** provides Esc, Tab, Ctrl, arrows, function keys
-6. **Voice-to-command** uses MLX Whisper/Parakeet on-device or Apple Speech fallback
+6. **Voice-to-command** uses Apple Speech or optional Doubao ASR
