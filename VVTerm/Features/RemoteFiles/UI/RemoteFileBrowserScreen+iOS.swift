@@ -12,7 +12,7 @@ final class RemoteFileBrowserPlatformState: ObservableObject {
 extension RemoteFileBrowserScreen {
     @ViewBuilder
     func platformContent(_ snapshot: Snapshot) -> some View {
-        iOSContent(snapshot)
+        browserContent(snapshot)
     }
 
     func platformUploadImportPresentation<Content: View>(_ content: Content) -> some View {
@@ -157,9 +157,9 @@ extension RemoteFileBrowserScreen {
     }
 
     @ViewBuilder
-    func iOSContent(_ snapshot: Snapshot) -> some View {
-        let displayedEntries = iOSDisplayedEntries(snapshot)
-        let emptyState = iOSEmptyStateContent(snapshot, displayedEntries: displayedEntries)
+    func browserContent(_ snapshot: Snapshot) -> some View {
+        let displayedEntries = filteredEntries(snapshot)
+        let emptyState = makeEmptyStateContent(snapshot, displayedEntries: displayedEntries)
 
         ZStack {
             if emptyState == nil {
@@ -212,7 +212,7 @@ extension RemoteFileBrowserScreen {
             }
         }
         .background(Color.clear)
-        .navigationDestination(isPresented: iOSPreviewBinding) {
+        .navigationDestination(isPresented: previewBinding) {
             RemoteFileInspectorView(
                 selectedEntry: snapshot.selectedEntry,
                 viewerPayload: snapshot.viewerPayload,
@@ -272,7 +272,7 @@ extension RemoteFileBrowserScreen {
         .toolbar {
             if #available(iOS 26, *) {
                 ToolbarItem(placement: .bottomBar) {
-                    iOSBottomToolbarButton(
+                    toolbarButton(
                         systemName: "arrow.turn.up.left",
                         isDisabled: snapshot.currentPath == "/"
                     ) {
@@ -283,7 +283,7 @@ extension RemoteFileBrowserScreen {
                 ToolbarSpacer(.fixed)
 
                 ToolbarItem(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "arrow.up.doc") {
+                    toolbarButton(systemName: "arrow.up.doc") {
                         beginUpload(to: snapshot.currentPath)
                     }
                 }
@@ -291,7 +291,7 @@ extension RemoteFileBrowserScreen {
                 ToolbarSpacer(.fixed)
 
                 ToolbarItem(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "folder.badge.plus") {
+                    toolbarButton(systemName: "folder.badge.plus") {
                         beginCreateFolder(in: snapshot.currentPath)
                     }
                 }
@@ -299,7 +299,7 @@ extension RemoteFileBrowserScreen {
                 ToolbarSpacer(.fixed)
 
                 ToolbarItem(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "document.on.document") {
+                    toolbarButton(systemName: "document.on.document") {
                         copyPathToClipboard(snapshot.currentPath)
                     }
                 }
@@ -307,11 +307,11 @@ extension RemoteFileBrowserScreen {
                 ToolbarSpacer(.fixed)
 
                 ToolbarItem(placement: .bottomBar) {
-                    iOSBrowserMenu()
+                    browserMenu()
                 }
             } else {
                 ToolbarItemGroup(placement: .bottomBar) {
-                    iOSBottomToolbarButton(
+                    toolbarButton(
                         systemName: "arrow.turn.up.left",
                         isDisabled: snapshot.currentPath == "/"
                     ) {
@@ -320,25 +320,25 @@ extension RemoteFileBrowserScreen {
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "arrow.up.doc") {
+                    toolbarButton(systemName: "arrow.up.doc") {
                         beginUpload(to: snapshot.currentPath)
                     }
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "folder.badge.plus") {
+                    toolbarButton(systemName: "folder.badge.plus") {
                         beginCreateFolder(in: snapshot.currentPath)
                     }
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
-                    iOSBottomToolbarButton(systemName: "document.on.document") {
+                    toolbarButton(systemName: "document.on.document") {
                         copyPathToClipboard(snapshot.currentPath)
                     }
                 }
 
                 ToolbarItemGroup(placement: .bottomBar) {
-                    iOSBrowserMenu()
+                    browserMenu()
                 }
             }
         }
@@ -347,7 +347,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    var iOSPreviewBinding: Binding<Bool> {
+    var previewBinding: Binding<Bool> {
         Binding(
             get: { presentedPreviewPath != nil },
             set: { isPresented in
@@ -369,20 +369,20 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func iOSDisplayedEntries(_ snapshot: Snapshot) -> [RemoteFileEntry] {
-        guard !trimmedIOSSearchQuery.isEmpty else { return snapshot.entries }
+    func filteredEntries(_ snapshot: Snapshot) -> [RemoteFileEntry] {
+        guard !trimmedSearchQuery.isEmpty else { return snapshot.entries }
 
         return snapshot.entries.filter { entry in
-            entry.name.localizedCaseInsensitiveContains(trimmedIOSSearchQuery)
-                || (entry.symlinkTarget?.localizedCaseInsensitiveContains(trimmedIOSSearchQuery) ?? false)
+            entry.name.localizedCaseInsensitiveContains(trimmedSearchQuery)
+                || (entry.symlinkTarget?.localizedCaseInsensitiveContains(trimmedSearchQuery) ?? false)
         }
     }
 
-    var trimmedIOSSearchQuery: String {
+    var trimmedSearchQuery: String {
         platformState.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func iOSEmptyStateContent(
+    func makeEmptyStateContent(
         _ snapshot: Snapshot,
         displayedEntries: [RemoteFileEntry]
     ) -> EmptyStateContent? {
@@ -403,7 +403,7 @@ extension RemoteFileBrowserScreen {
         }
 
         if displayedEntries.isEmpty && !snapshot.isLoadingDirectory {
-            guard !trimmedIOSSearchQuery.isEmpty else {
+            guard !trimmedSearchQuery.isEmpty else {
                 return EmptyStateContent(
                     icon: "folder",
                     title: String(localized: "Empty Folder"),
@@ -416,7 +416,7 @@ extension RemoteFileBrowserScreen {
                 title: String(localized: "No Results"),
                 message: String(
                     format: String(localized: "No items match \"%@\"."),
-                    trimmedIOSSearchQuery
+                    trimmedSearchQuery
                 )
             )
         }
@@ -424,7 +424,7 @@ extension RemoteFileBrowserScreen {
         return nil
     }
 
-    func iOSBrowserMenu() -> some View {
+    func browserMenu() -> some View {
         Menu {
             Toggle(
                 String(localized: "Show Hidden Files"),
@@ -452,7 +452,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func iOSBottomToolbarButton(
+    func toolbarButton(
         systemName: String,
         isDisabled: Bool = false,
         action: @escaping () -> Void
