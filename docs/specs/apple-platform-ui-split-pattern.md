@@ -587,7 +587,7 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: extracted the iOS terminal tab bar from `iOSContentView.swift` into `TerminalTabsBar+iOS.swift` and renamed the product UI types to neutral names.
+- Done: extracted the iOS terminal tab bar from `iOSContentView.swift` into `TerminalTabsBar+iOS.swift`, renamed `iOSServerComponents.swift` to `ServerComponents+iOS.swift`, and renamed the iOS app-shell product UI types to neutral names while keeping true platform shell/adapter names explicit.
 
 ### Settings And Forms
 
