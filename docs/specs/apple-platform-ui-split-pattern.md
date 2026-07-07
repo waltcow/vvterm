@@ -474,8 +474,8 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, and removed AppKit/UIKit imports from `RemoteFileBrowserScreen.swift`.
-- Remaining: move platform stored state, iOS search/sheet/drop presentation, and remaining platform routing modifiers out of `RemoteFileBrowserScreen.swift`.
+- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, removed AppKit/UIKit imports from `RemoteFileBrowserScreen.swift`, and moved body-level platform content/presentation modifiers into `RemoteFileBrowserScreen+iOS.swift` / `RemoteFileBrowserScreen+macOS.swift`.
+- Remaining: move platform stored state and remaining platform action-routing modifiers out of `RemoteFileBrowserScreen.swift`.
 
 ### Terminal Sessions
 
@@ -733,7 +733,7 @@ Reason: highest-value ownership cleanup. The feature already has partial platfor
 Steps:
 
 1. Done: introduce `RemoteFileBrowserScreen+iOS.swift` and `RemoteFileBrowserScreen+macOS.swift`.
-2. In progress: move platform content methods into those files.
+2. Done: move platform content selection and body-level presentation modifiers into those files.
 3. Move platform-specific stored state into platform child views or small platform models.
 4. Done: split `RemoteFileBrowserSupport.swift` by platform.
 5. In progress: remove product UI platform prefixes where the type is not a bridge.
