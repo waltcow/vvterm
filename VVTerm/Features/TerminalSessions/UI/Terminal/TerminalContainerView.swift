@@ -417,25 +417,6 @@ struct TerminalContainerView: View {
 
     @ViewBuilder
     private func terminalWrapperView(server: Server, credentials: ServerCredentials) -> some View {
-        #if os(iOS)
-        SSHTerminalWrapper(
-            session: session,
-            server: server,
-            credentials: credentials,
-            richPasteUIModel: richPasteUI,
-            isActive: isActive,
-            shouldPreserveKeyboardDuringReconnect: true,
-            onProcessExit: {
-                DispatchQueue.main.async {
-                    ConnectionSessionManager.shared.handleShellExit(for: session.id)
-                }
-            },
-            onReady: {
-                isReady = true
-            },
-            onVoiceTrigger: voiceTriggerHandler
-        )
-        #else
         SSHTerminalWrapper(
             session: session,
             server: server,
@@ -452,7 +433,6 @@ struct TerminalContainerView: View {
             },
             onVoiceTrigger: voiceTriggerHandler
         )
-        #endif
     }
 
     @ViewBuilder

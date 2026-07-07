@@ -13,7 +13,7 @@ struct SSHTerminalWrapper: View {
     let credentials: ServerCredentials
     let richPasteUIModel: TerminalRichPasteUIModel
     var isActive: Bool = true
-    var shouldPreserveKeyboardDuringReconnect: Bool = false
+    var shouldPreserveKeyboardDuringReconnect: Bool = true
     let onProcessExit: () -> Void
     let onReady: () -> Void
     var onVoiceTrigger: (() -> Void)? = nil
