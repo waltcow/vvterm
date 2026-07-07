@@ -783,28 +783,6 @@
 "root" = "root";
 "Required" = "必須";
 "Optional" = "任意";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "サーバー側の Tailscale SSH ポリシーを使用します。パスワードや SSH キーは不要です。";
-"Tailscale SSH authentication was not accepted by the server." = "サーバーは Tailscale SSH 認証を受け入れませんでした。";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "このアプリは現在、直接の tailnet 接続のみをサポートしています（userspace プロキシへのフォールバックはありません）。";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "OAuth ログインはブラウザで開きます。チーム/アプリのドメイン値はホストから自動検出されます。";
-"Team Domain Override" = "チームドメインの上書き";
-"Set Team Domain Override" = "チームドメインの上書きを設定";
-"App Domain Override" = "アプリドメインの上書き";
-"Hide Overrides" = "上書きを非表示";
-"Set Team/App Domain Override" = "チーム/アプリドメインの上書きを設定";
-"Service Token Client ID" = "サービストークンのクライアント ID";
-"Service Token Client Secret" = "サービストークンのクライアントシークレット";
-"Cloudflare configuration error: %@" = "Cloudflare 設定エラー: %@";
-"Cloudflare authentication failed: %@" = "Cloudflare 認証に失敗しました: %@";
-"Cloudflare tunnel failed: %@" = "Cloudflare トンネルに失敗しました: %@";
-"Cloudflare transport requires a valid hostname." = "Cloudflare トランスポートには有効なホスト名が必要です。";
-"Cloudflare service token client ID is required." = "Cloudflare サービストークンのクライアント ID が必要です。";
-"Cloudflare service token client secret is required." = "Cloudflare サービストークンのクライアントシークレットが必要です。";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Cloudflare OAuth 用にチームドメインとアプリドメインの上書きを両方指定してください。";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Cloudflare メタデータの検出に失敗しました。サーバー設定でチームドメインとアプリドメインの上書きを追加してください。";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "tmuxセッションを選択";
@@ -1138,7 +1116,6 @@
 "Clear" = "クリア";
 "Clear Filters" = "フィルターをクリアする";
 "Close Preview" = "プレビューを閉じる";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Cloudflare トンネルは接続されましたが、SSH ハンドシェイクはアップストリーム ターゲットによって閉じられました。アクセス ポリシーとサービス トークンのスコープを確認します。";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M は、ボタンが非表示の場合でも常に機能します。";
 "Collapsed" = "崩壊した";
 "Compare plans" = "プランを比較する";
@@ -1151,7 +1128,6 @@
 "Copy Names" = "名前をコピーする";
 "Copy Path" = "パスのコピー";
 "Copy Paths" = "パスのコピー";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Cloudflareチームドメインを自動検出できませんでした(\\(describeFailure(error)))。チームドメインのオーバーライドを追加します (例:team.cloudflareaccess.com)。";
 "Create Workspace" = "ワークスペースの作成";
 "Create a folder in the current remote directory." = "現在のリモート ディレクトリにフォルダーを作成します。";
 "Create a workspace before adding servers" = "サーバーを追加する前にワークスペースを作成する";
@@ -1299,7 +1275,6 @@
 "No valid files or folders were dropped." = "有効なファイルまたはフォルダーはドロップされませんでした。";
 "No valid remote items were dropped." = "有効なリモート項目は削除されませんでした。";
 "No workspaces available." = "利用可能なワークスペースがありません。";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "1 回の Pro 購入は、同じ Apple ID を持つ iPhone、iPad、Mac で機能します。";
 "One-time purchase" = "1回限りの購入";
 "One-time purchase. No subscription renewal." = "1回限りの購入。サブスクリプションの更新はありません。";
@@ -1382,7 +1357,6 @@
 "Server stats" = "サーバー統計";
 "Server stats included on Free" = "無料に含まれるサーバー統計";
 "Server stats included on Pro" = "Pro に含まれるサーバー統計";
-"Service Token" = "サービストークン";
 "Share" = "シェアする";
 "Share sheet ready." = "共有シートの準備ができました。";
 "Share…" = "シェア…";
@@ -1407,7 +1381,6 @@
 "Symlink" = "シンボリックリンク";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "すべての Apple デバイス間でサーバー、ワークスペース、テーマ、キーボード アクセサリの設定を同期します。";
 "Tab \\(number)" = "タブ \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "規約";
 "Terms of Use (EULA)" = "利用規約 (EULA)";
 "Text Document" = "テキストドキュメント";

@@ -2,9 +2,7 @@ import SwiftUI
 
 enum ServerTransportSelection: String, CaseIterable, Identifiable, Equatable {
     case standard
-    case tailscale
     case mosh
-    case cloudflare
 
     var id: String { rawValue }
 
@@ -12,12 +10,8 @@ enum ServerTransportSelection: String, CaseIterable, Identifiable, Equatable {
         switch self {
         case .standard:
             return String(localized: "SSH")
-        case .tailscale:
-            return String(localized: "Tailscale")
         case .mosh:
             return String(localized: "Mosh")
-        case .cloudflare:
-            return String(localized: "Cloudflare")
         }
     }
 
@@ -25,12 +19,8 @@ enum ServerTransportSelection: String, CaseIterable, Identifiable, Equatable {
         switch self {
         case .standard:
             return "terminal"
-        case .tailscale:
-            return "network"
         case .mosh:
             return "antenna.radiowaves.left.and.right"
-        case .cloudflare:
-            return "shield.lefthalf.filled"
         }
     }
 
@@ -38,23 +28,15 @@ enum ServerTransportSelection: String, CaseIterable, Identifiable, Equatable {
         switch self {
         case .standard:
             return .standard
-        case .tailscale:
-            return .tailscale
         case .mosh:
             return .mosh
-        case .cloudflare:
-            return .cloudflare
         }
     }
 
     init(server: Server) {
         switch server.connectionMode {
-        case .tailscale:
-            self = .tailscale
         case .mosh:
             self = .mosh
-        case .cloudflare:
-            self = .cloudflare
         case .standard:
             self = .standard
         }
@@ -69,16 +51,9 @@ struct ServerFormCredentialBuilder {
         password: String,
         sshKey: String,
         sshPassphrase: String,
-        sshPublicKey: String,
-        cloudflareAccessMode: CloudflareAccessMode?,
-        cloudflareClientID: String,
-        cloudflareClientSecret: String
+        sshPublicKey: String
     ) -> ServerCredentials {
         var credentials = ServerCredentials(serverId: serverId)
-
-        guard transportSelection != .tailscale else {
-            return credentials
-        }
 
         switch authMethod {
         case .password:
@@ -94,13 +69,6 @@ struct ServerFormCredentialBuilder {
             if !sshPublicKey.isEmpty {
                 credentials.publicKey = sshPublicKey.data(using: .utf8)
             }
-        }
-
-        if transportSelection == .cloudflare, cloudflareAccessMode == .serviceToken {
-            let clientID = cloudflareClientID.trimmingCharacters(in: .whitespacesAndNewlines)
-            let clientSecret = cloudflareClientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
-            credentials.cloudflareClientID = clientID.isEmpty ? nil : clientID
-            credentials.cloudflareClientSecret = clientSecret.isEmpty ? nil : clientSecret
         }
 
         return credentials
@@ -130,11 +98,6 @@ struct ServerFormSheet: View {
     @State private var sshKey: String = ""
     @State private var sshPassphrase: String = ""
     @State private var sshPublicKey: String = ""
-    @State private var selectedCloudflareAccessMode: CloudflareAccessMode = .oauth
-    @State private var cloudflareClientID: String = ""
-    @State private var cloudflareClientSecret: String = ""
-    @State private var cloudflareTeamDomainOverride: String = ""
-    @State private var showCloudflareOverrides: Bool = false
     @State private var selectedWorkspaceId: UUID?
     @State private var selectedEnvironment: ServerEnvironment = .production
     @State private var notes: String = ""
@@ -182,11 +145,6 @@ struct ServerFormSheet: View {
             _username = State(initialValue: server.username)
             _transportSelection = State(initialValue: ServerTransportSelection(server: server))
             _selectedAuthMethod = State(initialValue: server.authMethod)
-            _selectedCloudflareAccessMode = State(initialValue: server.cloudflareAccessMode ?? .oauth)
-            _cloudflareTeamDomainOverride = State(initialValue: server.cloudflareTeamDomainOverride ?? "")
-            _showCloudflareOverrides = State(
-                initialValue: !(server.cloudflareTeamDomainOverride ?? "").isEmpty
-            )
             _selectedEnvironment = State(initialValue: server.environment)
             _notes = State(initialValue: server.notes ?? "")
             _requiresBiometricUnlock = State(initialValue: server.requiresBiometricUnlock)
@@ -274,10 +232,6 @@ struct ServerFormSheet: View {
         let sshKey: String
         let sshPassphrase: String
         let sshPublicKey: String
-        let cloudflareAccessMode: CloudflareAccessMode
-        let cloudflareClientID: String
-        let cloudflareClientSecret: String
-        let cloudflareTeamDomainOverride: String
     }
 
     private var connectionSnapshot: ConnectionTestSnapshot {
@@ -290,11 +244,7 @@ struct ServerFormSheet: View {
             password: password,
             sshKey: sshKey,
             sshPassphrase: sshPassphrase,
-            sshPublicKey: sshPublicKey,
-            cloudflareAccessMode: selectedCloudflareAccessMode,
-            cloudflareClientID: cloudflareClientID,
-            cloudflareClientSecret: cloudflareClientSecret,
-            cloudflareTeamDomainOverride: cloudflareTeamDomainOverride
+            sshPublicKey: sshPublicKey
         )
     }
 
@@ -347,25 +297,23 @@ struct ServerFormSheet: View {
             do {
                 let credentials = try KeychainManager.shared.getCredentials(for: server)
 
-                if server.connectionMode != .tailscale {
-                    switch server.authMethod {
-                    case .password:
-                        if let pwd = credentials.password {
-                            password = pwd
-                        }
-                    case .sshKey:
-                        if let keyData = credentials.privateKey,
-                           let keyString = String(data: keyData, encoding: .utf8) {
-                            sshKey = keyString
-                        }
-                    case .sshKeyWithPassphrase:
-                        if let keyData = credentials.privateKey,
-                           let keyString = String(data: keyData, encoding: .utf8) {
-                            sshKey = keyString
-                        }
-                        if let phrase = credentials.passphrase {
-                            sshPassphrase = phrase
-                        }
+                switch server.authMethod {
+                case .password:
+                    if let pwd = credentials.password {
+                        password = pwd
+                    }
+                case .sshKey:
+                    if let keyData = credentials.privateKey,
+                       let keyString = String(data: keyData, encoding: .utf8) {
+                        sshKey = keyString
+                    }
+                case .sshKeyWithPassphrase:
+                    if let keyData = credentials.privateKey,
+                       let keyString = String(data: keyData, encoding: .utf8) {
+                        sshKey = keyString
+                    }
+                    if let phrase = credentials.passphrase {
+                        sshPassphrase = phrase
                     }
                 }
                 if let publicKeyData = credentials.publicKey,
@@ -375,8 +323,6 @@ struct ServerFormSheet: View {
                     sshPublicKey = ""
                 }
 
-                cloudflareClientID = credentials.cloudflareClientID ?? ""
-                cloudflareClientSecret = credentials.cloudflareClientSecret ?? ""
                 selectMatchingStoredKeyIfAvailable()
             } catch {
                 self.error = String(format: String(localized: "Failed to load credentials: %@"), error.localizedDescription)
@@ -457,10 +403,6 @@ struct ServerFormSheet: View {
             }
             .onChange(of: sshPassphrase) { _ in resetConnectionTestState() }
             .onChange(of: sshPublicKey) { _ in resetConnectionTestState() }
-            .onChange(of: selectedCloudflareAccessMode) { _ in resetConnectionTestState() }
-            .onChange(of: cloudflareClientID) { _ in resetConnectionTestState() }
-            .onChange(of: cloudflareClientSecret) { _ in resetConnectionTestState() }
-            .onChange(of: cloudflareTeamDomainOverride) { _ in resetConnectionTestState() }
     }
 
     @ViewBuilder
@@ -622,71 +564,26 @@ struct ServerFormSheet: View {
                 }
             }
 
-            if transportSelection == .cloudflare {
-                Picker("Cloudflare Access", selection: $selectedCloudflareAccessMode) {
-                    ForEach(CloudflareAccessMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-
-                switch selectedCloudflareAccessMode {
-                case .oauth:
-                    Text(String(localized: "OAuth login will open in browser. Team/App domain values are auto-discovered from host."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if showCloudflareOverrides {
-                        TextField("Team Domain Override", text: $cloudflareTeamDomainOverride, prompt: Text("team.cloudflareaccess.com"))
-                            .autocorrectionDisabled()
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            #endif
-
-                        Button("Hide Overrides") {
-                            showCloudflareOverrides = false
-                        }
-                    } else {
-                        Button("Set Team Domain Override") {
-                            showCloudflareOverrides = true
-                        }
-                    }
-
-                case .serviceToken:
-                    TextField("Service Token Client ID", text: $cloudflareClientID, prompt: Text(String(localized: "Required")))
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                    SecureField("Service Token Client Secret", text: $cloudflareClientSecret, prompt: Text(String(localized: "Required")))
+            Picker("Method", selection: $selectedAuthMethod) {
+                ForEach(AuthMethod.allCases) { method in
+                    Label(method.displayName, systemImage: method.icon)
+                        .tag(method)
                 }
             }
 
-            if transportSelection != .tailscale {
-                Picker("Method", selection: $selectedAuthMethod) {
-                    ForEach(AuthMethod.allCases) { method in
-                        Label(method.displayName, systemImage: method.icon)
-                            .tag(method)
-                    }
-                }
+            switch selectedAuthMethod {
+            case .password:
+                SecureField("Password", text: $password, prompt: Text(String(localized: "Required")))
+                    #if os(iOS)
+                    .textContentType(.password)
+                    #endif
 
-                switch selectedAuthMethod {
-                case .password:
-                    SecureField("Password", text: $password, prompt: Text(String(localized: "Required")))
-                        #if os(iOS)
-                        .textContentType(.password)
-                        #endif
+            case .sshKey:
+                keyInputView
 
-                case .sshKey:
-                    keyInputView
-
-                case .sshKeyWithPassphrase:
-                    keyInputView
-                    SecureField("Key Passphrase", text: $sshPassphrase, prompt: Text(String(localized: "Optional")))
-                }
-            } else {
-                Text(String(localized: "Uses server-side Tailscale SSH policy. No password or SSH key is required."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            case .sshKeyWithPassphrase:
+                keyInputView
+                SecureField("Key Passphrase", text: $sshPassphrase, prompt: Text(String(localized: "Optional")))
             }
         } header: {
             sectionHeader("Authentication")
@@ -907,22 +804,6 @@ struct ServerFormSheet: View {
     }
 
     private var hasValidCredentials: Bool {
-        guard transportSelection != .tailscale else {
-            return true
-        }
-
-        if transportSelection == .cloudflare {
-            switch selectedCloudflareAccessMode {
-            case .oauth:
-                break
-            case .serviceToken:
-                guard !cloudflareClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                      !cloudflareClientSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    return false
-                }
-            }
-        }
-
         switch selectedAuthMethod {
         case .password:
             return !password.isEmpty
@@ -952,10 +833,7 @@ struct ServerFormSheet: View {
             port: portNum,
             username: effectiveUsername,
             connectionMode: transportSelection.connectionMode,
-            authMethod: transportSelection == .tailscale ? .password : selectedAuthMethod,
-            cloudflareAccessMode: transportSelection == .cloudflare ? selectedCloudflareAccessMode : nil,
-            cloudflareTeamDomainOverride: transportSelection == .cloudflare ? normalizedCloudflareOverride(cloudflareTeamDomainOverride) : nil,
-            cloudflareAppDomainOverride: nil,
+            authMethod: selectedAuthMethod,
             notes: notes.isEmpty ? nil : notes,
             requiresBiometricUnlock: requiresBiometricUnlock,
             tmuxEnabledOverride: tmuxEnabled,
@@ -1004,16 +882,8 @@ struct ServerFormSheet: View {
             password: password,
             sshKey: sshKey,
             sshPassphrase: sshPassphrase,
-            sshPublicKey: sshPublicKey,
-            cloudflareAccessMode: transportSelection == .cloudflare ? selectedCloudflareAccessMode : nil,
-            cloudflareClientID: cloudflareClientID,
-            cloudflareClientSecret: cloudflareClientSecret
+            sshPublicKey: sshPublicKey
         )
-    }
-
-    private func normalizedCloudflareOverride(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func applyPrefill(_ prefill: ServerFormPrefill) {
@@ -1088,20 +958,7 @@ struct ServerFormSheet: View {
                 connectionTestSucceeded = true
                 success = true
             case .failure(let error):
-                let baseMessage = error.localizedDescription
-                if testServer.connectionMode == .tailscale {
-                    let reminder = String(localized: "This app currently supports direct tailnet connections only (no userspace proxy fallback).")
-                    if baseMessage.contains(reminder) {
-                        connectionTestError = baseMessage
-                    } else {
-                        connectionTestError = "\(baseMessage)\n\(reminder)"
-                    }
-                } else {
-                    connectionTestError = baseMessage
-                }
-                if let sshError = error as? SSHError, case .cloudflareConfigurationRequired = sshError {
-                    showCloudflareOverrides = true
-                }
+                connectionTestError = error.localizedDescription
                 connectionTestSucceeded = false
                 success = false
             }
@@ -1127,31 +984,19 @@ struct ServerFormSheet: View {
                     try await serverManager.updateServer(newServer)
                     // Store credentials based on auth method
                     let publicKeyData = sshPublicKey.isEmpty ? nil : sshPublicKey.data(using: .utf8)
-                    if transportSelection != .tailscale {
-                        switch selectedAuthMethod {
-                        case .password:
-                            if !password.isEmpty {
-                                try KeychainManager.shared.storePassword(for: newServer.id, password: password)
-                            }
-                        case .sshKey:
-                            if !sshKey.isEmpty, let keyData = sshKey.data(using: .utf8) {
-                                try KeychainManager.shared.storeSSHKey(for: newServer.id, privateKey: keyData, passphrase: nil, publicKey: publicKeyData)
-                            }
-                        case .sshKeyWithPassphrase:
-                            if !sshKey.isEmpty, let keyData = sshKey.data(using: .utf8) {
-                                try KeychainManager.shared.storeSSHKey(for: newServer.id, privateKey: keyData, passphrase: sshPassphrase.isEmpty ? nil : sshPassphrase, publicKey: publicKeyData)
-                            }
+                    switch selectedAuthMethod {
+                    case .password:
+                        if !password.isEmpty {
+                            try KeychainManager.shared.storePassword(for: newServer.id, password: password)
                         }
-                    }
-
-                    if transportSelection == .cloudflare, selectedCloudflareAccessMode == .serviceToken {
-                        try KeychainManager.shared.storeCloudflareServiceToken(
-                            for: newServer.id,
-                            clientID: cloudflareClientID,
-                            clientSecret: cloudflareClientSecret
-                        )
-                    } else {
-                        KeychainManager.shared.deleteCloudflareServiceToken(for: newServer.id)
+                    case .sshKey:
+                        if !sshKey.isEmpty, let keyData = sshKey.data(using: .utf8) {
+                            try KeychainManager.shared.storeSSHKey(for: newServer.id, privateKey: keyData, passphrase: nil, publicKey: publicKeyData)
+                        }
+                    case .sshKeyWithPassphrase:
+                        if !sshKey.isEmpty, let keyData = sshKey.data(using: .utf8) {
+                            try KeychainManager.shared.storeSSHKey(for: newServer.id, privateKey: keyData, passphrase: sshPassphrase.isEmpty ? nil : sshPassphrase, publicKey: publicKeyData)
+                        }
                     }
                 } else {
                     try await serverManager.addServer(newServer, credentials: credentials)

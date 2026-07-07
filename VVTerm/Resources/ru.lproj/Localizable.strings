@@ -783,28 +783,6 @@
 "root" = "root";
 "Required" = "Обязательно";
 "Optional" = "Необязательно";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "Использует серверную политику Tailscale SSH. Пароль или SSH-ключ не требуются.";
-"Tailscale SSH authentication was not accepted by the server." = "Аутентификация Tailscale SSH не была принята сервером.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "Сейчас это приложение поддерживает только прямые подключения tailnet (без резервного userspace-прокси).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "Вход OAuth откроется в браузере. Значения доменов команды/приложения автоматически определяются по хосту.";
-"Team Domain Override" = "Переопределение домена команды";
-"Set Team Domain Override" = "Задать переопределение домена команды";
-"App Domain Override" = "Переопределение домена приложения";
-"Hide Overrides" = "Скрыть переопределения";
-"Set Team/App Domain Override" = "Задать переопределение доменов команды/приложения";
-"Service Token Client ID" = "ID клиента сервисного токена";
-"Service Token Client Secret" = "Секрет клиента сервисного токена";
-"Cloudflare configuration error: %@" = "Ошибка конфигурации Cloudflare: %@";
-"Cloudflare authentication failed: %@" = "Аутентификация Cloudflare не удалась: %@";
-"Cloudflare tunnel failed: %@" = "Туннель Cloudflare не удался: %@";
-"Cloudflare transport requires a valid hostname." = "Транспорт Cloudflare требует допустимое имя хоста.";
-"Cloudflare service token client ID is required." = "Требуется ID клиента сервисного токена Cloudflare.";
-"Cloudflare service token client secret is required." = "Требуется секрет клиента сервисного токена Cloudflare.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Укажите переопределения домена команды и домена приложения для Cloudflare OAuth.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Не удалось обнаружить метаданные Cloudflare. Добавьте переопределения домена команды и домена приложения в настройках сервера.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "Выбрать сессию tmux";
@@ -1138,7 +1116,6 @@
 "Clear" = "Очистить";
 "Clear Filters" = "Очистить фильтры";
 "Close Preview" = "Закрыть предварительный просмотр";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Туннель Cloudflare подключен, но рукопожатие SSH было закрыто восходящей целью. Проверьте политику доступа и область действия токена службы.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd+Shift+M работает всегда, даже когда кнопка скрыта.";
 "Collapsed" = "Свернутый";
 "Compare plans" = "Сравнить планы";
@@ -1151,7 +1128,6 @@
 "Copy Names" = "Копировать имена";
 "Copy Path" = "Копировать путь";
 "Copy Paths" = "Копировать пути";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Не удалось автоматически обнаружить домен Cloudflare Team (\\(describeFailure(error))). Добавьте переопределение домена группы (например: team.cloudflareaccess.com).";
 "Create Workspace" = "Создать рабочую область";
 "Create a folder in the current remote directory." = "Создайте папку в текущем удаленном каталоге.";
 "Create a workspace before adding servers" = "Прежде чем добавлять серверы, создайте рабочую область.";
@@ -1299,7 +1275,6 @@
 "No valid files or folders were dropped." = "Никакие действительные файлы или папки не были удалены.";
 "No valid remote items were dropped." = "Ни один действительный удаленный элемент не был удален.";
 "No workspaces available." = "Нет доступных рабочих мест.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "Одна покупка Pro работает на iPhone, iPad и Mac с одним и тем же Apple ID.";
 "One-time purchase" = "Разовая покупка";
 "One-time purchase. No subscription renewal." = "Разовая покупка. Нет продления подписки.";
@@ -1382,7 +1357,6 @@
 "Server stats" = "Статистика сервера";
 "Server stats included on Free" = "Статистика сервера включена в бесплатную версию";
 "Server stats included on Pro" = "Статистика сервера включена в Pro";
-"Service Token" = "Сервисный токен";
 "Share" = "Поделиться";
 "Share sheet ready." = "Поделиться листом готов.";
 "Share…" = "Поделиться…";
@@ -1407,7 +1381,6 @@
 "Symlink" = "Симлинк";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "Синхронизируйте серверы, рабочие области, темы и настройки аксессуаров для клавиатуры на всех ваших устройствах Apple.";
 "Tab \\(number)" = "Вкладка \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "Условия";
 "Terms of Use (EULA)" = "Условия использования (EULA)";
 "Text Document" = "Текстовый документ";

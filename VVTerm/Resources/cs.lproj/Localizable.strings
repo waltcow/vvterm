@@ -784,28 +784,6 @@
 "root" = "root";
 "Required" = "Povinné";
 "Optional" = "Volitelné";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "Používá zásady Tailscale SSH na straně serveru. Heslo ani SSH klíč nejsou vyžadovány.";
-"Tailscale SSH authentication was not accepted by the server." = "Ověření Tailscale SSH nebylo serverem přijato.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "Tato aplikace momentálně podporuje pouze přímá tailnet připojení (bez náhradního userspace proxy).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "Přihlášení OAuth se otevře v prohlížeči. Hodnoty domény týmu/aplikace se automaticky zjistí z hostitele.";
-"Team Domain Override" = "Přepsání domény týmu";
-"Set Team Domain Override" = "Nastavit přepsání domény týmu";
-"App Domain Override" = "Přepsání domény aplikace";
-"Hide Overrides" = "Skrýt přepsání";
-"Set Team/App Domain Override" = "Nastavit přepsání domény týmu/aplikace";
-"Service Token Client ID" = "ID klienta servisního tokenu";
-"Service Token Client Secret" = "Tajný klíč klienta servisního tokenu";
-"Cloudflare configuration error: %@" = "Chyba konfigurace Cloudflare: %@";
-"Cloudflare authentication failed: %@" = "Ověření Cloudflare se nezdařilo: %@";
-"Cloudflare tunnel failed: %@" = "Tunel Cloudflare selhal: %@";
-"Cloudflare transport requires a valid hostname." = "Přenos Cloudflare vyžaduje platný název hostitele.";
-"Cloudflare service token client ID is required." = "Je vyžadováno ID klienta servisního tokenu Cloudflare.";
-"Cloudflare service token client secret is required." = "Je vyžadován tajný klíč klienta servisního tokenu Cloudflare.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Pro Cloudflare OAuth zadejte přepsání domény týmu i domény aplikace.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Zjištění metadat Cloudflare selhalo. V nastavení serveru přidejte přepsání domény týmu a domény aplikace.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "Vybrat relaci tmux";
@@ -1139,7 +1117,6 @@
 "Clear" = "Jasný";
 "Clear Filters" = "Vymazat filtry";
 "Close Preview" = "Zavřít náhled";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Tunel Cloudflare se připojil, ale handshake SSH byl uzavřen proti proudu cíle. Ověřte zásady přístupu a rozsah tokenu služby.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M funguje vždy, i když je tlačítko skryté.";
 "Collapsed" = "Zhroucený";
 "Compare plans" = "Porovnejte plány";
@@ -1152,7 +1129,6 @@
 "Copy Names" = "Copy Names";
 "Copy Path" = "Kopírovat cestu";
 "Copy Paths" = "Kopírovat cesty";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Nepodařilo se automaticky zjistit týmovou doménu Cloudflare (\\(describeFailure(error))). Přidejte přepsání týmové domény (například: team.cloudflareaccess.com).";
 "Create Workspace" = "Vytvořit pracovní prostor";
 "Create a folder in the current remote directory." = "Vytvořte složku v aktuálním vzdáleném adresáři.";
 "Create a workspace before adding servers" = "Před přidáním serverů vytvořte pracovní prostor";
@@ -1300,7 +1276,6 @@
 "No valid files or folders were dropped." = "Nebyly odstraněny žádné platné soubory ani složky.";
 "No valid remote items were dropped." = "Nebyly odstraněny žádné platné vzdálené položky.";
 "No workspaces available." = "Nejsou k dispozici žádné pracovní prostory.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "Jeden nákup Pro funguje na iPhonu, iPadu a Macu se stejným Apple ID.";
 "One-time purchase" = "Jednorázový nákup";
 "One-time purchase. No subscription renewal." = "Jednorázový nákup. Žádné obnovení předplatného.";
@@ -1383,7 +1358,6 @@
 "Server stats" = "Statistiky serveru";
 "Server stats included on Free" = "Statistiky serveru jsou součástí Free";
 "Server stats included on Pro" = "Statistiky serveru zahrnuté v Pro";
-"Service Token" = "Token služby";
 "Share" = "Sdílejte";
 "Share sheet ready." = "Sdílet list připraven.";
 "Share…" = "Sdílet…";
@@ -1408,7 +1382,6 @@
 "Symlink" = "Symbolický odkaz";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "Synchronizujte servery, pracovní prostory, motivy a nastavení příslušenství klávesnice na všech vašich zařízeních Apple.";
 "Tab \\(number)" = "Karta \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "Podmínky";
 "Terms of Use (EULA)" = "Podmínky použití (EULA)";
 "Text Document" = "Textový dokument";

@@ -99,7 +99,7 @@ Current architecture:
 - `App` owns app entry, composition roots, shared root containers, localization preferences, and iOS app-shell navigation.
 - `Core/Sync` owns CloudKit sync infrastructure.
 - `Core/Security` owns keychain, device identity, and privacy-mode infrastructure.
-- `Core/Network` owns shared connectivity monitoring and Cloudflare transport support.
+- `Core/Network` owns shared connectivity monitoring.
 - `Core/UI` owns shared view primitives and presentation helpers reused across features.
 - `Core/Terminal` owns shared clipboard, paste, and terminal text/default helpers.
 - `Core/Logging` owns shared logging utilities.

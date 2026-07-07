@@ -783,28 +783,6 @@
 "root" = "root";
 "Required" = "Required";
 "Optional" = "Optional";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "Uses server-side Tailscale SSH policy. No password or SSH key is required.";
-"Tailscale SSH authentication was not accepted by the server." = "Tailscale SSH authentication was not accepted by the server.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "This app currently supports direct tailnet connections only (no userspace proxy fallback).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "OAuth login will open in browser. Team/App domain values are auto-discovered from host.";
-"Team Domain Override" = "Team Domain Override";
-"Set Team Domain Override" = "Set Team Domain Override";
-"App Domain Override" = "App Domain Override";
-"Hide Overrides" = "Hide Overrides";
-"Set Team/App Domain Override" = "Set Team/App Domain Override";
-"Service Token Client ID" = "Service Token Client ID";
-"Service Token Client Secret" = "Service Token Client Secret";
-"Cloudflare configuration error: %@" = "Cloudflare configuration error: %@";
-"Cloudflare authentication failed: %@" = "Cloudflare authentication failed: %@";
-"Cloudflare tunnel failed: %@" = "Cloudflare tunnel failed: %@";
-"Cloudflare transport requires a valid hostname." = "Cloudflare transport requires a valid hostname.";
-"Cloudflare service token client ID is required." = "Cloudflare service token client ID is required.";
-"Cloudflare service token client secret is required." = "Cloudflare service token client secret is required.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Provide both Team Domain and App Domain overrides for Cloudflare OAuth.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "Choose tmux session";
@@ -1137,7 +1115,6 @@
 "Clear" = "Clear";
 "Clear Filters" = "Clear Filters";
 "Close Preview" = "Close Preview";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M always works, even when the button is hidden.";
 "Collapsed" = "Collapsed";
 "Compare plans" = "Compare plans";
@@ -1150,7 +1127,6 @@
 "Copy Names" = "Copy Names";
 "Copy Path" = "Copy Path";
 "Copy Paths" = "Copy Paths";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com).";
 "Create Workspace" = "Create Workspace";
 "Create a folder in the current remote directory." = "Create a folder in the current remote directory.";
 "Create a workspace before adding servers" = "Create a workspace before adding servers";
@@ -1298,7 +1274,6 @@
 "No valid files or folders were dropped." = "No valid files or folders were dropped.";
 "No valid remote items were dropped." = "No valid remote items were dropped.";
 "No workspaces available." = "No workspaces available.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID.";
 "One-time purchase" = "One-time purchase";
 "One-time purchase. No subscription renewal." = "One-time purchase. No subscription renewal.";
@@ -1381,7 +1356,6 @@
 "Server stats" = "Server stats";
 "Server stats included on Free" = "Server stats included on Free";
 "Server stats included on Pro" = "Server stats included on Pro";
-"Service Token" = "Service Token";
 "Share" = "Share";
 "Share sheet ready." = "Share sheet ready.";
 "Share…" = "Share…";
@@ -1406,7 +1380,6 @@
 "Symlink" = "Symlink";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices.";
 "Tab \\(number)" = "Tab \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "Terms";
 "Terms of Use (EULA)" = "Terms of Use (EULA)";
 "Text Document" = "Text Document";

@@ -6,9 +6,8 @@
     "eyebrow": "为日常远程工作而打造",
     "eyebrowSequence": [
       "为日常远程工作而打造",
-      "支持 SSH、Mosh 与 Tailscale",
+      "支持 SSH 与 Mosh",
       "内置 SFTP 远程文件",
-      "支持 Cloudflare Tunnel SSH",
       "基于 Ghostty 的终端模拟",
       "通过 iCloud 同步服务器数据",
       "凭据由 Keychain 安全保护",
@@ -29,7 +28,7 @@
     },
     "modern": {
       "title": "现代 SSH 方式直接可用",
-      "desc": "标准 SSH、Mosh、Tailscale SSH、Cloudflare Tunnel SSH 都能直接使用，不必拼装多个工具。"
+      "desc": "标准 SSH 和 Mosh 都能直接使用，不必拼装多个工具。"
     },
     "sync": {
       "title": "iCloud 同步更省心",
@@ -49,7 +48,7 @@
     },
     "connect": {
       "title": "按你的方式连接",
-      "desc": "想用标准 SSH 就用标准 SSH，需要现代传输方式时也能直接切换，配置阻力更小。"
+      "desc": "想用标准 SSH 就用标准 SSH，需要更稳的会话时切到 Mosh，配置阻力更小。"
     },
     "files": {
       "title": "内置 SFTP 文件浏览器",
@@ -100,7 +99,7 @@
         "1 个工作区",
         "1 台服务器",
         "1 个连接标签",
-        "支持 SSH、Mosh、Tailscale SSH 和 Cloudflare Tunnel SSH",
+        "支持 SSH 和 Mosh",
         "基于 Ghostty 的终端渲染",
         "iCloud 同步",
         "语音转命令",
@@ -158,7 +157,7 @@
     },
     "q3": {
       "question": "支持哪些连接方式？",
-      "answer": "VVTerm 支持标准 SSH，也支持 Mosh、Tailscale SSH 和 Cloudflare Tunnel SSH。需要时，凭据会安全保存在 Apple Keychain。"
+      "answer": "VVTerm 支持标准 SSH 和 Mosh。需要时，凭据会安全保存在 Apple Keychain。"
     },
     "q4": {
       "question": "VVTerm 能在 iPad 上使用吗？",

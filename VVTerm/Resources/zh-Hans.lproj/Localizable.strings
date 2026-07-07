@@ -780,28 +780,6 @@
 "root" = "root";
 "Required" = "必填";
 "Optional" = "可选";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "使用服务器端 Tailscale SSH 策略。无需密码或 SSH 密钥。";
-"Tailscale SSH authentication was not accepted by the server." = "服务器未接受 Tailscale SSH 身份验证。";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "此应用目前仅支持直接 tailnet 连接（不支持 userspace 代理回退）。";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "OAuth 登录将在浏览器中打开。团队/应用域名会从主机自动发现。";
-"Team Domain Override" = "团队域名覆盖";
-"Set Team Domain Override" = "设置团队域名覆盖";
-"App Domain Override" = "应用域名覆盖";
-"Hide Overrides" = "隐藏覆盖项";
-"Set Team/App Domain Override" = "设置团队/应用域名覆盖";
-"Service Token Client ID" = "服务令牌客户端 ID";
-"Service Token Client Secret" = "服务令牌客户端密钥";
-"Cloudflare configuration error: %@" = "Cloudflare 配置错误：%@";
-"Cloudflare authentication failed: %@" = "Cloudflare 认证失败：%@";
-"Cloudflare tunnel failed: %@" = "Cloudflare 隧道失败：%@";
-"Cloudflare transport requires a valid hostname." = "Cloudflare 传输需要有效的主机名。";
-"Cloudflare service token client ID is required." = "需要 Cloudflare 服务令牌客户端 ID。";
-"Cloudflare service token client secret is required." = "需要 Cloudflare 服务令牌客户端密钥。";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "请为 Cloudflare OAuth 同时提供团队域名和应用域名覆盖。";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "Cloudflare 元数据发现失败。请在服务器设置中添加团队域名和应用域名覆盖。";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "选择 tmux 会话";
@@ -1135,7 +1113,6 @@
 "Clear" = "清除";
 "Clear Filters" = "清除过滤器";
 "Close Preview" = "关闭预览";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Cloudflare 隧道已连接，但 SSH 握手已被上游目标关闭。验证访问策略和服务令牌范围。";
 "Cmd + Shift + M always works, even when the button is hidden." = "即使按钮隐藏，Cmd + Shift + M 始终有效。";
 "Collapsed" = "倒塌";
 "Compare plans" = "比较方案";
@@ -1148,7 +1125,6 @@
 "Copy Names" = "复制姓名";
 "Copy Path" = "复制路径";
 "Copy Paths" = "复制路径";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "无法自动发现 Cloudflare 团队域 (\\(describeFailure(error)))。添加团队域覆盖（例如：team.cloudflareaccess.com）。";
 "Create Workspace" = "创建工作空间";
 "Create a folder in the current remote directory." = "在当前远程目录中创建一个文件夹。";
 "Create a workspace before adding servers" = "添加服务器之前创建工作区";
@@ -1296,7 +1272,6 @@
 "No valid files or folders were dropped." = "没有删除有效的文件或文件夹。";
 "No valid remote items were dropped." = "没有丢弃有效的远程物品。";
 "No workspaces available." = "没有可用的工作空间。";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "使用同一个 Apple ID 购买一次 Pro，即可在 iPhone、iPad 和 Mac 上使用。";
 "One-time purchase" = "一次性购买";
 "One-time purchase. No subscription renewal." = "一次性购买，无订阅续费。";
@@ -1379,7 +1354,6 @@
 "Server stats" = "服务器统计";
 "Server stats included on Free" = "免费包含服务器统计信息";
 "Server stats included on Pro" = "Pro 中包含服务器统计信息";
-"Service Token" = "服务令牌";
 "Share" = "分享";
 "Share sheet ready." = "分享表准备好了。";
 "Share…" = "分享...";
@@ -1404,7 +1378,6 @@
 "Symlink" = "符号链接";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "在所有 Apple 设备上同步服务器、工作区、主题和键盘配件设置。";
 "Tab \\(number)" = "选项卡 \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "条款";
 "Terms of Use (EULA)" = "使用条款 (EULA)";
 "Text Document" = "文本文档";
