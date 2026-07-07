@@ -2,6 +2,13 @@
 import SwiftUI
 
 extension ConnectionTerminalContainer {
+    func platformChrome<Content: View>(
+        _ content: Content,
+        backgroundColor: Color
+    ) -> some View {
+        content
+    }
+
     @ViewBuilder
     var terminalLayer: some View {
         if selectedView == "terminal" && serverTabs.isEmpty {

@@ -151,25 +151,12 @@ struct ConnectionTerminalContainer: View {
     }
 
     private var sharedBody: some View {
-        contentLayer
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(liveTerminalBackgroundColor)
-            .overlay(alignment: .top) {
-                #if os(macOS)
-                if !isZenModeEnabled {
-                    MacOSToolbarBackdrop(color: liveTerminalBackgroundColor)
-                }
-                #endif
-            }
-            .background {
-                #if os(macOS)
-                if isZenModeEnabled {
-                    MacOSZenWindowChromeBridge(contentInsets: $zenWindowSafeAreaInsets)
-                        .frame(width: 0, height: 0)
-                }
-                #endif
-            }
-            .macOSZenExpandedTopSafeArea(isZenModeEnabled && selectedView == "terminal")
+        platformChrome(
+            contentLayer
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(liveTerminalBackgroundColor),
+            backgroundColor: liveTerminalBackgroundColor
+        )
             .onAppear {
                 updateTerminalBackgroundColor()
                 // Select first tab if none selected
@@ -962,21 +949,6 @@ struct ConnectionTerminalContainer: View {
         }
     }
     #endif
-}
-
-private extension View {
-    @ViewBuilder
-    func macOSZenExpandedTopSafeArea(_ isEnabled: Bool) -> some View {
-        #if os(macOS)
-        if isEnabled {
-            self.ignoresSafeArea(.container, edges: .top)
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
-    }
 }
 
 #if os(macOS)

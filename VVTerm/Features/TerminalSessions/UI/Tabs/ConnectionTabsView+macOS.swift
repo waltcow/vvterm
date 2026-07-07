@@ -131,6 +131,25 @@ struct MacOSToolbarBackdrop: View {
 }
 
 extension ConnectionTerminalContainer {
+    func platformChrome<Content: View>(
+        _ content: Content,
+        backgroundColor: Color
+    ) -> some View {
+        content
+            .overlay(alignment: .top) {
+                if !isZenModeEnabled {
+                    MacOSToolbarBackdrop(color: backgroundColor)
+                }
+            }
+            .background {
+                if isZenModeEnabled {
+                    MacOSZenWindowChromeBridge(contentInsets: $zenWindowSafeAreaInsets)
+                        .frame(width: 0, height: 0)
+                }
+            }
+            .macOSZenExpandedTopSafeArea(isZenModeEnabled && selectedView == "terminal")
+    }
+
     private var terminalContentInsets: EdgeInsets {
         isZenModeEnabled ? zenWindowSafeAreaInsets : EdgeInsets()
     }
@@ -156,6 +175,17 @@ extension ConnectionTerminalContainer {
                 openNewTab()
             }
             .padding(terminalContentInsets)
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func macOSZenExpandedTopSafeArea(_ isEnabled: Bool) -> some View {
+        if isEnabled {
+            self.ignoresSafeArea(.container, edges: .top)
+        } else {
+            self
         }
     }
 }
