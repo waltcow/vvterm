@@ -541,7 +541,7 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`, moved terminal render lifecycle hooks into platform files, and made the shared wrapper construction platform-neutral by putting the iOS keyboard-preservation default in `SSHTerminalWrapper+iOS.swift`.
+- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, renamed the platform zen panel product UI types/helpers to neutral names, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`, moved terminal render lifecycle hooks into platform files, and made the shared wrapper construction platform-neutral by putting the iOS keyboard-preservation default in `SSHTerminalWrapper+iOS.swift`.
 - Remaining: move voice recording presentation and remaining platform tab components out of shared terminal session UI files.
 
 ### App Shell
@@ -755,7 +755,7 @@ Steps:
 1. Done: split `SSHTerminalWrapper.swift` into platform files.
 2. Done: move macOS key monitoring and render pause/resume hooks out of shared `TerminalContainerView.swift`.
 3. Done: move the iOS terminal wrapper option out of shared `TerminalContainerView.swift` by making the iOS wrapper default preserve keyboard state during reconnect.
-4. Done: split zen mode panels into platform files.
+4. Done: split zen mode panels into platform files with neutral product UI names.
 5. Build iOS and macOS.
 
 Acceptance:
