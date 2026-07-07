@@ -481,7 +481,7 @@ Initial implementation status:
 
 Current issues:
 
-- `TerminalContainerView.swift` mixes shared connection lifecycle with iOS/macOS terminal wrapper differences, macOS key monitoring, voice recording presentation, and render pause/resume.
+- `TerminalContainerView.swift` still mixes shared connection lifecycle with iOS/macOS terminal wrapper differences, voice recording presentation, and render pause/resume.
 - `ConnectionTabsView.swift` still contains a macOS toolbar body and shared tab/session composition; the macOS zen chrome bridge has moved to `ConnectionTabsView+macOS.swift`.
 - `SSHTerminalWrapper.swift` has been split into shared, iOS, and macOS files.
 - `ZenModeControls.swift` keeps shared controls while `ZenModeControls+iOS.swift` and `ZenModeControls+macOS.swift` own the platform panels.
@@ -536,8 +536,13 @@ Migration notes:
 - Keep `SSHTerminalWrapper.swift` shared-only; platform wrappers belong in `SSHTerminalWrapper+iOS.swift` and `SSHTerminalWrapper+macOS.swift`.
 - Keep platform zen panels in `ZenModeControls+iOS.swift` and `ZenModeControls+macOS.swift`.
 - Keep AppKit zen chrome bridges in `ConnectionTabsView+macOS.swift`.
-- Move macOS `NSEvent` key monitoring out of `TerminalContainerView.swift`.
+- Keep macOS `NSEvent` key monitoring in `TerminalContainerView+macOS.swift`.
 - Keep terminal content non-glassy.
+
+Initial implementation status:
+
+- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, and moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`.
+- Remaining: move render pause/resume hooks, iOS terminal wrapper options, voice recording presentation, and remaining platform tab components out of shared terminal session UI files.
 
 ### App Shell
 
@@ -748,7 +753,7 @@ Reason: terminal lifecycle is sensitive, and platform behavior should be explici
 Steps:
 
 1. Done: split `SSHTerminalWrapper.swift` into platform files.
-2. Move macOS key monitoring and render pause/resume hooks out of shared `TerminalContainerView.swift`.
+2. Done: move macOS key monitoring out of shared `TerminalContainerView.swift`; remaining render pause/resume hooks stay pending.
 3. Move iOS terminal wrapper options into `TerminalContainerView+iOS.swift`.
 4. Done: split zen mode panels into platform files.
 5. Build iOS and macOS.
