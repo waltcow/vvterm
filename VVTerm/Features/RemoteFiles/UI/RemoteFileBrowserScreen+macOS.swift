@@ -48,7 +48,7 @@ final class RemoteFileBrowserPlatformState: ObservableObject {
 extension RemoteFileBrowserScreen {
     @ViewBuilder
     func platformContent(_ snapshot: Snapshot) -> some View {
-        macOSContent(snapshot)
+        browserContent(snapshot)
     }
 
     func platformUploadImportPresentation<Content: View>(_ content: Content) -> some View {
@@ -97,7 +97,7 @@ extension RemoteFileBrowserScreen {
     }
 
     func platformCurrentPathDidChange() {
-        cancelMacOSInlineEdit()
+        cancelInlineEdit()
         platformState.selectedPaths.removeAll()
     }
 
@@ -176,15 +176,15 @@ extension RemoteFileBrowserScreen {
     }
 
     func platformBeginUpload(to remotePath: String) {
-        presentMacOSUploadPanel(for: remotePath)
+        presentUploadPanel(for: remotePath)
     }
 
     func platformBeginDownload(_ entry: RemoteFileEntry) {
-        presentMacOSDownloadPanel(for: entry)
+        presentDownloadPanel(for: entry)
     }
 
     func platformBeginCreateFolder(in remotePath: String) {
-        beginMacOSInlineCreateFolder(in: remotePath)
+        beginInlineCreateFolder(in: remotePath)
     }
 
     func platformBeginRename(_ entry: RemoteFileEntry) {
@@ -201,14 +201,14 @@ extension RemoteFileBrowserScreen {
     func platformDidActivatePreviewEntry(_ entry: RemoteFileEntry) async {}
 
     func platformRequestDelete(_ entries: [RemoteFileEntry]) {
-        presentMacOSDeleteConfirmation(for: entries)
+        presentDeleteConfirmation(for: entries)
     }
 
-    func macOSContent(_ snapshot: Snapshot) -> some View {
+    func browserContent(_ snapshot: Snapshot) -> some View {
         GeometryReader { proxy in
-            let splitMetrics = macOSSplitMetrics(
+            let splitMetrics = makeSplitMetrics(
                 totalWidth: proxy.size.width,
-                showsPreview: shouldShowMacOSPreview(snapshot)
+                showsPreview: shouldShowPreview(snapshot)
             )
 
             VStack(spacing: 0) {
@@ -219,12 +219,12 @@ extension RemoteFileBrowserScreen {
 
                 if splitMetrics.showsPreview {
                     HSplitView {
-                        macOSTable(snapshot)
-                            .frame(minWidth: macOSMinimumTableWidth, maxWidth: .infinity, maxHeight: .infinity)
+                        fileTable(snapshot)
+                            .frame(minWidth: minimumTableWidth, maxWidth: .infinity, maxHeight: .infinity)
 
-                        macOSPreviewPanel(snapshot)
+                        previewPanel(snapshot)
                             .frame(
-                                minWidth: macOSPreviewMinimumWidth,
+                                minWidth: minimumPreviewWidth,
                                 idealWidth: splitMetrics.previewIdealWidth,
                                 maxWidth: splitMetrics.previewMaximumWidth,
                                 maxHeight: .infinity
@@ -232,12 +232,12 @@ extension RemoteFileBrowserScreen {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    macOSTable(snapshot)
+                    fileTable(snapshot)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
                 Divider()
-                macOSPathBar(snapshot)
+                pathBar(snapshot)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(.container, edges: .top)
@@ -245,18 +245,18 @@ extension RemoteFileBrowserScreen {
                 MacOSWindowTopInsetBridge(topInset: $platformState.titlebarHeight)
                     .frame(width: 0, height: 0)
             }
-            .background(macOSCanvasColor)
+            .background(canvasColor)
             .contextMenu {
                 browserActionMenu(currentPath: snapshot.currentPath)
             }
         }
     }
 
-    func macOSTable(_ snapshot: Snapshot) -> some View {
+    func fileTable(_ snapshot: Snapshot) -> some View {
         MacOSRemoteFileTableView(
             entries: snapshot.entries,
             currentPath: snapshot.currentPath,
-            selectedPaths: effectiveMacOSSelection(snapshot: snapshot, entries: snapshot.entries),
+            selectedPaths: effectiveSelection(snapshot: snapshot, entries: snapshot.entries),
             sort: snapshot.sort,
             sortDirection: snapshot.sortDirection,
             inlineCreateFolderParentPath: platformState.inlineEditor?.createFolderParentPath,
@@ -264,7 +264,7 @@ extension RemoteFileBrowserScreen {
             inlineProposedName: platformState.inlineEditor?.proposedName ?? "",
             isInlineSubmitting: platformState.inlineEditor?.isSubmitting == true,
             onSelectionChange: { selection, modifierFlags in
-                handleMacOSSelectionChange(selection, modifierFlags: modifierFlags, entries: snapshot.entries)
+                handleSelectionChange(selection, modifierFlags: modifierFlags, entries: snapshot.entries)
             },
             onActivate: { entry in
                 previewEntry(entry)
@@ -273,10 +273,10 @@ extension RemoteFileBrowserScreen {
                 browser.updateSort(sort, direction: direction, for: fileTab)
             },
             onUploadDroppedURLs: { urls, destinationPath in
-                handleMacOSDroppedURLs(urls, to: destinationPath)
+                handleDroppedURLs(urls, to: destinationPath)
             },
             onDropRemotePayload: { payload, destinationPath in
-                handleMacOSDroppedRemotePayload(payload, to: destinationPath)
+                handleDroppedRemotePayload(payload, to: destinationPath)
             },
             menuForEntry: { entry in
                 appKitEntryMenu(for: entry)
@@ -294,14 +294,14 @@ extension RemoteFileBrowserScreen {
                 kindLabel(for: entry)
             },
             onSubmitInlineEdit: { proposedName in
-                submitMacOSInlineEdit(proposedName)
+                submitInlineEdit(proposedName)
             },
             onCancelInlineEdit: {
-                cancelMacOSInlineEdit()
+                cancelInlineEdit()
             },
             serverId: server.id
         )
-        .background(macOSCanvasColor)
+        .background(canvasColor)
         .overlay {
             if let error = snapshot.directoryError {
                 RemoteFileEmptyState(
@@ -314,7 +314,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func beginMacOSInlineCreateFolder(in remotePath: String) {
+    func beginInlineCreateFolder(in remotePath: String) {
         let destinationPath = RemoteFilePath.normalize(remotePath, relativeTo: snapshot.currentPath)
 
         Task {
@@ -327,7 +327,7 @@ extension RemoteFileBrowserScreen {
             }
 
             let folderName = await MainActor.run {
-                uniqueMacOSFolderName(in: browser.entries(for: fileTab))
+                uniqueFolderName(in: browser.entries(for: fileTab))
             }
 
             let createdPath = RemoteFilePath.appending(folderName, to: destinationPath)
@@ -358,12 +358,12 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func cancelMacOSInlineEdit() {
+    func cancelInlineEdit() {
         guard platformState.inlineEditor?.isSubmitting != true else { return }
         platformState.inlineEditor = nil
     }
 
-    func submitMacOSInlineEdit(_ proposedName: String) {
+    func submitInlineEdit(_ proposedName: String) {
         guard let editor = platformState.inlineEditor, !editor.isSubmitting else { return }
 
         switch editor {
@@ -393,7 +393,7 @@ extension RemoteFileBrowserScreen {
                     },
                     onSuccess: { _ in
                         platformState.inlineEditor = nil
-                        selectMacOSEntry(at: createdPath)
+                        selectEntry(at: createdPath)
                     },
                     onFailure: { error in
                         platformState.inlineEditor = .createFolder(
@@ -444,7 +444,7 @@ extension RemoteFileBrowserScreen {
                     },
                     onSuccess: { _ in
                         platformState.inlineEditor = nil
-                        selectMacOSEntry(at: destinationPath)
+                        selectEntry(at: destinationPath)
                     },
                     onFailure: { error in
                         platformState.inlineEditor = .rename(
@@ -468,7 +468,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func selectMacOSEntry(at path: String) {
+    func selectEntry(at path: String) {
         platformState.selectedPaths = [path]
         if let entry = browser.entries(for: fileTab).first(where: { $0.path == path }) {
             browser.focus(entry, in: fileTab)
@@ -477,7 +477,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func uniqueMacOSFolderName(in entries: [RemoteFileEntry]) -> String {
+    func uniqueFolderName(in entries: [RemoteFileEntry]) -> String {
         let baseName = String(localized: "Untitled Folder")
         let existingNames = Set(entries.map { $0.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) })
 
@@ -496,7 +496,7 @@ extension RemoteFileBrowserScreen {
         return baseName
     }
 
-    func macOSPreviewPanel(_ snapshot: Snapshot) -> some View {
+    func previewPanel(_ snapshot: Snapshot) -> some View {
         RemoteFileInspectorView(
             selectedEntry: snapshot.selectedEntry,
             viewerPayload: snapshot.viewerPayload,
@@ -504,9 +504,9 @@ extension RemoteFileBrowserScreen {
             viewerError: snapshot.viewerError,
             directoryError: snapshot.directoryError,
             chrome: .sidebar,
-            backgroundColor: macOSCanvasColor,
-            previewBackgroundColor: macOSRaisedSurfaceColor,
-            sectionBackgroundColor: macOSRaisedSurfaceColor,
+            backgroundColor: canvasColor,
+            previewBackgroundColor: raisedSurfaceColor,
+            sectionBackgroundColor: raisedSurfaceColor,
             onLoadPreview: { entry in
                 Task { await browser.loadPreview(for: entry, in: fileTab, server: server) }
             },
@@ -542,18 +542,18 @@ extension RemoteFileBrowserScreen {
             }
         )
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(macOSCanvasColor)
+        .background(canvasColor)
     }
 
-    func shouldShowMacOSPreview(_ snapshot: Snapshot) -> Bool {
+    func shouldShowPreview(_ snapshot: Snapshot) -> Bool {
         snapshot.selectedEntry != nil || snapshot.viewerPayload != nil || snapshot.viewerError != nil || snapshot.isLoadingViewer
     }
 
-    func macOSPathBar(_ snapshot: Snapshot) -> some View {
+    func pathBar(_ snapshot: Snapshot) -> some View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    macOSBreadcrumbButton(
+                    breadcrumbButton(
                         title: server.name,
                         systemImage: "server.rack",
                         isCurrent: snapshot.currentPath == "/"
@@ -572,7 +572,7 @@ extension RemoteFileBrowserScreen {
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.tertiary)
 
-                        macOSBreadcrumbButton(
+                        breadcrumbButton(
                             title: breadcrumb.title,
                             systemImage: "folder.fill",
                             isCurrent: index == snapshot.breadcrumbs.dropFirst().count - 1
@@ -591,7 +591,7 @@ extension RemoteFileBrowserScreen {
             HStack {
                 Spacer(minLength: 0)
 
-                Text(macOSFooterStatusLabel(snapshot))
+                Text(footerStatusLabel(snapshot))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -602,10 +602,10 @@ extension RemoteFileBrowserScreen {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
         }
-        .background(macOSChromeSurfaceColor)
+        .background(chromeSurfaceColor)
     }
 
-    func effectiveMacOSSelection(snapshot: Snapshot, entries: [RemoteFileEntry]) -> Set<String> {
+    func effectiveSelection(snapshot: Snapshot, entries: [RemoteFileEntry]) -> Set<String> {
         let visiblePaths = Set(entries.map(\.id))
         var selection = platformState.selectedPaths.intersection(visiblePaths)
 
@@ -618,13 +618,13 @@ extension RemoteFileBrowserScreen {
         return selection
     }
 
-    func macOSSelectedEntries(for snapshot: Snapshot) -> [RemoteFileEntry] {
-        let selectedPaths = effectiveMacOSSelection(snapshot: snapshot, entries: snapshot.entries)
+    func selectedTableEntries(for snapshot: Snapshot) -> [RemoteFileEntry] {
+        let selectedPaths = effectiveSelection(snapshot: snapshot, entries: snapshot.entries)
         guard !selectedPaths.isEmpty else { return [] }
         return snapshot.entries.filter { selectedPaths.contains($0.id) }
     }
 
-    func handleMacOSSelectionChange(
+    func handleSelectionChange(
         _ selection: Set<String>,
         modifierFlags: NSEvent.ModifierFlags,
         entries: [RemoteFileEntry]
@@ -647,7 +647,7 @@ extension RemoteFileBrowserScreen {
         browser.focus(entry, in: fileTab)
     }
 
-    func handleMacOSDroppedURLs(_ urls: [URL], to destinationPath: String) {
+    func handleDroppedURLs(_ urls: [URL], to destinationPath: String) {
         guard !urls.isEmpty else { return }
         beginUploadFlow(
             urls: urls,
@@ -656,7 +656,7 @@ extension RemoteFileBrowserScreen {
         )
     }
 
-    func handleMacOSDroppedRemotePayload(_ payload: RemoteFileDragPayload, to destinationPath: String) {
+    func handleDroppedRemotePayload(_ payload: RemoteFileDragPayload, to destinationPath: String) {
         performTransfer(
             title: String(localized: "Transferring"),
             initialMessage: String(localized: "Preparing remote items."),
@@ -666,7 +666,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func presentMacOSUploadPanel(for remotePath: String) {
+    func presentUploadPanel(for remotePath: String) {
         let panel = NSOpenPanel()
         panel.title = String(localized: "Upload to Remote Folder")
         panel.message = String(localized: "Choose files or folders to upload.")
@@ -689,7 +689,7 @@ extension RemoteFileBrowserScreen {
         )
     }
 
-    func presentMacOSDownloadPanel(for entry: RemoteFileEntry) {
+    func presentDownloadPanel(for entry: RemoteFileEntry) {
         let panel = NSSavePanel()
         panel.title = String(localized: "Download Remote File")
         panel.message = String(localized: "Choose where to save the downloaded file.")
@@ -716,7 +716,7 @@ extension RemoteFileBrowserScreen {
         }
     }
 
-    func presentMacOSDeleteConfirmation(for entries: [RemoteFileEntry]) {
+    func presentDeleteConfirmation(for entries: [RemoteFileEntry]) {
         let sortedEntries = entries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -785,7 +785,7 @@ extension RemoteFileBrowserScreen {
     }
 
     func appKitEntryMenu(for entry: RemoteFileEntry) -> NSMenu {
-        let targetEntries = macOSContextMenuEntries(for: entry)
+        let targetEntries = contextMenuEntries(for: entry)
         if targetEntries.count > 1 {
             return appKitMultiEntryMenu(for: targetEntries)
         }
@@ -884,7 +884,7 @@ extension RemoteFileBrowserScreen {
         return menu
     }
 
-    func macOSContextMenuEntries(for entry: RemoteFileEntry) -> [RemoteFileEntry] {
+    func contextMenuEntries(for entry: RemoteFileEntry) -> [RemoteFileEntry] {
         let selectedEntries = snapshot.entries.filter { platformState.selectedPaths.contains($0.id) }
         guard selectedEntries.count > 1,
               selectedEntries.contains(where: { $0.id == entry.id }) else {
@@ -927,8 +927,8 @@ extension RemoteFileBrowserScreen {
         return menu
     }
 
-    func macOSFooterStatusLabel(_ snapshot: Snapshot) -> String {
-        let selectedEntries = macOSSelectedEntries(for: snapshot)
+    func footerStatusLabel(_ snapshot: Snapshot) -> String {
+        let selectedEntries = selectedTableEntries(for: snapshot)
         var parts: [String] = []
 
         if selectedEntries.isEmpty {
@@ -985,7 +985,7 @@ extension RemoteFileBrowserScreen {
         return total
     }
 
-    func macOSBreadcrumbButton(
+    func breadcrumbButton(
         title: String,
         systemImage: String,
         isCurrent: Bool,
@@ -995,7 +995,7 @@ extension RemoteFileBrowserScreen {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(systemImage == "server.rack" ? Color.accentColor : macOSFolderTint)
+                    .foregroundStyle(systemImage == "server.rack" ? Color.accentColor : folderTint)
 
                 Text(title)
                     .font(.callout.weight(.medium))
@@ -1006,60 +1006,60 @@ extension RemoteFileBrowserScreen {
         .buttonStyle(.plain)
     }
 
-    var macOSFolderTint: Color {
+    var folderTint: Color {
         Color(nsColor: .systemBlue)
     }
 
-    var macOSCanvasColor: Color {
+    var canvasColor: Color {
         terminalThemeBackgroundColor
     }
 
-    var macOSPreviewMinimumWidth: CGFloat {
+    var minimumPreviewWidth: CGFloat {
         220
     }
 
-    var macOSPreviewMaximumWidth: CGFloat {
+    var maximumPreviewWidth: CGFloat {
         440
     }
 
-    var macOSMinimumTableWidth: CGFloat {
+    var minimumTableWidth: CGFloat {
         220
     }
 
-    func macOSSplitMetrics(totalWidth: CGFloat, showsPreview: Bool) -> (showsPreview: Bool, previewIdealWidth: CGFloat, previewMaximumWidth: CGFloat) {
+    func makeSplitMetrics(totalWidth: CGFloat, showsPreview: Bool) -> (showsPreview: Bool, previewIdealWidth: CGFloat, previewMaximumWidth: CGFloat) {
         guard showsPreview else {
             return (false, 0, 0)
         }
 
         let splitDividerAllowance: CGFloat = 12
-        let availablePreviewWidth = totalWidth - macOSMinimumTableWidth - splitDividerAllowance
+        let availablePreviewWidth = totalWidth - minimumTableWidth - splitDividerAllowance
 
-        guard availablePreviewWidth >= macOSPreviewMinimumWidth else {
+        guard availablePreviewWidth >= minimumPreviewWidth else {
             return (false, 0, 0)
         }
 
-        let previewMaximumWidth = min(macOSPreviewMaximumWidth, availablePreviewWidth)
+        let previewMaximumWidth = min(maximumPreviewWidth, availablePreviewWidth)
         let previewIdealWidth = min(
             previewMaximumWidth,
-            max(macOSPreviewMinimumWidth, totalWidth * 0.34)
+            max(minimumPreviewWidth, totalWidth * 0.34)
         )
 
         return (true, previewIdealWidth, previewMaximumWidth)
     }
 
-    var macOSChromeSurfaceColor: Color {
-        macOSSurfaceColor(blendFraction: colorScheme == .dark ? 0.05 : 0.035)
+    var chromeSurfaceColor: Color {
+        surfaceColor(blendFraction: colorScheme == .dark ? 0.05 : 0.035)
     }
 
-    var macOSPanelColor: Color {
-        macOSSurfaceColor(blendFraction: colorScheme == .dark ? 0.09 : 0.06)
+    var panelColor: Color {
+        surfaceColor(blendFraction: colorScheme == .dark ? 0.09 : 0.06)
     }
 
-    var macOSRaisedSurfaceColor: Color {
-        macOSSurfaceColor(blendFraction: colorScheme == .dark ? 0.14 : 0.10)
+    var raisedSurfaceColor: Color {
+        surfaceColor(blendFraction: colorScheme == .dark ? 0.14 : 0.10)
     }
 
-    func macOSSurfaceColor(blendFraction: CGFloat) -> Color {
+    func surfaceColor(blendFraction: CGFloat) -> Color {
         let baseColor = NSColor(terminalThemeBackgroundColor)
         let targetColor: NSColor = baseColor.brightnessComponent > 0.5 ? .black : .white
         return Color(baseColor.blended(withFraction: blendFraction, of: targetColor) ?? baseColor)
