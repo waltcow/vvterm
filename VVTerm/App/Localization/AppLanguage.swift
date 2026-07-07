@@ -6,18 +6,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case system = "system"
     case en = "en"
     case zhHans = "zh-Hans"
-    case ja = "ja"
-    case th = "th"
-    case vi = "vi"
-    case es = "es"
-    case ru = "ru"
-    case fr = "fr"
-    case de = "de"
-    case be = "be"
-    case uk = "uk"
-    case pl = "pl"
-    case cs = "cs"
-    case ko = "ko"
 
     var id: String { rawValue }
 
@@ -26,18 +14,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .system: return String(localized: "System (Default)")
         case .en: return "English"
         case .zhHans: return "简体中文"
-        case .ja: return "日本語"
-        case .ko: return "한국어"
-        case .th: return "ไทย"
-        case .vi: return "Tiếng Việt"
-        case .es: return "Español"
-        case .ru: return "Русский"
-        case .fr: return "Français"
-        case .de: return "Deutsch"
-        case .be: return "Беларуская"
-        case .uk: return "Українська"
-        case .pl: return "Polski"
-        case .cs: return "Čeština"
         }
     }
 
@@ -49,11 +25,14 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 
     static func applySelection(_ rawValue: String) {
-        if rawValue == AppLanguage.system.rawValue {
+        guard let selection = AppLanguage(rawValue: rawValue), selection != .system else {
+            UserDefaults.standard.removeObject(forKey: storageKey)
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        } else {
-            UserDefaults.standard.set([rawValue], forKey: "AppleLanguages")
+            UserDefaults.standard.synchronize()
+            return
         }
+
+        UserDefaults.standard.set([selection.rawValue], forKey: "AppleLanguages")
         UserDefaults.standard.synchronize()
     }
 
