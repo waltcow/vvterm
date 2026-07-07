@@ -474,8 +474,8 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, split `RemoteFileTabChrome.swift` into shared / iOS / macOS files, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, removed AppKit/UIKit imports and platform gates from `RemoteFileBrowserScreen.swift`, moved body-level platform content/presentation modifiers into `RemoteFileBrowserScreen+iOS.swift` / `RemoteFileBrowserScreen+macOS.swift`, moved platform action routing and sheet sizing into those files, moved platform-specific state into platform state models, and renamed the iOS-only remote-file tab bar/button types to neutral names.
-- Remaining: remove product UI platform prefixes where the type or helper is not a platform adapter.
+- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, split `RemoteFileTabChrome.swift` into shared / iOS / macOS files, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, removed AppKit/UIKit imports and platform gates from `RemoteFileBrowserScreen.swift`, moved body-level platform content/presentation modifiers into `RemoteFileBrowserScreen+iOS.swift` / `RemoteFileBrowserScreen+macOS.swift`, moved platform action routing and sheet sizing into those files, moved platform-specific state into platform state models, renamed the remote-file tab bar/button types to neutral names, and renamed product UI screen helpers so only true AppKit adapter/support names keep platform prefixes.
+- Remaining: no Phase 1 screen/chrome prefix cleanup remains; future Remote Files preview or sheet cluster splits should be scoped separately if those files grow beyond small platform modifiers.
 
 ### Terminal Sessions
 
@@ -736,7 +736,7 @@ Steps:
 2. Done: move platform content selection and body-level presentation modifiers into those files.
 3. Done: move platform-specific stored state into platform child views or small platform models.
 4. Done: split `RemoteFileBrowserSupport.swift` by platform.
-5. In progress: remove product UI platform prefixes where the type is not a bridge; remote file tab chrome is done.
+5. Done: remove product UI platform prefixes where the type is not a bridge; true AppKit adapters and support helpers keep platform names.
 6. Done: build iOS and macOS.
 
 Acceptance:
