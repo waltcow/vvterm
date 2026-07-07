@@ -127,4 +127,64 @@ extension ManageCustomThemesSheet {
         }
     }
 }
+
+extension ThemeBuilderSheet {
+    var platformBody: some View {
+        NavigationStack {
+            formContent
+                .environment(\.defaultMinListRowHeight, 34)
+                .modifier(ThemeBuilderCompactListSectionSpacingModifier())
+                .modifier(ThemeBuilderTransparentNavigationBarModifier())
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarAppearance(
+                    backgroundColor: .clear,
+                    isTranslucent: true,
+                    shadowColor: .clear
+                )
+                .navigationTitle(title)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .tint(.secondary)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            save()
+                        }
+                        .disabled(!canSave)
+                    }
+                    if onDeleteRequest != nil {
+                        ToolbarItemGroup(placement: .bottomBar) {
+                            Button("Remove Theme", role: .destructive) {
+                                showingDeleteConfirmation = true
+                            }
+                            .tint(.red)
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+        }
+    }
+}
+
+private struct ThemeBuilderCompactListSectionSpacingModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.listSectionSpacing(.compact)
+        } else {
+            content
+        }
+    }
+}
+
+private struct ThemeBuilderTransparentNavigationBarModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.toolbarBackground(.hidden, for: .navigationBar)
+        } else {
+            content
+        }
+    }
+}
 #endif

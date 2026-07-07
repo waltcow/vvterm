@@ -1033,7 +1033,7 @@ struct ManageCustomThemesSheet: View {
     }
 }
 
-private struct ThemeBuilderSheet: View {
+struct ThemeBuilderSheet: View {
     let usePerAppearanceTheme: Bool
     let showApplyTarget: Bool
     let title: String
@@ -1041,7 +1041,7 @@ private struct ThemeBuilderSheet: View {
     let onDeleteRequest: (() -> Void)?
     let onSave: (String, String, CustomThemeApplyTarget) throws -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
     @State private var name: String
     @State private var background: String
@@ -1053,7 +1053,7 @@ private struct ThemeBuilderSheet: View {
     @State private var paletteColors: [String]
     @State private var applyTarget: CustomThemeApplyTarget
     @State private var errorMessage: String?
-    @State private var showingDeleteConfirmation = false
+    @State var showingDeleteConfirmation = false
 
     private struct ParsedThemeValues {
         var background = "#101418"
@@ -1096,7 +1096,7 @@ private struct ThemeBuilderSheet: View {
         _applyTarget = State(initialValue: initialApplyTarget)
     }
 
-    private var canSave: Bool {
+    var canSave: Bool {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard TerminalThemeValidator.isValidHexColor(background) else { return false }
         guard TerminalThemeValidator.isValidHexColor(foreground) else { return false }
@@ -1133,60 +1133,7 @@ private struct ThemeBuilderSheet: View {
     }
 
     var body: some View {
-        Group {
-            #if os(iOS)
-            NavigationStack {
-                formContent
-                .environment(\.defaultMinListRowHeight, 34)
-                .modifier(ThemeBuilderCompactListSectionSpacingModifier())
-                .modifier(ThemeBuilderTransparentNavigationBarModifier())
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarAppearance(
-                    backgroundColor: .clear,
-                    isTranslucent: true,
-                    shadowColor: .clear
-                )
-                .navigationTitle(title)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                            .tint(.secondary)
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            save()
-                        }
-                        .disabled(!canSave)
-                    }
-                    if onDeleteRequest != nil {
-                        ToolbarItemGroup(placement: .bottomBar) {
-                            Button("Remove Theme", role: .destructive) {
-                                showingDeleteConfirmation = true
-                            }
-                            .tint(.red)
-
-                            Spacer(minLength: 0)
-                        }
-                    }
-                }
-            }
-            #else
-            VStack(spacing: 0) {
-                DialogSheetHeader(title: LocalizedStringKey(title)) {
-                    dismiss()
-                }
-
-                Divider()
-
-                formContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                Divider()
-
-                macActionRow
-            }
-            #endif
-        }
+        platformBody
         .alert("Delete Custom Theme?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 onDeleteRequest?()
@@ -1198,7 +1145,7 @@ private struct ThemeBuilderSheet: View {
         .adaptiveSoftScrollEdges()
     }
 
-    private var formContent: some View {
+    var formContent: some View {
         Form {
                 Section {
                     #if os(iOS)
@@ -1285,34 +1232,6 @@ private struct ThemeBuilderSheet: View {
             }
         .formStyle(.grouped)
     }
-
-    #if os(macOS)
-    private var macActionRow: some View {
-        HStack(spacing: 10) {
-            if onDeleteRequest != nil {
-                Button("Remove Theme", role: .destructive) {
-                    showingDeleteConfirmation = true
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-            }
-
-            Spacer(minLength: 0)
-
-            Button("Cancel") {
-                dismiss()
-            }
-
-            Button("Save") {
-                save()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canSave)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-    #endif
 
     private var terminalPreview: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1466,28 +1385,6 @@ private struct ThemeBuilderSheet: View {
         #endif
     }
 
-    #if os(iOS)
-    private struct ThemeBuilderCompactListSectionSpacingModifier: ViewModifier {
-        func body(content: Content) -> some View {
-            if #available(iOS 17.0, *) {
-                content.listSectionSpacing(.compact)
-            } else {
-                content
-            }
-        }
-    }
-
-    private struct ThemeBuilderTransparentNavigationBarModifier: ViewModifier {
-        func body(content: Content) -> some View {
-            if #available(iOS 16.0, *) {
-                content.toolbarBackground(.hidden, for: .navigationBar)
-            } else {
-                content
-            }
-        }
-    }
-    #endif
-
     private static func parseThemeValues(from content: String?) -> ParsedThemeValues {
         guard let content, !content.isEmpty else {
             return ParsedThemeValues()
@@ -1545,7 +1442,7 @@ private struct ThemeBuilderSheet: View {
         return parsed
     }
 
-    private func save() {
+    func save() {
         do {
             var lines: [String] = []
             lines.append("background = \(TerminalThemeValidator.normalizeHexColor(background) ?? background)")
