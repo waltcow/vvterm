@@ -481,7 +481,7 @@ Initial implementation status:
 
 Current issues:
 
-- `TerminalContainerView.swift` still mixes shared connection lifecycle with iOS/macOS terminal wrapper differences, voice recording presentation, and render pause/resume.
+- `TerminalContainerView.swift` still mixes shared connection lifecycle with voice recording presentation and small platform presentation modifiers.
 - `ConnectionTabsView.swift` still contains a macOS toolbar body and shared tab/session composition; the macOS zen chrome bridge has moved to `ConnectionTabsView+macOS.swift`.
 - `SSHTerminalWrapper.swift` has been split into shared, iOS, and macOS files.
 - `ZenModeControls.swift` keeps shared controls while `ZenModeControls+iOS.swift` and `ZenModeControls+macOS.swift` own the platform panels.
@@ -541,8 +541,8 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, and moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`.
-- Remaining: move render pause/resume hooks, iOS terminal wrapper options, voice recording presentation, and remaining platform tab components out of shared terminal session UI files.
+- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`, moved terminal render lifecycle hooks into platform files, and made the shared wrapper construction platform-neutral by putting the iOS keyboard-preservation default in `SSHTerminalWrapper+iOS.swift`.
+- Remaining: move voice recording presentation and remaining platform tab components out of shared terminal session UI files.
 
 ### App Shell
 
@@ -753,8 +753,8 @@ Reason: terminal lifecycle is sensitive, and platform behavior should be explici
 Steps:
 
 1. Done: split `SSHTerminalWrapper.swift` into platform files.
-2. Done: move macOS key monitoring out of shared `TerminalContainerView.swift`; remaining render pause/resume hooks stay pending.
-3. Move iOS terminal wrapper options into `TerminalContainerView+iOS.swift`.
+2. Done: move macOS key monitoring and render pause/resume hooks out of shared `TerminalContainerView.swift`.
+3. Done: move the iOS terminal wrapper option out of shared `TerminalContainerView.swift` by making the iOS wrapper default preserve keyboard state during reconnect.
 4. Done: split zen mode panels into platform files.
 5. Build iOS and macOS.
 
