@@ -10,6 +10,10 @@ extension TerminalSettingsView {
             return font.isFixedPitch
         }.sorted()
     }
+
+    var keyboardAccessorySection: EmptyView {
+        EmptyView()
+    }
 }
 
 struct CustomThemeManagerRow: View {

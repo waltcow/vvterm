@@ -147,8 +147,8 @@ struct TerminalSettingsView: View {
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @AppStorage("terminalNotificationsEnabled") private var terminalNotificationsEnabled = true
     @AppStorage("terminalProgressEnabled") private var terminalProgressEnabled = true
-    @AppStorage("terminalAccessoryCustomizationEnabled") private var terminalAccessoryCustomizationEnabled = true
-    @AppStorage("terminalKeyboardDismissButtonEnabled") private var terminalKeyboardDismissButtonEnabled = true
+    @AppStorage("terminalAccessoryCustomizationEnabled") var terminalAccessoryCustomizationEnabled = true
+    @AppStorage("terminalKeyboardDismissButtonEnabled") var terminalKeyboardDismissButtonEnabled = true
     @AppStorage("terminalTmuxEnabledDefault") private var tmuxEnabledDefault = true
     @AppStorage("terminalTmuxStartupBehaviorDefault") private var tmuxStartupBehaviorDefaultRaw = TmuxStartupBehavior.askEveryTime.rawValue
 
@@ -383,35 +383,6 @@ struct TerminalSettingsView: View {
             Toggle("Enable terminal notifications", isOn: $terminalNotificationsEnabled)
             Toggle("Show progress overlays", isOn: $terminalProgressEnabled)
         }
-    }
-
-    @ViewBuilder
-    private var keyboardAccessorySection: some View {
-        #if os(iOS)
-        if terminalAccessoryCustomizationEnabled {
-            Section {
-                Toggle("Show keyboard dismiss button", isOn: $terminalKeyboardDismissButtonEnabled)
-
-                NavigationLink {
-                    TerminalAccessoryCustomizationView()
-                } label: {
-                    Text("Customize Accessory Bar")
-                }
-
-                NavigationLink {
-                    TerminalCustomActionLibraryView()
-                } label: {
-                    Text("Manage Custom Actions")
-                }
-            } header: {
-                Text("Keyboard Accessory")
-            } footer: {
-                Text("Reorder actions, add custom actions, show or hide the keyboard dismiss button, and sync your accessory bar across devices.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        #endif
     }
 
     private var sessionPersistenceSection: some View {
