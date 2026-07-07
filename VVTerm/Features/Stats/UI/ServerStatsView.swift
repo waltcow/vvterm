@@ -3526,34 +3526,6 @@ private struct ProcessDetailsSheet: View {
     }
 }
 
-private struct ProcessSheetMetric: View {
-    let title: String
-    let value: Double
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(formatPercent(value))
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-
-                Text(title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
-
-            ProgressView(value: min(max(value / 100, 0), 1))
-                .tint(color)
-                .frame(width: 58)
-        }
-        .frame(width: 66, alignment: .trailing)
-    }
-}
-
 private struct EmptyProcessListRow: View {
     let isFiltered: Bool
 
@@ -4583,24 +4555,6 @@ private struct SystemDetailsSheet: View {
     }
 }
 
-private struct InfoRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        if !value.isEmpty {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 16)
-                Text(value)
-                    .multilineTextAlignment(.trailing)
-                    .monospacedDigit()
-            }
-        }
-    }
-}
-
 // MARK: - Charts
 
 private struct MetricPreviewChart: View {
@@ -5020,71 +4974,4 @@ private func dockerActionSystemImage(_ action: DockerContainerAction) -> String 
 
 private func dockerActionRole(_ action: DockerContainerAction) -> ButtonRole? {
     action == .stop ? .destructive : nil
-}
-
-// MARK: - Formatting
-
-private func formatPercent(_ value: Double) -> String {
-    String(format: "%.0f%%", value)
-}
-
-private func formatSpeed(_ bytesPerSecond: UInt64) -> String {
-    let mbps = Double(bytesPerSecond) / 1_048_576
-    if mbps >= 1 {
-        return String(format: "%.1f MB/s", mbps)
-    }
-
-    let kbps = Double(bytesPerSecond) / 1_024
-    if kbps >= 1 {
-        return String(format: "%.0f KB/s", kbps)
-    }
-
-    return "0 B/s"
-}
-
-private func formatUptimeDetail(_ seconds: TimeInterval) -> String {
-    let totalSeconds = max(Int(seconds), 0)
-    let days = totalSeconds / 86_400
-    let hours = (totalSeconds % 86_400) / 3_600
-    let minutes = (totalSeconds % 3_600) / 60
-
-    if days > 0 {
-        return String(format: String(localized: "%lldd %lldh"), Int64(days), Int64(hours))
-    }
-    if hours > 0 {
-        return String(format: String(localized: "%lldh %lldm"), Int64(hours), Int64(minutes))
-    }
-    return String(format: String(localized: "%lldm"), Int64(minutes))
-}
-
-private func formatBytes(_ bytes: UInt64) -> String {
-    let tb = Double(bytes) / 1_099_511_627_776
-    if tb >= 1 {
-        return String(format: "%.1f TB", tb)
-    }
-
-    let gb = Double(bytes) / 1_073_741_824
-    if gb >= 1 {
-        return String(format: "%.1f GB", gb)
-    }
-
-    let mb = Double(bytes) / 1_048_576
-    if mb >= 1 {
-        return String(format: "%.0f MB", mb)
-    }
-
-    let kb = Double(bytes) / 1_024
-    if kb >= 1 {
-        return String(format: "%.0f KB", kb)
-    }
-
-    return "\(bytes) B"
-}
-
-private func formatUsedCapacity(_ used: UInt64, total: UInt64) -> String {
-    guard total > 0 else {
-        return String(format: String(localized: "%@ used"), formatBytes(used))
-    }
-
-    return String(format: String(localized: "%@ / %@ used"), formatBytes(used), formatBytes(total))
 }
