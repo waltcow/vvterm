@@ -4,6 +4,37 @@ import SwiftUI
 import AppKit
 
 extension RemoteFileBrowserScreen {
+    enum MacOSInlineEditor: Equatable {
+        case createFolder(parentPath: String, proposedName: String, isSubmitting: Bool)
+        case rename(entryPath: String, originalName: String, proposedName: String, isSubmitting: Bool)
+
+        var proposedName: String {
+            switch self {
+            case .createFolder(_, let proposedName, _),
+                 .rename(_, _, let proposedName, _):
+                return proposedName
+            }
+        }
+
+        var isSubmitting: Bool {
+            switch self {
+            case .createFolder(_, _, let isSubmitting),
+                 .rename(_, _, _, let isSubmitting):
+                return isSubmitting
+            }
+        }
+
+        var createFolderParentPath: String? {
+            guard case .createFolder(let parentPath, _, _) = self else { return nil }
+            return parentPath
+        }
+
+        var renameEntryPath: String? {
+            guard case .rename(let entryPath, _, _, _) = self else { return nil }
+            return entryPath
+        }
+    }
+
     func macOSContent(_ snapshot: Snapshot) -> some View {
         GeometryReader { proxy in
             let splitMetrics = macOSSplitMetrics(
@@ -112,6 +143,188 @@ extension RemoteFileBrowserScreen {
                 .padding(32)
             }
         }
+    }
+
+    func beginMacOSInlineCreateFolder(in remotePath: String) {
+        let destinationPath = RemoteFilePath.normalize(remotePath, relativeTo: snapshot.currentPath)
+
+        Task {
+            if snapshot.currentPath != destinationPath {
+                await browser.openBreadcrumb(
+                    RemoteFileBreadcrumb(title: "", path: destinationPath),
+                    in: fileTab,
+                    server: server
+                )
+            }
+
+            let folderName = await MainActor.run {
+                uniqueMacOSFolderName(in: browser.entries(for: fileTab))
+            }
+
+            let createdPath = RemoteFilePath.appending(folderName, to: destinationPath)
+
+            do {
+                try await browser.createDirectory(
+                    named: folderName,
+                    in: destinationPath,
+                    tab: fileTab,
+                    server: server
+                )
+
+                await MainActor.run {
+                    macOSSelectedPaths = [createdPath]
+                    browser.clearViewer(for: fileTab)
+                    macOSInlineEditor = .rename(
+                        entryPath: createdPath,
+                        originalName: folderName,
+                        proposedName: folderName,
+                        isSubmitting: false
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    presentOperationError(error)
+                }
+            }
+        }
+    }
+
+    func cancelMacOSInlineEdit() {
+        guard macOSInlineEditor?.isSubmitting != true else { return }
+        macOSInlineEditor = nil
+    }
+
+    func submitMacOSInlineEdit(_ proposedName: String) {
+        guard let editor = macOSInlineEditor, !editor.isSubmitting else { return }
+
+        switch editor {
+        case .createFolder(let parentPath, _, _):
+            let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else {
+                macOSInlineEditor = nil
+                return
+            }
+            do {
+                let validatedName = try validatedRemoteName(proposedName)
+                let createdPath = RemoteFilePath.appending(validatedName, to: parentPath)
+                macOSInlineEditor = .createFolder(
+                    parentPath: parentPath,
+                    proposedName: proposedName,
+                    isSubmitting: true
+                )
+
+                performOperation(
+                    operation: {
+                        try await browser.createDirectory(
+                            named: validatedName,
+                            in: parentPath,
+                            tab: fileTab,
+                            server: server
+                        )
+                    },
+                    onSuccess: { _ in
+                        macOSInlineEditor = nil
+                        selectMacOSEntry(at: createdPath)
+                    },
+                    onFailure: { error in
+                        macOSInlineEditor = .createFolder(
+                            parentPath: parentPath,
+                            proposedName: proposedName,
+                            isSubmitting: false
+                        )
+                        presentOperationError(error)
+                    }
+                )
+            } catch {
+                macOSInlineEditor = .createFolder(
+                    parentPath: parentPath,
+                    proposedName: proposedName,
+                    isSubmitting: false
+                )
+                presentOperationError(error)
+            }
+
+        case .rename(let entryPath, let originalName, _, _):
+            do {
+                let validatedName = try validatedRemoteName(proposedName)
+                if validatedName == originalName {
+                    macOSInlineEditor = nil
+                    return
+                }
+
+                let destinationPath = RemoteFilePath.appending(
+                    validatedName,
+                    to: RemoteFilePath.parent(of: entryPath)
+                )
+
+                macOSInlineEditor = .rename(
+                    entryPath: entryPath,
+                    originalName: originalName,
+                    proposedName: proposedName,
+                    isSubmitting: true
+                )
+
+                performOperation(
+                    operation: {
+                        try await browser.renameItem(
+                            at: entryPath,
+                            to: destinationPath,
+                            in: fileTab,
+                            server: server
+                        )
+                    },
+                    onSuccess: { _ in
+                        macOSInlineEditor = nil
+                        selectMacOSEntry(at: destinationPath)
+                    },
+                    onFailure: { error in
+                        macOSInlineEditor = .rename(
+                            entryPath: entryPath,
+                            originalName: originalName,
+                            proposedName: proposedName,
+                            isSubmitting: false
+                        )
+                        presentOperationError(error)
+                    }
+                )
+            } catch {
+                macOSInlineEditor = .rename(
+                    entryPath: entryPath,
+                    originalName: originalName,
+                    proposedName: proposedName,
+                    isSubmitting: false
+                )
+                presentOperationError(error)
+            }
+        }
+    }
+
+    func selectMacOSEntry(at path: String) {
+        macOSSelectedPaths = [path]
+        if let entry = browser.entries(for: fileTab).first(where: { $0.path == path }) {
+            browser.focus(entry, in: fileTab)
+        } else {
+            browser.clearViewer(for: fileTab)
+        }
+    }
+
+    func uniqueMacOSFolderName(in entries: [RemoteFileEntry]) -> String {
+        let baseName = String(localized: "Untitled Folder")
+        let existingNames = Set(entries.map { $0.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current) })
+
+        guard !existingNames.contains(baseName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)) else {
+            for index in 2...10_000 {
+                let candidate = "\(baseName) \(index)"
+                let foldedCandidate = candidate.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                if !existingNames.contains(foldedCandidate) {
+                    return candidate
+                }
+            }
+
+            return "\(baseName) \(UUID().uuidString.prefix(4))"
+        }
+
+        return baseName
     }
 
     func macOSPreviewPanel(_ snapshot: Snapshot) -> some View {
@@ -282,6 +495,94 @@ extension RemoteFileBrowserScreen {
         ) { onProgress in
             try await transferDroppedRemoteItems([payload], to: destinationPath, onProgress: onProgress)
         }
+    }
+
+    func presentMacOSUploadPanel(for remotePath: String) {
+        let panel = NSOpenPanel()
+        panel.title = String(localized: "Upload to Remote Folder")
+        panel.message = String(localized: "Choose files or folders to upload.")
+        panel.prompt = String(localized: "Upload")
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.resolvesAliases = true
+
+        let response = panel.runModal()
+        guard response == .OK else { return }
+
+        let urls = panel.urls
+        guard !urls.isEmpty else { return }
+
+        beginUploadFlow(
+            urls: urls,
+            to: remotePath,
+            initialMessage: String(localized: "Preparing files for upload.")
+        )
+    }
+
+    func presentMacOSDownloadPanel(for entry: RemoteFileEntry) {
+        let panel = NSSavePanel()
+        panel.title = String(localized: "Download Remote File")
+        panel.message = String(localized: "Choose where to save the downloaded file.")
+        panel.nameFieldStringValue = entry.name.isEmpty ? "download" : entry.name
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+
+        let response = panel.runModal()
+        guard response == .OK, let destinationURL = panel.url else { return }
+
+        performTransfer(
+            title: String(localized: "Downloading"),
+            initialMessage: String(localized: "Downloading remote file."),
+            successMessage: String(localized: "Download complete."),
+            successFileURL: destinationURL,
+            successFileName: destinationURL.lastPathComponent,
+            successFilePath: destinationURL.path
+        ) {
+            try await browser.downloadFile(
+                at: entry.path,
+                to: destinationURL,
+                server: server
+            )
+        }
+    }
+
+    func presentMacOSDeleteConfirmation(for entries: [RemoteFileEntry]) {
+        let sortedEntries = entries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.icon = NSImage(systemSymbolName: "trash", accessibilityDescription: String(localized: "Delete"))
+
+        if sortedEntries.count == 1, let entry = sortedEntries.first {
+            alert.messageText = deleteAlertTitle(for: entry)
+            alert.informativeText = deleteAlertMessage(for: entry)
+        } else {
+            alert.messageText = String(
+                format: String(localized: "Delete %lld Items?"),
+                Int64(sortedEntries.count)
+            )
+
+            let previewNames = sortedEntries.prefix(3).map(\.name).joined(separator: ", ")
+            if sortedEntries.count > 3 {
+                alert.informativeText = String(
+                    format: String(localized: "This will permanently remove %@ and %lld more items from the remote server. This cannot be undone."),
+                    previewNames,
+                    Int64(sortedEntries.count - 3)
+                )
+            } else {
+                alert.informativeText = String(
+                    format: String(localized: "This will permanently remove %@ from the remote server. This cannot be undone."),
+                    previewNames
+                )
+            }
+        }
+
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+        deleteEntries(sortedEntries)
     }
 
     func appKitBackgroundMenu(currentPath: String) -> NSMenu {
