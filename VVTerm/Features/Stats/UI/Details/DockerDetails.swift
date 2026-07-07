@@ -47,7 +47,7 @@ struct DockerDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "Docker"),
             systemImage: "shippingbox",
             tint: .blue
@@ -55,7 +55,7 @@ struct DockerDetailsSheet: View {
             dockerControlsMenu
         } content: {
             VStack(spacing: 0) {
-                StatsMacSearchField(prompt: String(localized: "Search Containers"), text: $searchText)
+                StatsSearchField(prompt: String(localized: "Search Containers"), text: $searchText)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 Divider()
@@ -398,7 +398,7 @@ private struct DockerContainerDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "Container Details"),
             systemImage: "shippingbox",
             tint: .blue

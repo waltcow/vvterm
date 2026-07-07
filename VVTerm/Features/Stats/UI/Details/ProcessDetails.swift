@@ -61,7 +61,7 @@ struct ProcessesSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "Processes"),
             systemImage: "list.bullet.rectangle",
             tint: .purple
@@ -69,7 +69,7 @@ struct ProcessesSheet: View {
             processControlsMenu
         } content: {
             VStack(spacing: 0) {
-                StatsMacSearchField(prompt: String(localized: "Search Processes"), text: $searchText)
+                StatsSearchField(prompt: String(localized: "Search Processes"), text: $searchText)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 Divider()
@@ -432,7 +432,7 @@ private struct ProcessDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "Process Details"),
             systemImage: "list.bullet.rectangle",
             tint: .purple

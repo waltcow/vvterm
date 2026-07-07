@@ -11,7 +11,7 @@ struct CPUDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "CPU Details"),
             systemImage: "cpu",
             tint: .pink
@@ -119,7 +119,7 @@ struct GPUDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "GPU Details"),
             systemImage: "display",
             tint: .green
@@ -285,7 +285,7 @@ struct SystemDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "System Details"),
             systemImage: "server.rack",
             tint: .cyan

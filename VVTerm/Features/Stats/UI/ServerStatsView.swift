@@ -65,7 +65,7 @@ struct ServerStatsView: View {
     @ViewBuilder
     private var appearanceSettingsContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(
+        StatsDetailShell(
             String(localized: "Stats Appearance"),
             systemImage: "slider.horizontal.3",
             tint: .blue

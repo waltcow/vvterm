@@ -2,7 +2,7 @@
 import AppKit
 import SwiftUI
 
-struct StatsMacDetailShell<Controls: View, Content: View>: View {
+struct StatsDetailShell<Controls: View, Content: View>: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
     let systemImage: String
@@ -43,7 +43,7 @@ struct StatsMacDetailShell<Controls: View, Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                StatsMacSheetTitle(title: title, systemImage: systemImage, tint: tint)
+                StatsSheetTitle(title: title, systemImage: systemImage, tint: tint)
 
                 Spacer(minLength: 12)
 
@@ -72,7 +72,7 @@ struct StatsMacDetailShell<Controls: View, Content: View>: View {
     }
 }
 
-private struct StatsMacSheetTitle: View {
+private struct StatsSheetTitle: View {
     let title: String
     let systemImage: String
     let tint: Color
@@ -92,7 +92,7 @@ private struct StatsMacSheetTitle: View {
     }
 }
 
-struct StatsMacSearchField: View {
+struct StatsSearchField: View {
     let prompt: String
     @Binding var text: String
 
