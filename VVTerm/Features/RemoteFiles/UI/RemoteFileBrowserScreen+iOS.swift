@@ -1,7 +1,13 @@
 import SwiftUI
 
 #if os(iOS)
+import Combine
 import UIKit
+
+@MainActor
+final class RemoteFileBrowserPlatformState: ObservableObject {
+    @Published var searchQuery = ""
+}
 
 extension RemoteFileBrowserScreen {
     @ViewBuilder
@@ -21,7 +27,7 @@ extension RemoteFileBrowserScreen {
 
     func platformSearchPresentation<Content: View>(_ content: Content) -> some View {
         content
-            .searchable(text: $iOSSearchQuery, prompt: String(localized: "Search Files"))
+            .searchable(text: $platformState.searchQuery, prompt: String(localized: "Search Files"))
     }
 
     func platformSharePresentation<Content: View>(_ content: Content) -> some View {
@@ -337,7 +343,7 @@ extension RemoteFileBrowserScreen {
             }
         }
         .onChange(of: snapshot.currentPath) { _ in
-            iOSSearchQuery = ""
+            platformState.searchQuery = ""
         }
     }
 
@@ -373,7 +379,7 @@ extension RemoteFileBrowserScreen {
     }
 
     var trimmedIOSSearchQuery: String {
-        iOSSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        platformState.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func iOSEmptyStateContent(

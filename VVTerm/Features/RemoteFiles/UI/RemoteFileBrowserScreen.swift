@@ -19,7 +19,6 @@ struct RemoteFileBrowserScreen: View {
     @State var downloadExportFilename = ""
     @State var isDownloadExporterPresented = false
     @State var shareItem: RemoteFileShareItem?
-    @State var iOSSearchQuery = ""
     @State var newFolderDestinationPath: String?
     @State var newFolderName = ""
     @State var isCreateFolderSubmitting = false
@@ -39,12 +38,8 @@ struct RemoteFileBrowserScreen: View {
     @State var permissionErrorMessage: String?
     @State var operationErrorMessage: String?
     @State var isDropTargeted = false
+    @StateObject var platformState = RemoteFileBrowserPlatformState()
     @StateObject private var noticeHost = NoticeHostModel()
-    #if os(macOS)
-    @State var macOSInlineEditor: MacOSInlineEditor?
-    @State var macOSSelectedPaths: Set<String> = []
-    @State var macOSTitlebarHeight: CGFloat = 0
-    #endif
 
     struct Snapshot {
         let currentPath: String

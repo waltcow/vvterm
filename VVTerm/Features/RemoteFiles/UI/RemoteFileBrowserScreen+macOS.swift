@@ -3,9 +3,10 @@ import UniformTypeIdentifiers
 
 #if os(macOS)
 import AppKit
+import Combine
 
 extension RemoteFileBrowserScreen {
-    enum MacOSInlineEditor: Equatable {
+    enum InlineEditor: Equatable {
         case createFolder(parentPath: String, proposedName: String, isSubmitting: Bool)
         case rename(entryPath: String, originalName: String, proposedName: String, isSubmitting: Bool)
 
@@ -35,7 +36,16 @@ extension RemoteFileBrowserScreen {
             return entryPath
         }
     }
+}
 
+@MainActor
+final class RemoteFileBrowserPlatformState: ObservableObject {
+    @Published var inlineEditor: RemoteFileBrowserScreen.InlineEditor?
+    @Published var selectedPaths: Set<String> = []
+    @Published var titlebarHeight: CGFloat = 0
+}
+
+extension RemoteFileBrowserScreen {
     @ViewBuilder
     func platformContent(_ snapshot: Snapshot) -> some View {
         macOSContent(snapshot)
@@ -88,7 +98,7 @@ extension RemoteFileBrowserScreen {
 
     func platformCurrentPathDidChange() {
         cancelMacOSInlineEdit()
-        macOSSelectedPaths.removeAll()
+        platformState.selectedPaths.removeAll()
     }
 
     func platformSelectionTrackingPresentation<Content: View>(
@@ -97,29 +107,29 @@ extension RemoteFileBrowserScreen {
     ) -> some View {
         content
             .onChange(of: snapshot.entries.map(\.id)) { visiblePaths in
-                let nextSelection = macOSSelectedPaths.intersection(Set(visiblePaths))
-                if nextSelection != macOSSelectedPaths {
-                    macOSSelectedPaths = nextSelection
+                let nextSelection = platformState.selectedPaths.intersection(Set(visiblePaths))
+                if nextSelection != platformState.selectedPaths {
+                    platformState.selectedPaths = nextSelection
                 }
 
-                if let inlineRenamePath = macOSInlineEditor?.renameEntryPath,
+                if let inlineRenamePath = platformState.inlineEditor?.renameEntryPath,
                    !visiblePaths.contains(inlineRenamePath),
-                   macOSInlineEditor?.isSubmitting == false {
-                    macOSInlineEditor = nil
+                   platformState.inlineEditor?.isSubmitting == false {
+                    platformState.inlineEditor = nil
                 }
             }
             .onChange(of: snapshot.selectedPath) { newValue in
-                guard macOSSelectedPaths.count <= 1 else { return }
+                guard platformState.selectedPaths.count <= 1 else { return }
 
                 guard let newValue, snapshot.entries.contains(where: { $0.id == newValue }) else {
-                    if !macOSSelectedPaths.isEmpty {
-                        macOSSelectedPaths = []
+                    if !platformState.selectedPaths.isEmpty {
+                        platformState.selectedPaths = []
                     }
                     return
                 }
 
-                if macOSSelectedPaths != [newValue] {
-                    macOSSelectedPaths = [newValue]
+                if platformState.selectedPaths != [newValue] {
+                    platformState.selectedPaths = [newValue]
                 }
             }
     }
@@ -178,9 +188,9 @@ extension RemoteFileBrowserScreen {
     }
 
     func platformBeginRename(_ entry: RemoteFileEntry) {
-        macOSSelectedPaths = [entry.id]
+        platformState.selectedPaths = [entry.id]
         browser.focus(entry, in: fileTab)
-        macOSInlineEditor = .rename(
+        platformState.inlineEditor = .rename(
             entryPath: entry.path,
             originalName: entry.name,
             proposedName: entry.name,
@@ -202,9 +212,9 @@ extension RemoteFileBrowserScreen {
             )
 
             VStack(spacing: 0) {
-                if macOSTitlebarHeight > 0 {
+                if platformState.titlebarHeight > 0 {
                     Color.clear
-                        .frame(height: macOSTitlebarHeight)
+                        .frame(height: platformState.titlebarHeight)
                 }
 
                 if splitMetrics.showsPreview {
@@ -232,7 +242,7 @@ extension RemoteFileBrowserScreen {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea(.container, edges: .top)
             .background {
-                MacOSWindowTopInsetBridge(topInset: $macOSTitlebarHeight)
+                MacOSWindowTopInsetBridge(topInset: $platformState.titlebarHeight)
                     .frame(width: 0, height: 0)
             }
             .background(macOSCanvasColor)
@@ -249,10 +259,10 @@ extension RemoteFileBrowserScreen {
             selectedPaths: effectiveMacOSSelection(snapshot: snapshot, entries: snapshot.entries),
             sort: snapshot.sort,
             sortDirection: snapshot.sortDirection,
-            inlineCreateFolderParentPath: macOSInlineEditor?.createFolderParentPath,
-            inlineRenamePath: macOSInlineEditor?.renameEntryPath,
-            inlineProposedName: macOSInlineEditor?.proposedName ?? "",
-            isInlineSubmitting: macOSInlineEditor?.isSubmitting == true,
+            inlineCreateFolderParentPath: platformState.inlineEditor?.createFolderParentPath,
+            inlineRenamePath: platformState.inlineEditor?.renameEntryPath,
+            inlineProposedName: platformState.inlineEditor?.proposedName ?? "",
+            isInlineSubmitting: platformState.inlineEditor?.isSubmitting == true,
             onSelectionChange: { selection, modifierFlags in
                 handleMacOSSelectionChange(selection, modifierFlags: modifierFlags, entries: snapshot.entries)
             },
@@ -331,9 +341,9 @@ extension RemoteFileBrowserScreen {
                 )
 
                 await MainActor.run {
-                    macOSSelectedPaths = [createdPath]
+                    platformState.selectedPaths = [createdPath]
                     browser.clearViewer(for: fileTab)
-                    macOSInlineEditor = .rename(
+                    platformState.inlineEditor = .rename(
                         entryPath: createdPath,
                         originalName: folderName,
                         proposedName: folderName,
@@ -349,24 +359,24 @@ extension RemoteFileBrowserScreen {
     }
 
     func cancelMacOSInlineEdit() {
-        guard macOSInlineEditor?.isSubmitting != true else { return }
-        macOSInlineEditor = nil
+        guard platformState.inlineEditor?.isSubmitting != true else { return }
+        platformState.inlineEditor = nil
     }
 
     func submitMacOSInlineEdit(_ proposedName: String) {
-        guard let editor = macOSInlineEditor, !editor.isSubmitting else { return }
+        guard let editor = platformState.inlineEditor, !editor.isSubmitting else { return }
 
         switch editor {
         case .createFolder(let parentPath, _, _):
             let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedName.isEmpty else {
-                macOSInlineEditor = nil
+                platformState.inlineEditor = nil
                 return
             }
             do {
                 let validatedName = try validatedRemoteName(proposedName)
                 let createdPath = RemoteFilePath.appending(validatedName, to: parentPath)
-                macOSInlineEditor = .createFolder(
+                platformState.inlineEditor = .createFolder(
                     parentPath: parentPath,
                     proposedName: proposedName,
                     isSubmitting: true
@@ -382,11 +392,11 @@ extension RemoteFileBrowserScreen {
                         )
                     },
                     onSuccess: { _ in
-                        macOSInlineEditor = nil
+                        platformState.inlineEditor = nil
                         selectMacOSEntry(at: createdPath)
                     },
                     onFailure: { error in
-                        macOSInlineEditor = .createFolder(
+                        platformState.inlineEditor = .createFolder(
                             parentPath: parentPath,
                             proposedName: proposedName,
                             isSubmitting: false
@@ -395,7 +405,7 @@ extension RemoteFileBrowserScreen {
                     }
                 )
             } catch {
-                macOSInlineEditor = .createFolder(
+                platformState.inlineEditor = .createFolder(
                     parentPath: parentPath,
                     proposedName: proposedName,
                     isSubmitting: false
@@ -407,7 +417,7 @@ extension RemoteFileBrowserScreen {
             do {
                 let validatedName = try validatedRemoteName(proposedName)
                 if validatedName == originalName {
-                    macOSInlineEditor = nil
+                    platformState.inlineEditor = nil
                     return
                 }
 
@@ -416,7 +426,7 @@ extension RemoteFileBrowserScreen {
                     to: RemoteFilePath.parent(of: entryPath)
                 )
 
-                macOSInlineEditor = .rename(
+                platformState.inlineEditor = .rename(
                     entryPath: entryPath,
                     originalName: originalName,
                     proposedName: proposedName,
@@ -433,11 +443,11 @@ extension RemoteFileBrowserScreen {
                         )
                     },
                     onSuccess: { _ in
-                        macOSInlineEditor = nil
+                        platformState.inlineEditor = nil
                         selectMacOSEntry(at: destinationPath)
                     },
                     onFailure: { error in
-                        macOSInlineEditor = .rename(
+                        platformState.inlineEditor = .rename(
                             entryPath: entryPath,
                             originalName: originalName,
                             proposedName: proposedName,
@@ -447,7 +457,7 @@ extension RemoteFileBrowserScreen {
                     }
                 )
             } catch {
-                macOSInlineEditor = .rename(
+                platformState.inlineEditor = .rename(
                     entryPath: entryPath,
                     originalName: originalName,
                     proposedName: proposedName,
@@ -459,7 +469,7 @@ extension RemoteFileBrowserScreen {
     }
 
     func selectMacOSEntry(at path: String) {
-        macOSSelectedPaths = [path]
+        platformState.selectedPaths = [path]
         if let entry = browser.entries(for: fileTab).first(where: { $0.path == path }) {
             browser.focus(entry, in: fileTab)
         } else {
@@ -597,7 +607,7 @@ extension RemoteFileBrowserScreen {
 
     func effectiveMacOSSelection(snapshot: Snapshot, entries: [RemoteFileEntry]) -> Set<String> {
         let visiblePaths = Set(entries.map(\.id))
-        var selection = macOSSelectedPaths.intersection(visiblePaths)
+        var selection = platformState.selectedPaths.intersection(visiblePaths)
 
         if selection.isEmpty,
            let selectedPath = snapshot.selectedPath,
@@ -619,7 +629,7 @@ extension RemoteFileBrowserScreen {
         modifierFlags: NSEvent.ModifierFlags,
         entries: [RemoteFileEntry]
     ) {
-        macOSSelectedPaths = selection
+        platformState.selectedPaths = selection
 
         guard selection.count == 1,
               let selectedPath = selection.first,
@@ -875,7 +885,7 @@ extension RemoteFileBrowserScreen {
     }
 
     func macOSContextMenuEntries(for entry: RemoteFileEntry) -> [RemoteFileEntry] {
-        let selectedEntries = snapshot.entries.filter { macOSSelectedPaths.contains($0.id) }
+        let selectedEntries = snapshot.entries.filter { platformState.selectedPaths.contains($0.id) }
         guard selectedEntries.count > 1,
               selectedEntries.contains(where: { $0.id == entry.id }) else {
             return [entry]
