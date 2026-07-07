@@ -643,7 +643,8 @@ Initial implementation status:
 - Done: moved the macOS custom-theme manager row into `TerminalSettingsView+macOS.swift`, removing AppKit imports and direct AppKit color usage from the shared terminal settings file.
 - Done: moved the iOS keyboard accessory settings section into `TerminalSettingsView+iOS.swift` with a no-op macOS counterpart, leaving the shared terminal settings form to compose the section without owning iOS-only navigation targets.
 - Done: split keychain settings row action presentation into `KeychainSettingsView+iOS.swift` and `KeychainSettingsView+macOS.swift`, leaving common action contents and keychain operations in the shared file.
-- Remaining: split larger platform presentation clusters for terminal settings, server forms, and keychain settings into platform extension files once each cluster can move as a coherent unit.
+- Done: split `ServerFormSheet` and `MoveServerSheet` platform bodies plus macOS action rows into `ServerFormSheet+iOS.swift` and `ServerFormSheet+macOS.swift`, leaving validation, form sections, credential loading, and save/move behavior shared.
+- Remaining: split larger platform presentation clusters for terminal settings, server forms, and keychain settings into platform extension files once each cluster can move as a coherent unit; keep small row-level field modifiers inline unless they become complete platform controls.
 
 ### Store And Support
 
