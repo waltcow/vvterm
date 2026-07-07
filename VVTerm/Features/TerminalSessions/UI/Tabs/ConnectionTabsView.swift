@@ -39,11 +39,11 @@ struct ConnectionTerminalContainer: View {
     @State private var showingSplitPaneUpgradeAlert = false
     @State private var showingZenPanel = false
     #if os(macOS)
-    @State private var zenWindowSafeAreaInsets = EdgeInsets()
+    @State var zenWindowSafeAreaInsets = EdgeInsets()
     #endif
 
     /// Selected view type - persisted per server
-    private var selectedView: String {
+    var selectedView: String {
         viewTabConfig.effectiveView(for: tabManager.selectedViewByServer[server.id])
     }
 
@@ -76,12 +76,12 @@ struct ConnectionTerminalContainer: View {
     }
 
     /// Tabs for THIS server only
-    private var serverTabs: [TerminalTab] {
+    var serverTabs: [TerminalTab] {
         tabManager.tabs(for: server.id)
     }
 
     /// Selected tab ID for this server
-    private var selectedTabId: UUID? {
+    var selectedTabId: UUID? {
         tabManager.selectedTabByServer[server.id]
     }
 
@@ -144,14 +144,6 @@ struct ConnectionTerminalContainer: View {
                 tabManager.cancelTmuxAttachPrompt(paneId: prompt.id)
             }
         )
-    }
-
-    private var macOSZenTerminalContentInsets: EdgeInsets {
-        #if os(macOS)
-        return isZenModeEnabled ? zenWindowSafeAreaInsets : EdgeInsets()
-        #else
-        return EdgeInsets()
-        #endif
     }
 
     private var liveTerminalBackgroundColor: Color {
@@ -262,36 +254,7 @@ struct ConnectionTerminalContainer: View {
                 }
             }
 
-            #if os(macOS)
-            // Each tab is an isolated terminal view
-            ForEach(serverTabs, id: \.id) { tab in
-                let isVisible = selectedView == "terminal" && selectedTabId == tab.id
-                TerminalTabView(
-                    tab: tab,
-                    server: server,
-                    tabManager: tabManager,
-                    isSelected: isVisible
-                )
-                .padding(macOSZenTerminalContentInsets)
-                .opacity(isVisible ? 1 : 0)
-                .allowsHitTesting(isVisible)
-                .zIndex(isVisible ? 1 : 0)
-            }
-
-            // Empty state when in terminal view with no tabs
-            if selectedView == "terminal" && serverTabs.isEmpty {
-                TerminalEmptyStateView(server: server) {
-                    openNewTab()
-                }
-                .padding(macOSZenTerminalContentInsets)
-            }
-            #else
-            if selectedView == "terminal" && serverTabs.isEmpty {
-                TerminalEmptyStateView(server: server) {
-                    openNewTab()
-                }
-            }
-            #endif
+            terminalLayer
         }
     }
 
@@ -322,7 +285,7 @@ struct ConnectionTerminalContainer: View {
         }
     }
 
-    private func openNewTab(selectTerminalViewOnSuccess: Bool = false) {
+    func openNewTab(selectTerminalViewOnSuccess: Bool = false) {
         guard tabManager.canOpenNewTab else {
             showingTabLimitAlert = true
             return

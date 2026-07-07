@@ -129,4 +129,34 @@ struct MacOSToolbarBackdrop: View {
         .allowsHitTesting(false)
     }
 }
+
+extension ConnectionTerminalContainer {
+    private var terminalContentInsets: EdgeInsets {
+        isZenModeEnabled ? zenWindowSafeAreaInsets : EdgeInsets()
+    }
+
+    @ViewBuilder
+    var terminalLayer: some View {
+        ForEach(serverTabs, id: \.id) { tab in
+            let isVisible = selectedView == "terminal" && selectedTabId == tab.id
+            TerminalTabView(
+                tab: tab,
+                server: server,
+                tabManager: tabManager,
+                isSelected: isVisible
+            )
+            .padding(terminalContentInsets)
+            .opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isVisible)
+            .zIndex(isVisible ? 1 : 0)
+        }
+
+        if selectedView == "terminal" && serverTabs.isEmpty {
+            TerminalEmptyStateView(server: server) {
+                openNewTab()
+            }
+            .padding(terminalContentInsets)
+        }
+    }
+}
 #endif
