@@ -585,6 +585,10 @@ Migration notes:
 - First move `VVTermCommands` and app delegates out of `VVTermApp.swift`.
 - Then split iOS server-list child views into separate iOS files with neutral type names where feasible.
 
+Initial implementation status:
+
+- Done: extracted the iOS terminal tab bar from `iOSContentView.swift` into `TerminalTabsBar+iOS.swift` and renamed the product UI types to neutral names.
+
 ### Settings And Forms
 
 Current issues:
