@@ -217,7 +217,25 @@ final class StoreManager: ObservableObject {
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
-        case .unverified:
+        case .unverified(let unverifiedValue, let verificationError):
+            if let transaction = unverifiedValue as? Transaction {
+                logger.error(
+                    """
+                    StoreKit transaction verification failed for product \
+                    \(transaction.productID, privacy: .public), transaction \
+                    \(String(transaction.id), privacy: .public): \
+                    \(String(describing: verificationError), privacy: .public)
+                    """
+                )
+            } else {
+                logger.error(
+                    """
+                    StoreKit verification failed for \
+                    \(String(describing: T.self), privacy: .public): \
+                    \(String(describing: verificationError), privacy: .public)
+                    """
+                )
+            }
             throw StoreError.verificationFailed
         case .verified(let safe):
             return safe
