@@ -1,7 +1,4 @@
 import SwiftUI
-#if os(iOS)
-import UIKit
-#endif
 
 enum ServerTransportSelection: String, CaseIterable, Identifiable, Equatable {
     case standard
@@ -121,7 +118,7 @@ struct ServerFormSheet: View {
     let prefill: ServerFormPrefill?
     let onSave: (Server) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
     @State private var name: String = ""
     @State private var host: String = ""
@@ -148,7 +145,7 @@ struct ServerFormSheet: View {
     @State private var showingServerLimitAlert = false
     @State private var showingCreateWorkspace = false
     @State private var showingAddKeySheet = false
-    @State private var isSaving = false
+    @State var isSaving = false
     @State private var isLoadingCredentials = false
     @State private var error: String?
     @State private var storedKeys: [SSHKeyEntry] = []
@@ -160,7 +157,7 @@ struct ServerFormSheet: View {
     @State private var lastTestSnapshot: ConnectionTestSnapshot?
     @State private var showingLocalDiscoverySheet = false
 
-    private var isEditing: Bool { server != nil }
+    var isEditing: Bool { server != nil }
 
     init(
         serverManager: ServerManager,
@@ -305,34 +302,15 @@ struct ServerFormSheet: View {
         connectionTestSucceeded && lastTestSnapshot == connectionSnapshot
     }
 
-    private var saveButtonDisabled: Bool {
+    var saveButtonDisabled: Bool {
         !isValid || isSaving || isAtLimit || isLoadingCredentials || isTestingConnection
     }
 
     var body: some View {
-        #if os(iOS)
-        formContent
-        #else
-        VStack(spacing: 0) {
-            DialogSheetHeader(
-                title: isEditing ? "Edit Server" : "Add Server",
-                onClose: { dismiss() },
-                isCloseDisabled: isSaving
-            )
-
-            Divider()
-
-            formContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Divider()
-
-            macActionRow
-        }
-        #endif
+        platformBody
     }
 
-    private var formContent: some View {
+    var formContent: some View {
         Form {
             limitSection
             serverSection
@@ -484,37 +462,6 @@ struct ServerFormSheet: View {
             .onChange(of: cloudflareClientSecret) { _ in resetConnectionTestState() }
             .onChange(of: cloudflareTeamDomainOverride) { _ in resetConnectionTestState() }
     }
-
-    #if os(macOS)
-    private var macActionRow: some View {
-        HStack(spacing: 10) {
-            Spacer(minLength: 0)
-
-            Button("Cancel") {
-                dismiss()
-            }
-            .disabled(isSaving)
-
-            Button {
-                saveServer()
-            } label: {
-                if isSaving {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(String(localized: "Saving..."))
-                    }
-                } else {
-                    Text(isEditing ? String(localized: "Save") : String(localized: "Add"))
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(saveButtonDisabled)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-    #endif
 
     @ViewBuilder
     private var assignmentSection: some View {
@@ -1163,7 +1110,7 @@ struct ServerFormSheet: View {
         return success
     }
 
-    private func saveServer() {
+    func saveServer() {
         isSaving = true
         error = nil
 
@@ -1241,11 +1188,11 @@ struct MoveServerSheet: View {
     let preferredDestination: Workspace?
     let onMove: (Server) -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
 
     @State private var selectedWorkspaceId: UUID?
     @State private var selectedEnvironment: ServerEnvironment
-    @State private var isMoving = false
+    @State var isMoving = false
     @State private var error: String?
     @State private var showingUpgrade = false
     @State private var showingCreateWorkspace = false
@@ -1291,7 +1238,7 @@ struct MoveServerSheet: View {
         return destinationWorkspaces.first
     }
 
-    private var moveButtonDisabled: Bool {
+    var moveButtonDisabled: Bool {
         isMoving || selectedDestination == nil
     }
 
@@ -1328,34 +1275,10 @@ struct MoveServerSheet: View {
     }
 
     var body: some View {
-        #if os(iOS)
-        content
-        #else
-        VStack(spacing: 0) {
-            DialogSheetHeader(
-                title: "Move Server",
-                onClose: { dismiss() },
-                isCloseDisabled: isMoving
-            )
-
-            Divider()
-
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Divider()
-
-            macActionRow
-        }
-        #endif
+        platformBody
     }
 
-    @ViewBuilder
-    private var content: some View {
-        formContent
-    }
-
-    private var formContent: some View {
+    var formContent: some View {
         Form {
             Section {
                 LabeledContent("Server") {
@@ -1465,37 +1388,6 @@ struct MoveServerSheet: View {
         .adaptiveSoftScrollEdges()
     }
 
-    #if os(macOS)
-    private var macActionRow: some View {
-        HStack(spacing: 10) {
-            Spacer(minLength: 0)
-
-            Button("Cancel") {
-                dismiss()
-            }
-            .disabled(isMoving)
-
-            Button {
-                moveServer()
-            } label: {
-                if isMoving {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(String(localized: "Moving..."))
-                    }
-                } else {
-                    Text("Move")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(moveButtonDisabled)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-    #endif
-
     private func reconcileSelection() {
         let hasValidSelection = selectedWorkspaceId.map { selectedId in
             destinationWorkspaces.contains(where: { $0.id == selectedId })
@@ -1514,7 +1406,7 @@ struct MoveServerSheet: View {
         )
     }
 
-    private func moveServer() {
+    func moveServer() {
         guard let destination = selectedDestination else { return }
 
         isMoving = true
