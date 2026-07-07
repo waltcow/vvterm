@@ -499,6 +499,7 @@ VVTerm/Features/TerminalSessions/UI/Terminal/
 
 VVTerm/Features/TerminalSessions/UI/Tabs/
   ConnectionTabsView.swift
+  ConnectionTabsView+iOS.swift
   ConnectionTabsView+macOS.swift
   ConnectionTabComponents.swift
   ConnectionTabComponents+macOS.swift
@@ -541,8 +542,8 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, renamed the platform zen panel product UI types/helpers to neutral names, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`, moved terminal render lifecycle hooks into platform files, and made the shared wrapper construction platform-neutral by putting the iOS keyboard-preservation default in `SSHTerminalWrapper+iOS.swift`.
-- Remaining: move voice recording presentation and remaining platform tab components out of shared terminal session UI files.
+- Done: split `SSHTerminalWrapper.swift`, split zen mode platform panels, renamed the platform zen panel product UI types/helpers to neutral names, moved macOS zen chrome bridges into `ConnectionTabsView+macOS.swift`, moved terminal tab rendering hooks into `ConnectionTabsView+iOS.swift` / `ConnectionTabsView+macOS.swift`, moved macOS `NSEvent` key monitoring plus platform fallback colors into `TerminalContainerView+macOS.swift` / `TerminalContainerView+iOS.swift`, moved terminal render lifecycle hooks into platform files, and made the shared wrapper construction platform-neutral by putting the iOS keyboard-preservation default in `SSHTerminalWrapper+iOS.swift`.
+- Remaining: move voice recording presentation, macOS toolbar/command bridge body, and remaining platform tab modifiers out of shared terminal session UI files.
 
 ### App Shell
 
