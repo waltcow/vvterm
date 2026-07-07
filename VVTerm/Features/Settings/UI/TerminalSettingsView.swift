@@ -774,7 +774,7 @@ private struct CustomThemeSaveSheet: View {
     }
 }
 
-private struct ManageCustomThemesSheet: View {
+struct ManageCustomThemesSheet: View {
     let customThemes: [TerminalTheme]
     @Binding var darkThemeName: String
     @Binding var lightThemeName: String
@@ -784,16 +784,16 @@ private struct ManageCustomThemesSheet: View {
     let onDelete: (UUID) -> Void
     let onSaveEdit: (UUID, String, String) throws -> Void
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
     @State private var showingThemeImporter = false
     @State private var showingThemeBuilder = false
     @State private var pendingCustomThemeSource: PendingCustomThemeSource?
     @State private var customThemeErrorMessage: String?
-    @State private var themePendingDeletion: TerminalTheme?
-    @State private var themePendingEdit: TerminalTheme?
-    @State private var hoveredThemeID: UUID?
+    @State var themePendingDeletion: TerminalTheme?
+    @State var themePendingEdit: TerminalTheme?
+    @State var hoveredThemeID: UUID?
 
-    private var sortedThemes: [TerminalTheme] {
+    var sortedThemes: [TerminalTheme] {
         customThemes.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
@@ -827,13 +827,7 @@ private struct ManageCustomThemesSheet: View {
     }
 
     var body: some View {
-        Group {
-            #if os(iOS)
-            iosBody
-            #else
-            macBody
-            #endif
-        }
+        platformBody
         .sheet(item: editThemeSheetBinding) { theme in
             ThemeBuilderSheet(
                 usePerAppearanceTheme: false,
@@ -902,150 +896,7 @@ private struct ManageCustomThemesSheet: View {
         .adaptiveSoftScrollEdges()
     }
 
-    #if os(iOS)
-    private var iosBody: some View {
-        NavigationStack {
-            Group {
-                if sortedThemes.isEmpty {
-                    customThemesEmptyState
-                } else {
-                    List {
-                        ForEach(sortedThemes) { theme in
-                            themeRow(theme)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Custom Themes")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Label("Back", systemImage: "chevron.backward")
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        createThemeMenuItems
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-        }
-    }
-
-    private func themeRow(_ theme: TerminalTheme) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(theme.name)
-                    .font(.body.weight(.semibold))
-                    .lineLimit(1)
-
-                if let assignment = assignmentLabel(for: theme.name) {
-                    Text(assignment)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            Menu {
-                applyMenuItems(themeName: theme.name)
-
-                Divider()
-
-                Button("Edit") {
-                    themePendingEdit = theme
-                }
-
-                Button("Delete", role: .destructive) {
-                    themePendingDeletion = theme
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button("Edit") {
-                themePendingEdit = theme
-            }
-            .tint(.blue)
-
-            Button("Delete", role: .destructive) {
-                themePendingDeletion = theme
-            }
-        }
-    }
-    #endif
-
-    #if os(macOS)
-    private var macBody: some View {
-        VStack(spacing: 0) {
-            DialogSheetHeader(title: "Custom Themes") {
-                dismiss()
-            }
-
-            Divider()
-
-            if sortedThemes.isEmpty {
-                customThemesEmptyState
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-            } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(sortedThemes) { theme in
-                            let assignment = assignmentLabel(for: theme.name)
-                            CustomThemeManagerRow(
-                                theme: theme,
-                                assignment: assignment,
-                                usePerAppearanceTheme: usePerAppearanceTheme,
-                                isHovered: hoveredThemeID == theme.id,
-                                isSelected: assignment != nil,
-                                onApply: { target in
-                                    applyThemeSelection(themeName: theme.name, applyTarget: target)
-                                },
-                                onEdit: {
-                                    themePendingEdit = theme
-                                },
-                                onDeleteRequest: {
-                                    themePendingDeletion = theme
-                                }
-                            )
-                            .onHover { hovering in
-                                hoveredThemeID = hovering ? theme.id : nil
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                }
-            }
-
-            Divider()
-
-            HStack {
-                Menu {
-                    createThemeMenuItems
-                } label: {
-                    Label("New Custom Theme", systemImage: "plus.circle.fill")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .menuStyle(.borderlessButton)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-            }
-        }
-        .frame(width: 400, height: 500)
-    }
-    #endif
-
-    private var customThemesEmptyState: some View {
+    var customThemesEmptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "paintpalette")
                 .font(.system(size: 44))
@@ -1063,7 +914,7 @@ private struct ManageCustomThemesSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func assignmentLabel(for theme: String) -> String? {
+    func assignmentLabel(for theme: String) -> String? {
         if usePerAppearanceTheme {
             let usesDark = darkThemeName == theme
             let usesLight = lightThemeName == theme
@@ -1084,7 +935,7 @@ private struct ManageCustomThemesSheet: View {
     }
 
     @ViewBuilder
-    private func applyMenuItems(themeName: String) -> some View {
+    func applyMenuItems(themeName: String) -> some View {
         if usePerAppearanceTheme {
             Button("Apply to Dark") {
                 applyThemeSelection(themeName: themeName, applyTarget: .dark)
@@ -1103,7 +954,7 @@ private struct ManageCustomThemesSheet: View {
     }
 
     @ViewBuilder
-    private var createThemeMenuItems: some View {
+    var createThemeMenuItems: some View {
         Button("Paste from Clipboard") {
             importThemeFromClipboard()
         }
@@ -1164,7 +1015,7 @@ private struct ManageCustomThemesSheet: View {
         }
     }
 
-    private func applyThemeSelection(themeName: String, applyTarget: CustomThemeApplyTarget) {
+    func applyThemeSelection(themeName: String, applyTarget: CustomThemeApplyTarget) {
         guard usePerAppearanceTheme else {
             darkThemeName = themeName
             return
