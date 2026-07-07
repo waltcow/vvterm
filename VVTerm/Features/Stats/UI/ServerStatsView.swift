@@ -281,20 +281,31 @@ struct ServerStatsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(StatsBlocksContent.pageBackground(for: currentPreferences.style, backgroundColor: backgroundColor))
         .proUpgradePresentation(isPresented: $isShowingDockerUpgrade, source: .dockerStats)
-        .sheet(isPresented: $isShowingAppearanceSettings) {
-            NavigationStack {
-                AppearanceSettings()
-                    .navigationTitle(Text("Stats Appearance"))
-                    #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
-                    #endif
-                    .statsSheetCloseToolbar(placement: .leading)
-            }
-            #if os(iOS)
-            .presentationDetents([.large])
-            #endif
-            .adaptiveSoftScrollEdges()
+        .statsDetailPresentation(isPresented: $isShowingAppearanceSettings, size: StatsPresentationSize.large) {
+            appearanceSettingsContent
         }
+    }
+
+    @ViewBuilder
+    private var appearanceSettingsContent: some View {
+        #if os(macOS)
+        StatsMacDetailShell(
+            String(localized: "Stats Appearance"),
+            systemImage: "slider.horizontal.3",
+            tint: .blue
+        ) {
+            AppearanceSettings()
+        }
+        #else
+        NavigationStack {
+            AppearanceSettings()
+                .navigationTitle(Text("Stats Appearance"))
+                .navigationBarTitleDisplayMode(.inline)
+                .statsSheetCloseToolbar(placement: .leading)
+        }
+        .presentationDetents([.large])
+        .adaptiveSoftScrollEdges()
+        #endif
     }
 }
 
@@ -2845,7 +2856,11 @@ private struct ProcessesSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "Processes")) {
+        StatsMacDetailShell(
+            String(localized: "Processes"),
+            systemImage: "list.bullet.rectangle",
+            tint: .purple
+        ) {
             processControlsMenu
         } content: {
             VStack(spacing: 0) {
@@ -3189,32 +3204,45 @@ private extension View {
 }
 
 private enum StatsPresentationSize {
-    static let standard = CGSize(width: 560, height: 600)
-    static let large = CGSize(width: 640, height: 680)
+    static let standard = CGSize(width: 720, height: 640)
+    static let large = CGSize(width: 900, height: 760)
 }
 
 #if os(macOS)
 private struct StatsMacDetailShell<Controls: View, Content: View>: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
+    let systemImage: String
+    let tint: Color
+    let showsControls: Bool
     let controls: () -> Controls
     let content: () -> Content
 
     init(
         _ title: String,
+        systemImage: String,
+        tint: Color,
         @ViewBuilder controls: @escaping () -> Controls,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
+        self.systemImage = systemImage
+        self.tint = tint
+        self.showsControls = true
         self.controls = controls
         self.content = content
     }
 
     init(
         _ title: String,
+        systemImage: String,
+        tint: Color,
         @ViewBuilder content: @escaping () -> Content
     ) where Controls == EmptyView {
         self.title = title
+        self.systemImage = systemImage
+        self.tint = tint
+        self.showsControls = false
         self.controls = { EmptyView() }
         self.content = content
     }
@@ -3222,28 +3250,20 @@ private struct StatsMacDetailShell<Controls: View, Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
+                StatsMacSheetTitle(title: title, systemImage: systemImage, tint: tint)
 
                 Spacer(minLength: 12)
 
-                controls()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .background(Color.primary.opacity(0.08), in: Circle())
+                if showsControls {
+                    controls()
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Close"))
+
+                Button(String(localized: "Close")) {
+                    close()
+                }
+                .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background(.bar)
 
@@ -3252,6 +3272,30 @@ private struct StatsMacDetailShell<Controls: View, Content: View>: View {
             content()
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func close() {
+        dismiss()
+    }
+}
+
+private struct StatsMacSheetTitle: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        Label {
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tint)
+        }
+        .labelStyle(.titleAndIcon)
     }
 }
 
@@ -3282,9 +3326,9 @@ private extension View {
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         #if os(macOS)
-        popover(isPresented: isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) {
+        sheet(isPresented: isPresented) {
             content()
-                .frame(width: size.width, height: size.height)
+                .frame(minWidth: size.width, minHeight: size.height)
         }
         #else
         sheet(isPresented: isPresented) {
@@ -3300,9 +3344,9 @@ private extension View {
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
         #if os(macOS)
-        popover(item: item, attachmentAnchor: .rect(.bounds), arrowEdge: .trailing) { value in
+        sheet(item: item) { value in
             content(value)
-                .frame(width: size.width, height: size.height)
+                .frame(minWidth: size.width, minHeight: size.height)
         }
         #else
         sheet(item: item) { value in
@@ -3388,7 +3432,11 @@ private struct ProcessDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "Process Details")) {
+        StatsMacDetailShell(
+            String(localized: "Process Details"),
+            systemImage: "list.bullet.rectangle",
+            tint: .purple
+        ) {
             processDetailsList
         }
         #else
@@ -3516,7 +3564,11 @@ private struct DockerDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "Docker")) {
+        StatsMacDetailShell(
+            String(localized: "Docker"),
+            systemImage: "shippingbox",
+            tint: .blue
+        ) {
             dockerControlsMenu
         } content: {
             VStack(spacing: 0) {
@@ -3863,7 +3915,11 @@ private struct DockerContainerDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "Container Details")) {
+        StatsMacDetailShell(
+            String(localized: "Container Details"),
+            systemImage: "shippingbox",
+            tint: .blue
+        ) {
             containerDetailsList
         }
         #else
@@ -4134,7 +4190,11 @@ private struct CPUDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "CPU Details")) {
+        StatsMacDetailShell(
+            String(localized: "CPU Details"),
+            systemImage: "cpu",
+            tint: .pink
+        ) {
             cpuDetailsList
         }
         #else
@@ -4238,7 +4298,11 @@ private struct GPUDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "GPU Details")) {
+        StatsMacDetailShell(
+            String(localized: "GPU Details"),
+            systemImage: "display",
+            tint: .green
+        ) {
             gpuDetailsList
         }
         #else
@@ -4400,7 +4464,11 @@ private struct SystemDetailsSheet: View {
     @ViewBuilder
     private var sheetContent: some View {
         #if os(macOS)
-        StatsMacDetailShell(String(localized: "System Details")) {
+        StatsMacDetailShell(
+            String(localized: "System Details"),
+            systemImage: "server.rack",
+            tint: .cyan
+        ) {
             systemDetailsList
         }
         #else
