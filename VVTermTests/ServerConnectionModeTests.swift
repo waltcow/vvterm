@@ -1,4 +1,5 @@
 import Foundation
+import CloudKit
 import Testing
 @testable import VVTerm
 
@@ -36,7 +37,7 @@ struct ServerConnectionModeTests {
 
     @Test
     func decodeWithoutConnectionModeDefaultsToStandard() throws {
-        let server = makeServer(connectionMode: .tailscale, authMethod: .password)
+        let server = makeServer(connectionMode: .mosh, authMethod: .password)
         let data = try mutateJSON(server) { object in
             object.removeValue(forKey: "connectionMode")
         }
@@ -86,36 +87,65 @@ struct ServerConnectionModeTests {
     }
 
     @Test
-    func decodeCloudflareConnectionMode() throws {
-        let server = makeServer(connectionMode: .cloudflare, authMethod: .password)
-        let data = try JSONEncoder().encode(server)
+    func decodeLegacyTailscaleConnectionModeDefaultsToStandard() throws {
+        let server = makeServer(connectionMode: .standard, authMethod: .password)
+        let data = try mutateJSON(server) { object in
+            object["connectionMode"] = "tailscale"
+        }
+
         let decoded = try JSONDecoder().decode(Server.self, from: data)
-        #expect(decoded.connectionMode == .cloudflare)
+        #expect(decoded.connectionMode == .standard)
     }
 
     @Test
-    func tailscaleSelectionMapsToTailscaleModeAndEmptyCredentials() {
-        let server = makeServer(connectionMode: .tailscale, authMethod: .sshKeyWithPassphrase)
-        #expect(ServerTransportSelection(server: server) == .tailscale)
-        #expect(ServerTransportSelection.tailscale.connectionMode == .tailscale)
+    func decodeLegacyCloudflareConnectionModeDefaultsToStandard() throws {
+        let server = makeServer(connectionMode: .standard, authMethod: .password)
+        let data = try mutateJSON(server) { object in
+            object["connectionMode"] = "cloudflare"
+        }
 
-        let credentials = ServerFormCredentialBuilder.build(
-            serverId: UUID(),
-            transportSelection: .tailscale,
-            authMethod: .password,
-            password: "secret",
-            sshKey: "PRIVATE",
-            sshPassphrase: "phrase",
-            sshPublicKey: "PUBLIC",
-            cloudflareAccessMode: nil,
-            cloudflareClientID: "",
-            cloudflareClientSecret: ""
-        )
+        let decoded = try JSONDecoder().decode(Server.self, from: data)
+        #expect(decoded.connectionMode == .standard)
+    }
 
-        #expect(credentials.password == nil)
-        #expect(credentials.privateKey == nil)
-        #expect(credentials.passphrase == nil)
-        #expect(credentials.publicKey == nil)
+    @Test
+    func legacyCloudflareFieldsAreIgnoredByLocalPersistence() throws {
+        let server = makeServer(connectionMode: .standard, authMethod: .password)
+        let data = try mutateJSON(server) { object in
+            object["connectionMode"] = "cloudflare"
+            object["cloudflareAccessMode"] = "serviceToken"
+            object["cloudflareTeamDomainOverride"] = "team.cloudflareaccess.com"
+            object["cloudflareAppDomainOverride"] = "ssh.example.com"
+        }
+
+        let decoded = try JSONDecoder().decode(Server.self, from: data)
+        let encoded = try JSONEncoder().encode(decoded)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+        #expect(decoded.connectionMode == .standard)
+        #expect(object["cloudflareAccessMode"] == nil)
+        #expect(object["cloudflareTeamDomainOverride"] == nil)
+        #expect(object["cloudflareAppDomainOverride"] == nil)
+    }
+
+    @Test
+    func cloudKitDecodesLegacyTailscaleAndCloudflareModesAsStandard() throws {
+        let tailscale = try #require(Self.cloudKitServer(connectionMode: "tailscale"))
+        let cloudflare = try #require(Self.cloudKitServer(connectionMode: "cloudflare"))
+
+        #expect(tailscale.connectionMode == .standard)
+        #expect(cloudflare.connectionMode == .standard)
+    }
+
+    @Test
+    func cloudKitDoesNotWriteLegacyCloudflareFields() throws {
+        let server = try #require(Self.cloudKitServer(connectionMode: "cloudflare", includeCloudflareFields: true))
+        let record = server.toRecord()
+
+        #expect(server.connectionMode == .standard)
+        #expect(record["cloudflareAccessMode"] == nil)
+        #expect(record["cloudflareTeamDomainOverride"] == nil)
+        #expect(record["cloudflareAppDomainOverride"] == nil)
     }
 
     @Test
@@ -127,10 +157,7 @@ struct ServerConnectionModeTests {
             password: "secret",
             sshKey: "",
             sshPassphrase: "",
-            sshPublicKey: "",
-            cloudflareAccessMode: nil,
-            cloudflareClientID: "",
-            cloudflareClientSecret: ""
+            sshPublicKey: ""
         )
         #expect(passwordCredentials.password == "secret")
         #expect(passwordCredentials.privateKey == nil)
@@ -145,10 +172,7 @@ struct ServerConnectionModeTests {
             password: "",
             sshKey: "PRIVATE_KEY",
             sshPassphrase: "phrase",
-            sshPublicKey: "PUBLIC_KEY",
-            cloudflareAccessMode: nil,
-            cloudflareClientID: "",
-            cloudflareClientSecret: ""
+            sshPublicKey: "PUBLIC_KEY"
         )
         #expect(String(data: keyCredentials.privateKey ?? Data(), encoding: .utf8) == "PRIVATE_KEY")
         #expect(keyCredentials.passphrase == "phrase")
@@ -156,22 +180,38 @@ struct ServerConnectionModeTests {
     }
 
     @Test
-    func cloudflareServiceTokenPreservesSSHAndAccessCredentials() {
+    func standardSelectionPreservesPasswordCredentials() {
         let credentials = ServerFormCredentialBuilder.build(
             serverId: UUID(),
-            transportSelection: .cloudflare,
+            transportSelection: .standard,
             authMethod: .password,
             password: "ssh-password",
             sshKey: "",
             sshPassphrase: "",
-            sshPublicKey: "",
-            cloudflareAccessMode: .serviceToken,
-            cloudflareClientID: "cf-id",
-            cloudflareClientSecret: "cf-secret"
+            sshPublicKey: ""
         )
 
         #expect(credentials.password == "ssh-password")
-        #expect(credentials.cloudflareClientID == "cf-id")
-        #expect(credentials.cloudflareClientSecret == "cf-secret")
+        #expect(credentials.privateKey == nil)
+    }
+
+    private static func cloudKitServer(
+        connectionMode: String,
+        includeCloudflareFields: Bool = false
+    ) -> Server? {
+        let record = CKRecord(recordType: "Server", recordID: CKRecord.ID(recordName: UUID().uuidString))
+        record["workspaceId"] = UUID().uuidString
+        record["name"] = "Legacy Server"
+        record["host"] = "ssh.example.com"
+        record["port"] = 22
+        record["username"] = "root"
+        record["authMethod"] = AuthMethod.password.rawValue
+        record["connectionMode"] = connectionMode
+        if includeCloudflareFields {
+            record["cloudflareAccessMode"] = "serviceToken"
+            record["cloudflareTeamDomainOverride"] = "team.cloudflareaccess.com"
+            record["cloudflareAppDomainOverride"] = "ssh.example.com"
+        }
+        return Server(from: record)
     }
 }

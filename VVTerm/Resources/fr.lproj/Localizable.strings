@@ -679,28 +679,6 @@
 "root" = "root";
 "Required" = "Requis";
 "Optional" = "Facultatif";
-"Tailscale SSH" = "Tailscale SSH";
-"Uses server-side Tailscale SSH policy. No password or SSH key is required." = "Utilise la politique Tailscale SSH côté serveur. Aucun mot de passe ni clé SSH n'est requis.";
-"Tailscale SSH authentication was not accepted by the server." = "L'authentification Tailscale SSH n'a pas été acceptée par le serveur.";
-"This app currently supports direct tailnet connections only (no userspace proxy fallback)." = "Cette app ne prend actuellement en charge que les connexions tailnet directes (sans solution de secours via proxy userspace).";
-"Cloudflare" = "Cloudflare";
-"Cloudflare Access" = "Cloudflare Access";
-"OAuth login will open in browser. Team/App domain values are auto-discovered from host." = "La connexion OAuth s'ouvrira dans le navigateur. Les valeurs des domaines d'équipe/d'app sont détectées automatiquement à partir de l'hôte.";
-"Team Domain Override" = "Remplacement du domaine d'équipe";
-"Set Team Domain Override" = "Définir le remplacement du domaine d'équipe";
-"App Domain Override" = "Remplacement du domaine d'app";
-"Hide Overrides" = "Masquer les remplacements";
-"Set Team/App Domain Override" = "Définir le remplacement des domaines d'équipe/d'app";
-"Service Token Client ID" = "ID client du jeton de service";
-"Service Token Client Secret" = "Secret client du jeton de service";
-"Cloudflare configuration error: %@" = "Erreur de configuration Cloudflare : %@";
-"Cloudflare authentication failed: %@" = "Échec de l'authentification Cloudflare : %@";
-"Cloudflare tunnel failed: %@" = "Échec du tunnel Cloudflare : %@";
-"Cloudflare transport requires a valid hostname." = "Le transport Cloudflare nécessite un nom d'hôte valide.";
-"Cloudflare service token client ID is required." = "L'ID client du jeton de service Cloudflare est requis.";
-"Cloudflare service token client secret is required." = "Le secret client du jeton de service Cloudflare est requis.";
-"Provide both Team Domain and App Domain overrides for Cloudflare OAuth." = "Indiquez les remplacements des domaines d'équipe et d'app pour Cloudflare OAuth.";
-"Cloudflare metadata discovery failed. Add Team Domain and App Domain overrides in server settings." = "La découverte des métadonnées Cloudflare a échoué. Ajoutez les remplacements des domaines d'équipe et d'app dans les réglages du serveur.";
 
 /* Tmux Attach Prompt */
 "Choose tmux session" = "Choisir une session tmux";
@@ -1034,7 +1012,6 @@
 "Clear" = "Effacer";
 "Clear Filters" = "Effacer les filtres";
 "Close Preview" = "Fermer l'aperçu";
-"Cloudflare tunnel connected, but SSH handshake was closed by the upstream target. Verify Access policy and service token scope." = "Le tunnel Cloudflare s'est connecté, mais la négociation SSH a été fermée par la cible en amont. Vérifiez la stratégie d’accès et la portée du jeton de service.";
 "Cmd + Shift + M always works, even when the button is hidden." = "Cmd + Shift + M fonctionne toujours, même lorsque le bouton est masqué.";
 "Collapsed" = "Effondré";
 "Compare plans" = "Comparez les forfaits";
@@ -1047,7 +1024,6 @@
 "Copy Names" = "Copier les noms";
 "Copy Path" = "Copier le chemin";
 "Copy Paths" = "Copier les chemins";
-"Could not auto-discover Cloudflare Team Domain (\\(describeFailure(error))). Add Team Domain override (for example: team.cloudflareaccess.com)." = "Impossible de découvrir automatiquement le domaine d'équipe Cloudflare (\\(describeFailure(error))). Ajoutez le remplacement du domaine d'équipe (par exemple : team.cloudflareaccess.com).";
 "Create Workspace" = "Créer un espace de travail";
 "Create a folder in the current remote directory." = "Créez un dossier dans le répertoire distant actuel.";
 "Create a workspace before adding servers" = "Créez un espace de travail avant d'ajouter des serveurs";
@@ -1195,7 +1171,6 @@
 "No valid files or folders were dropped." = "Aucun fichier ou dossier valide n'a été supprimé.";
 "No valid remote items were dropped." = "Aucun élément distant valide n'a été supprimé.";
 "No workspaces available." = "Aucun espace de travail disponible.";
-"OAuth" = "OAuth";
 "One Pro purchase works on iPhone, iPad, and Mac with the same Apple ID." = "Un achat Pro fonctionne sur iPhone, iPad et Mac avec le même identifiant Apple.";
 "One-time purchase" = "Achat unique";
 "One-time purchase. No subscription renewal." = "Achat unique. Pas de renouvellement d'abonnement.";
@@ -1278,7 +1253,6 @@
 "Server stats" = "Statistiques du serveur";
 "Server stats included on Free" = "Statistiques du serveur incluses dans Free";
 "Server stats included on Pro" = "Statistiques du serveur incluses sur Pro";
-"Service Token" = "Jeton de service";
 "Share" = "Partager";
 "Share sheet ready." = "Feuille de partage prête.";
 "Share…" = "Partager…";
@@ -1303,7 +1277,6 @@
 "Symlink" = "Lien symbolique";
 "Sync servers, workspaces, themes, and keyboard accessory settings across all your Apple devices." = "Synchronisez les paramètres des serveurs, des espaces de travail, des thèmes et des accessoires de clavier sur tous vos appareils Apple.";
 "Tab \\(number)" = "Onglet \\(number)";
-"Tailscale" = "Tailscale";
 "Terms" = "Conditions";
 "Terms of Use (EULA)" = "Conditions d'utilisation (CLUF)";
 "Text Document" = "Document texte";

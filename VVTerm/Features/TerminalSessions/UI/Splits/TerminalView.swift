@@ -1311,7 +1311,7 @@ struct SSHTerminalPaneWrapper: NSViewRepresentable {
                                 excluding: paneId
                             )
                             return !hasOtherRegistrations
-                        case .authenticationFailed, .tailscaleAuthenticationNotAccepted, .cloudflareConfigurationRequired, .cloudflareAuthenticationFailed, .cloudflareTunnelFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
+                        case .authenticationFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
                             return false
                         }
                     },

@@ -6,7 +6,7 @@ export const SITE = {
   siteUrl: "https://vvterm.com",
   title: "VVTerm - SSH Terminal and SFTP Client for iPhone, iPad, and Mac",
   description:
-    "Your servers. Everywhere. Native SSH terminal and SFTP client for iPhone, iPad, and Mac with Mosh, Tailscale SSH, Cloudflare Tunnel SSH, iCloud sync, and Keychain security.",
+    "Your servers. Everywhere. Native SSH terminal and SFTP client for iPhone, iPad, and Mac with Mosh, iCloud sync, and Keychain security.",
   appStoreUrl: "https://apps.apple.com/app/vvterm/id6757482822",
   githubUrl: "https://github.com/vivy-company/vvterm",
   discordUrl: "https://discord.gg/zemMZtrkSb",
@@ -40,7 +40,7 @@ export const faqSchema = [
     name: "Which authentication methods are supported?",
     acceptedAnswer: {
       "@type": "Answer",
-      text: "VVTerm supports password authentication, SSH keys, SSH keys with passphrase, plus Mosh, Tailscale SSH, and Cloudflare Tunnel SSH.",
+      text: "VVTerm supports password authentication, SSH keys, SSH keys with passphrase, plus Mosh connections.",
     },
   },
   {
@@ -82,7 +82,7 @@ export const softwareSchema = {
     },
   ],
   description:
-    "SSH terminal and SFTP remote file browser for iPhone, iPad, and Mac with standard SSH, Mosh, Tailscale SSH, and Cloudflare Tunnel SSH.",
+    "SSH terminal and SFTP remote file browser for iPhone, iPad, and Mac with standard SSH and Mosh.",
   url: "https://vvterm.com/",
   image: "https://vvterm.com/og.png",
   author: {
@@ -93,8 +93,6 @@ export const softwareSchema = {
   features: [
     "Standard SSH",
     "Mosh transport with SSH fallback",
-    "Tailscale SSH",
-    "Cloudflare Tunnel SSH",
     "SFTP remote file browser",
     "Inline text, image, and video previews",
     "Remote file upload, download, rename, move, and delete",

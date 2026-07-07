@@ -1,15 +1,6 @@
 {
-  "originHash" : "e97bd80d6e6250d3cc4558fb0ab6cfad926435bd62affdd38b2fdd2ac26608b8",
+  "originHash" : "926098b5333ec88a7da0cafcb914a34f63631dece9d8e4a78f12628abbafd123",
   "pins" : [
-    {
-      "identity" : "swift-cloudflared",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/wiedymi/swift-cloudflared.git",
-      "state" : {
-        "revision" : "1be78afe5dae7a20ce0837ce34085f03a77f7587",
-        "version" : "0.1.2"
-      }
-    },
     {
       "identity" : "swift-mosh",
       "kind" : "remoteSourceControl",
@@ -26,15 +17,6 @@
       "state" : {
         "branch" : "main",
         "revision" : "e7a14c16d745ec1d7e4355f35407f8407808475a"
-      }
-    },
-    {
-      "identity" : "tweetnacl-swiftwrap",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/bitmark-inc/tweetnacl-swiftwrap.git",
-      "state" : {
-        "revision" : "f8fd111642bf2336b11ef9ea828510693106e954",
-        "version" : "1.1.0"
       }
     },
     {
