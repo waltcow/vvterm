@@ -336,8 +336,6 @@
 /* Transcription */
 "Engine" = "Motor";
 "System (Apple)" = "Systém (Apple)";
-"Whisper (MLX)" = "Whisper (MLX)";
-"Parakeet (MLX)" = "Parakeet (MLX)";
 "Provider" = "Poskytovatel";
 "Language" = "Jazyk";
 "Model" = "Model";
@@ -349,10 +347,7 @@
 "Failed" = "Neúspěšné";
 "Storage" = "Úložiště";
 "Model Storage" = "Úložiště modelů";
-"Total MLX Models" = "Celkem modelů MLX";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "Používá vestavěné rozpoznávání řeči Apple. Pro nejlepší výsledky je vyžadována síť.";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI Whisper běží lokálně pomocí MLX. Po stažení funguje offline.";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA Parakeet běží lokálně pomocí MLX. Optimalizováno pro přepis v reálném čase.";
 "English" = "Angličtina";
 "Spanish" = "Španělština";
 "French" = "Francouzština";
@@ -364,7 +359,6 @@
 "Russian" = "Ruština";
 "Auto-detect" = "Automaticky detekovat";
 
-/* MLX Models */
 "Tiny" = "Velmi malý";
 "Fastest, smallest" = "Nejrychlejší, nejmenší";
 "Full precision" = "Plná přesnost";
@@ -383,9 +377,7 @@
 "Large v3 4-bit" = "Velký v3 4‑bit";
 "Smaller download" = "Menší stažení";
 "4-bit quantized" = "Kvantizovaný 4‑bit";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "Velký model s vysokou přesností";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "Wi‑Fi";
@@ -641,7 +633,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "Je vyžadováno oprávnění k mikrofonu. Bude automaticky vyžádáno při začátku nahrávání.";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "Rozpoznávání řeči není k dispozici. Povolte Siri v Nastavení systému > Siri a Spotlight.";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "Nepodařilo se spustit nahrávání. Zkontrolujte oprávnění mikrofonu v Nastavení systému > Soukromí a zabezpečení > Mikrofon.";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "Přepis MLX není na tomto Macu k dispozici. Přepínám na Apple Speech.";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "Upgradujte na Pro pro neomezené servery";
@@ -674,8 +665,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "Systém (Apple Speech)";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Model Errors */
 "Failed to remove model" = "Nepodařilo se odstranit model";
@@ -1326,7 +1315,6 @@
 "Organize servers with your own environments." = "Uspořádejte servery s vlastním prostředím.";
 "Other" = "Jiné";
 "Owner" = "vlastník";
-"Parakeet supports English only." = "Parakeet podporuje pouze angličtinu.";
 "Parent" = "Rodič";
 "Path copied to clipboard." = "Cesta byla zkopírována do schránky.";
 "Pay once and keep Pro access forever." = "Zaplaťte jednou a ponechte si přístup Pro navždy.";

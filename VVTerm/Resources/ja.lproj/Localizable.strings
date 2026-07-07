@@ -336,8 +336,6 @@
 /* Transcription */
 "Engine" = "エンジン";
 "System (Apple)" = "システム（Apple）";
-"Whisper (MLX)" = "Whisper（MLX）";
-"Parakeet (MLX)" = "Parakeet（MLX）";
 "Provider" = "プロバイダー";
 "Language" = "言語";
 "Model" = "モデル";
@@ -349,10 +347,7 @@
 "Failed" = "失敗";
 "Storage" = "ストレージ";
 "Model Storage" = "モデルのストレージ";
-"Total MLX Models" = "MLXモデル合計";
 "Uses Apple's built-in speech recognition. Requires network for best results." = "Appleの内蔵音声認識を使用します。最良の結果にはネットワークが必要です。";
-"OpenAI Whisper runs locally using MLX. Works offline after download." = "OpenAI WhisperはMLXでローカル実行されます。ダウンロード後はオフラインで動作します。";
-"NVIDIA Parakeet runs locally using MLX. Optimized for real-time transcription." = "NVIDIA ParakeetはMLXでローカル実行されます。リアルタイム文字起こしに最適化されています。";
 "English" = "英語";
 "Spanish" = "スペイン語";
 "French" = "フランス語";
@@ -364,7 +359,6 @@
 "Russian" = "ロシア語";
 "Auto-detect" = "自動検出";
 
-/* MLX Models */
 "Tiny" = "超小";
 "Fastest, smallest" = "最速・最小";
 "Full precision" = "フル精度";
@@ -383,9 +377,7 @@
 "Large v3 4-bit" = "大 v3 4ビット";
 "Smaller download" = "ダウンロードが小さい";
 "4-bit quantized" = "4ビット量子化";
-"Parakeet TDT 0.6B v2" = "Parakeet TDT 0.6B v2";
 "Large, high-accuracy model" = "大型・高精度モデル";
-"Parakeet TDT 0.6B" = "Parakeet TDT 0.6B";
 
 /* Network */
 "WiFi" = "Wi‑Fi";
@@ -640,7 +632,6 @@
 "Microphone permission is required. The microphone will be automatically requested when recording starts." = "マイクの許可が必要です。録音開始時に自動で要求されます。";
 "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight." = "音声認識が利用できません。システム設定 > SiriとSpotlight でSiriを有効にしてください。";
 "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone." = "録音の開始に失敗しました。システム設定 > プライバシーとセキュリティ > マイク で権限を確認してください。";
-"MLX transcription is not available on this Mac. Switching to Apple Speech." = "このMacではMLX文字起こしが利用できません。Apple Speechに切り替えます。";
 
 /* Pro Required Errors */
 "Upgrade to Pro for unlimited servers" = "無制限のサーバーにはProへアップグレード";
@@ -673,8 +664,6 @@
 
 /* Auth Provider */
 "System (Apple Speech)" = "システム（Apple Speech）";
-"MLX Whisper" = "MLX Whisper";
-"MLX Parakeet" = "MLX Parakeet";
 
 /* Model Errors */
 "Failed to remove model" = "モデルの削除に失敗しました";
@@ -1325,7 +1314,6 @@
 "Organize servers with your own environments." = "独自の環境でサーバーを編成します。";
 "Other" = "その他";
 "Owner" = "オーナー";
-"Parakeet supports English only." = "インコは英語のみをサポートしています。";
 "Parent" = "親";
 "Path copied to clipboard." = "パスがクリップボードにコピーされました。";
 "Pay once and keep Pro access forever." = "一度支払うと永久に Pro アクセスを維持できます。";
