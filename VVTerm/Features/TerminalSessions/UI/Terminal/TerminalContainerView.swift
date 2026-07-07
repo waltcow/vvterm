@@ -4,11 +4,6 @@
 //
 
 import SwiftUI
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 // MARK: - Terminal Container View
 
@@ -53,7 +48,7 @@ struct TerminalContainerView: View {
     #endif
 
     #if os(macOS)
-    @State private var keyMonitor: Any?
+    @State private var keyMonitor = TerminalVoiceKeyMonitor()
     #endif
 
     /// Terminal background color from theme
@@ -642,16 +637,6 @@ struct TerminalContainerView: View {
         return platformFallbackBackgroundColor()
     }
 
-    private static func platformFallbackBackgroundColor() -> Color {
-        #if os(iOS)
-        return Color(UIColor.systemBackground)
-        #elseif os(macOS)
-        return Color(NSColor.windowBackgroundColor)
-        #else
-        return .black
-        #endif
-    }
-
     private func disableTmuxForServer() {
         guard let server else { return }
         ConnectionSessionManager.shared.disableTmux(for: server.id)
@@ -809,45 +794,26 @@ struct TerminalContainerView: View {
 
     #if os(macOS)
     private func setupKeyMonitor() {
-        guard keyMonitor == nil else { return }
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
-            handleMonitoredKeyDown(event)
-        }
-    }
-
-    private func cleanupKeyMonitor() {
-        if let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
-            keyMonitor = nil
-        }
-    }
-
-    private func handleMonitoredKeyDown(_ event: NSEvent) -> NSEvent? {
-        handleVoiceShortcut(event)
-    }
-
-    private func handleVoiceShortcut(_ event: NSEvent) -> NSEvent? {
-        let keyCodeEscape: UInt16 = 53
-        let keyCodeReturn: UInt16 = 36
-
-        if showingVoiceRecording {
-            if event.keyCode == keyCodeEscape {
+        keyMonitor.start(
+            isRecording: {
+                showingVoiceRecording
+            },
+            cancelRecording: {
                 audioService.cancelRecording()
                 showingVoiceRecording = false
                 voiceProcessing = false
-                return nil
-            }
-            if event.keyCode == keyCodeReturn {
+            },
+            submitRecording: {
                 toggleVoiceRecording()
-                return nil
+            },
+            toggleRecording: {
+                toggleVoiceRecording()
             }
-        }
+        )
+    }
 
-        guard MacTerminalShortcut.toggleVoiceRecording.matches(event) else {
-            return event
-        }
-        toggleVoiceRecording()
-        return nil
+    private func cleanupKeyMonitor() {
+        keyMonitor.stop()
     }
     #endif
 
