@@ -474,7 +474,7 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, removed AppKit/UIKit imports and platform gates from `RemoteFileBrowserScreen.swift`, moved body-level platform content/presentation modifiers into `RemoteFileBrowserScreen+iOS.swift` / `RemoteFileBrowserScreen+macOS.swift`, moved platform action routing and sheet sizing into those files, and moved platform-specific state into platform state models.
+- Done: renamed the platform screen files, split `RemoteFileBrowserSupport.swift`, split `RemoteFileTabChrome.swift` into shared / iOS / macOS files, moved macOS AppKit upload/download/delete helpers into `RemoteFileBrowserScreen+macOS.swift`, removed AppKit/UIKit imports and platform gates from `RemoteFileBrowserScreen.swift`, moved body-level platform content/presentation modifiers into `RemoteFileBrowserScreen+iOS.swift` / `RemoteFileBrowserScreen+macOS.swift`, moved platform action routing and sheet sizing into those files, moved platform-specific state into platform state models, and renamed the iOS-only remote-file tab bar/button types to neutral names.
 - Remaining: remove product UI platform prefixes where the type or helper is not a platform adapter.
 
 ### Terminal Sessions
@@ -736,7 +736,7 @@ Steps:
 2. Done: move platform content selection and body-level presentation modifiers into those files.
 3. Done: move platform-specific stored state into platform child views or small platform models.
 4. Done: split `RemoteFileBrowserSupport.swift` by platform.
-5. In progress: remove product UI platform prefixes where the type is not a bridge.
+5. In progress: remove product UI platform prefixes where the type is not a bridge; remote file tab chrome is done.
 6. Done: build iOS and macOS.
 
 Acceptance:
