@@ -1,10 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-#if os(iOS)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 // MARK: - Keychain Settings View
 
@@ -170,12 +165,7 @@ struct KeychainSettingsView: View {
     }
 
     private func copyToClipboard(_ text: String) {
-        #if os(iOS)
-        UIPasteboard.general.string = text
-        #elseif os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
+        Clipboard.copy(text)
     }
 
     @ViewBuilder
@@ -372,21 +362,12 @@ struct AddSSHKeySheet: View {
     }
 
     private func pasteKeyFromClipboard() {
-        #if os(iOS)
-        if let key = UIPasteboard.general.string {
+        if let key = Clipboard.readString() {
             keyContent = key
             if name.isEmpty {
                 name = extractKeyName(from: key)
             }
         }
-        #elseif os(macOS)
-        if let key = NSPasteboard.general.string(forType: .string) {
-            keyContent = key
-            if name.isEmpty {
-                name = extractKeyName(from: key)
-            }
-        }
-        #endif
     }
 
     private func handleKeyImport(_ result: Result<[URL], Error>) {
@@ -625,12 +606,7 @@ struct KeyDetailsSheet: View {
     }
 
     private func copyToClipboard(_ text: String) {
-        #if os(iOS)
-        UIPasteboard.general.string = text
-        #elseif os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
+        Clipboard.copy(text)
         copied = true
     }
 }
@@ -699,12 +675,7 @@ struct PublicKeyDisplaySheet: View {
     }
 
     private func copyToClipboard(_ text: String) {
-        #if os(iOS)
-        UIPasteboard.general.string = text
-        #elseif os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
+        Clipboard.copy(text)
         copied = true
     }
 }
