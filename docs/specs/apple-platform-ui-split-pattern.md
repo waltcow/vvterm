@@ -550,7 +550,7 @@ Initial implementation status:
 
 Current issues:
 
-- `VVTermApp.swift` contains app entry, root composition, and both app delegates; macOS commands live in `Commands+macOS.swift`.
+- `VVTermApp.swift` contains app entry and shared root composition; app delegates and macOS commands live in platform files.
 - `ContentView.swift` is mostly macOS shell composition but has shared naming.
 - `App/iOS/iOSContentView.swift` is a platform shell and can keep an iOS-specific file path, but product child views inside it should be split over time.
 
@@ -589,8 +589,8 @@ Migration notes:
 
 Initial implementation status:
 
-- Done: extracted the iOS terminal tab bar from `iOSContentView.swift` into `TerminalTabsBar+iOS.swift`, renamed `iOSServerComponents.swift` to `ServerComponents+iOS.swift`, renamed the iOS app-shell product UI types to neutral names while keeping true platform shell/adapter names explicit, and moved macOS commands into `Commands+macOS.swift`.
-- Remaining: move app delegates into platform files and continue splitting large iOS app-shell child views when the scope is isolated.
+- Done: extracted the iOS terminal tab bar from `iOSContentView.swift` into `TerminalTabsBar+iOS.swift`, renamed `iOSServerComponents.swift` to `ServerComponents+iOS.swift`, renamed the iOS app-shell product UI types to neutral names while keeping true platform shell/adapter names explicit, moved macOS commands into `Commands+macOS.swift`, and split app delegates into `AppDelegate+iOS.swift` / `AppDelegate+macOS.swift`.
+- Remaining: continue splitting large iOS app-shell child views when the scope is isolated.
 
 ### Settings And Forms
 
@@ -780,7 +780,7 @@ Reason: app root files should make platform root ownership clear.
 
 Steps:
 
-1. Move app delegates into `AppDelegate+iOS.swift` and `AppDelegate+macOS.swift`.
+1. Done: move app delegates into `AppDelegate+iOS.swift` and `AppDelegate+macOS.swift`.
 2. Done: move macOS commands into `Commands+macOS.swift`.
 3. Keep AppKit shell bridges platform-named.
 4. Consider moving iOS server list pieces out of `iOSContentView.swift` with neutral product names.
