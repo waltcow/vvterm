@@ -745,7 +745,7 @@ Privacy:
 - Do not log full payload contents.
 
 ### Rendering Architecture
-Refactor `ServerStatsView` into a small container:
+Stats now uses a small root wrapper and separate layout/detail/component files. Keep new customization work in this structure instead of creating a second `Blocks/` or `Layouts/` tree.
 
 ```swift
 struct ServerStatsView: View {
@@ -762,36 +762,36 @@ struct ServerStatsView: View {
 }
 ```
 
-Create UI files:
+Current UI files:
 - `VVTerm/Features/Stats/UI/ServerStatsView.swift` - lifecycle/container
+- `VVTerm/Features/Stats/UI/ServerStatsDashboard.swift` - collection lifecycle, retry overlay, and collector action handoff
+- `VVTerm/Features/Stats/UI/StatsBlocksContent.swift` - ordered visible blocks, style selection, previews, and page layout
+- `VVTerm/Features/Stats/UI/StatsDashboardCards.swift` - compact/detailed dashboard card layouts
+- `VVTerm/Features/Stats/UI/ClassicStatsContent.swift` - classic layout
+- `VVTerm/Features/Stats/UI/StatsVisualStyle.swift` - style tokens, platform color constants, and appearance resolution
+- `VVTerm/Features/Stats/UI/StatsFormatters.swift` - shared display formatting
+- `VVTerm/Features/Stats/UI/StatsPreviewFixture.swift` - appearance preview sample data
+- `VVTerm/Features/Stats/UI/DetailPresentation.swift` - shared detail presentation API
+- `VVTerm/Features/Stats/UI/DetailPresentation+iOS.swift` - iOS sheet presentation modifiers
+- `VVTerm/Features/Stats/UI/DetailPresentation+macOS.swift` - macOS sheet chrome and search field
 - `VVTerm/Features/Stats/UI/AppearanceSettings.swift`
-- `VVTerm/Features/Stats/UI/Layouts/CompactLayout.swift`
-- `VVTerm/Features/Stats/UI/Layouts/DetailedLayout.swift`
-- `VVTerm/Features/Stats/UI/Layouts/ClassicLayout.swift`
-- `VVTerm/Features/Stats/UI/Blocks/SummaryBlock.swift`
-- `VVTerm/Features/Stats/UI/Blocks/MetricBlocks.swift`
-- `VVTerm/Features/Stats/UI/Blocks/GPUBlock.swift`
-- `VVTerm/Features/Stats/UI/Blocks/StorageBlock.swift`
-- `VVTerm/Features/Stats/UI/Blocks/ProcessBlock.swift`
-- `VVTerm/Features/Stats/UI/Components/Cards.swift`
-- `VVTerm/Features/Stats/UI/Components/Charts.swift`
-- `VVTerm/Features/Stats/UI/Components/Meters.swift`
-- `VVTerm/Features/Stats/UI/Components/Rows.swift`
-- `VVTerm/Features/Stats/UI/Components/DetailSheets.swift`
+- `VVTerm/Features/Stats/UI/Components/StatsCardComponents.swift`
+- `VVTerm/Features/Stats/UI/Components/StatsChartsAndMeters.swift`
+- `VVTerm/Features/Stats/UI/Details/StatsDetailRows.swift`
+- `VVTerm/Features/Stats/UI/Details/ProcessDetails.swift`
+- `VVTerm/Features/Stats/UI/Details/DockerDetails.swift`
+- `VVTerm/Features/Stats/UI/Details/HardwareDetails.swift`
 
-`LayoutHost` responsibilities:
+`StatsBlocksContent` responsibilities:
 - choose style
 - pass ordered visible blocks to selected style
 - keep error overlay and collection lifecycle in the container
 
-Block components:
-- `SummaryBlock`
-- `CPUBlock`
-- `MemoryBlock`
-- `GPUBlock`
-- `NetworkBlock`
-- `StorageBlock`
-- `ProcessBlock`
+Block/card ownership:
+- Add new dashboard card content to `StatsDashboardCards.swift` if it is part of compact/detailed cards.
+- Add new classic-only presentation to `ClassicStatsContent.swift`.
+- Add reusable visual primitives to `Components/`.
+- Add drill-down/detail presentation to `Details/`.
 
 Do not create density-specific block types such as `CompactGPUBlock` or `DetailedGPUBlock`. Layout density should be passed through a small style value so block ownership remains shared.
 

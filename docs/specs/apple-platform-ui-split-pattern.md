@@ -2,11 +2,11 @@
 
 Status: architecture guardrail and migration plan
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Summary
 
-VVTerm ships one Apple app target across iOS and macOS. Shared feature code is valuable, but large SwiftUI files have accumulated many inline `#if os(iOS)` and `#if os(macOS)` branches, plus product UI type names such as `iOSServerRow`, `MacOSZenModePanel`, and `StatsMacSearchField`.
+VVTerm ships one Apple app target across iOS and macOS. Shared feature code is valuable, but large SwiftUI files have historically accumulated many inline `#if os(iOS)` and `#if os(macOS)` branches, plus product UI type names such as `iOSServerRow`, `MacOSZenModePanel`, and legacy Stats macOS helper names.
 
 This spec defines the preferred pattern for Apple-platform UI code:
 
@@ -214,7 +214,7 @@ Examples of acceptable platform names:
 - `GhosttyTerminalView+iOS.swift`
 - `GhosttyTerminalView+macOS.swift`
 
-Examples that should move toward neutral product names:
+Legacy or current examples that should move toward neutral product names:
 
 - `iOSServerRow`
 - `iOSTerminalTabsBar`
@@ -692,24 +692,41 @@ Initial implementation status:
 
 ### Stats
 
-Current issues:
+Current shape:
 
-- `ServerStatsView.swift` is very large and currently has many platform gates.
-- There is existing in-progress local work in this file, so platform cleanup should wait until that work is settled.
-- `StatsMacDetailShell`, `StatsMacSheetTitle`, and `StatsMacSearchField` are product UI types with platform prefixes.
+- `ServerStatsView.swift` is now a thin root wrapper. It owns injected inputs, app/storage state, sheet trigger state, and top-level composition only.
+- `ServerStatsDashboard.swift` owns the live collection lifecycle, visibility handling, retry overlay, and collector action closures.
+- `StatsBlocksContent.swift` owns block ordering, visibility, style selection, preview composition, and page layout.
+- `StatsDashboardCards.swift` owns the compact/detailed dashboard cards.
+- `ClassicStatsContent.swift` owns the classic Stats layout.
+- `Components/` owns reusable cards, chart, gauge, meter, and summary primitives.
+- `Details/` owns process, Docker, CPU, GPU, system, and shared detail rows.
+- `DetailPresentation.swift`, `DetailPresentation+iOS.swift`, and `DetailPresentation+macOS.swift` own the shared presentation API and platform sheet chrome.
 
-Target shape:
+Current file map:
 
 ```text
 VVTerm/Features/Stats/UI/
   ServerStatsView.swift
-  ServerStatsView+iOS.swift
-  ServerStatsView+macOS.swift
+  ServerStatsDashboard.swift
+  StatsBlocksContent.swift
+  StatsDashboardCards.swift
+  ClassicStatsContent.swift
+  StatsVisualStyle.swift
+  StatsFormatters.swift
+  StatsPreviewFixture.swift
+  AppearanceSettings.swift
+  DetailPresentation.swift
   DetailPresentation+iOS.swift
   DetailPresentation+macOS.swift
   Components/
-  Blocks/
-  Layouts/
+    StatsCardComponents.swift
+    StatsChartsAndMeters.swift
+  Details/
+    StatsDetailRows.swift
+    ProcessDetails.swift
+    DockerDetails.swift
+    HardwareDetails.swift
 ```
 
 Shared responsibilities:
@@ -719,19 +736,25 @@ Shared responsibilities:
 - block order and visibility
 - layout/style selection
 - shared block data
+- formatting and preview fixture data
+- detail sheet content that is not platform chrome
 
 Platform responsibilities:
 
 - sheet chrome and sizing
-- search-field implementation if it must differ
+- search-field implementation when it must differ
 - toolbar close placement
 - platform-native list/detail presentation
+- narrow platform constants such as native grouped colors or iOS detents
 
-Migration notes:
+Ongoing rules:
 
 - Align this work with `docs/specs/stats-view-customization.md`.
 - Keep Stats visually aligned across iOS and macOS unless a native platform convention requires a difference.
-- Prefer neutral names such as `DetailShell`, `SheetTitle`, and `SearchField` inside platform files.
+- Do not move metric cards, chart drawing, detail sheets, or collector operations back into `ServerStatsView.swift`.
+- Keep product UI type names neutral. For example, use `StatsDetailShell` and `StatsSearchField` in `DetailPresentation+macOS.swift`; the filename already communicates the platform.
+- Small inline `#if os(...)` gates are acceptable for narrow constants and modifiers. Split the code when a branch becomes a body, layout, lifecycle, or state ownership variant.
+- If future Stats files exceed a single coherent responsibility, split by product responsibility first, then by platform only when native presentation differs.
 
 ### Core UI Notices
 
@@ -830,21 +853,24 @@ Acceptance:
 
 ### Phase 5: Stats
 
-Reason: large file, many platform branches, and existing in-progress local work.
+Reason: `ServerStatsView.swift` had become a large mixed-responsibility file with platform branches, cards, charts, details, collector lifecycle, preview data, formatting, and sheet chrome in one place.
 
 Steps:
 
-1. Wait until current Stats work is clean.
-2. Align with `docs/specs/stats-view-customization.md`.
-3. Split detail presentation, search, and sheet chrome by platform.
-4. Keep block rendering shared unless platform-native presentation clearly requires separation.
-5. Build iOS and macOS.
+1. Done: split detail presentation into shared API plus `DetailPresentation+iOS.swift` and `DetailPresentation+macOS.swift`.
+2. Done: extract shared detail rows, formatters, process details, Docker details, hardware details, charts, meters, card primitives, visual style helpers, and preview fixture data.
+3. Done: extract classic layout, dashboard card layout, block layout, and dashboard lifecycle wrapper.
+4. Done: keep `ServerStatsView.swift` as the root wrapper and appearance-sheet entry point.
+5. Done: rename macOS-only Stats product UI helpers to neutral names inside the macOS platform file.
+6. Done: build iOS and macOS after each implementation slice.
+7. Ongoing: keep small platform gates narrow; split future body/layout/lifecycle branches into platform files.
 
 Acceptance:
 
 - `ServerStatsView.swift` becomes a lifecycle/container file.
 - Platform sheet/detail chrome lives in platform files.
 - Block order, visibility, and style behavior remains shared.
+- Product UI names do not carry `iOS`, `Mac`, `macOS`, or `MacOS` prefixes unless they are true platform adapters.
 
 ## Review Checklist
 

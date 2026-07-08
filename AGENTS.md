@@ -148,6 +148,14 @@ Apple platform UI split pattern:
 - Platform-specific stored SwiftUI state should usually live in platform child views or small platform models. Swift extensions cannot add stored properties, so do not keep long-term gated `@State` in shared views just to make an extension split compile.
 - After platform UI splits, validate both iOS and macOS builds unless the change is documentation-only.
 
+Stats UI ownership:
+- Keep `ServerStatsView.swift` as a thin root wrapper for injected inputs, app/storage state, sheet triggers, and composition. Do not add metric cards, charts, detail sheets, or collector operations back into this file.
+- Keep collection lifecycle, visibility handling, retry overlay, and collector action closures in `ServerStatsDashboard.swift`.
+- Keep block ordering, style selection, preview composition, and page layout in `StatsBlocksContent.swift`, `StatsDashboardCards.swift`, and `ClassicStatsContent.swift`.
+- Keep reusable cards, charts, gauges, and meters under `Features/Stats/UI/Components`, and detail sheets/rows under `Features/Stats/UI/Details`.
+- Keep platform sheet chrome and close/search presentation behind `DetailPresentation.swift`, `DetailPresentation+iOS.swift`, and `DetailPresentation+macOS.swift`. Product UI types inside those files should use neutral names such as `StatsDetailShell` or `StatsSearchField`; the filename carries the platform ownership.
+- Small inline platform gates are acceptable only for platform constants or narrow modifiers such as native colors, toolbar placement, or iOS detents. If a platform branch grows into a body/layout/lifecycle variant, split it into a platform file.
+
 ## Refactoring Rules
 
 When doing architectural refactors:
