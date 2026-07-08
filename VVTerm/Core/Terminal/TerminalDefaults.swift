@@ -98,6 +98,7 @@ enum TerminalDefaults {
     static let fontSizeKey = "terminalFontSize"
     static let cursorStyleKey = "terminalCursorStyle"
     static let cursorBlinkKey = "terminalCursorBlink"
+    static let sshAutoReconnectKey = "sshAutoReconnect"
     static let legacyDefaultFontName = "JetBrainsMono Nerd Font"
     static let minimumFontSize = 4.0
     static let maximumFontSize = 32.0
@@ -133,6 +134,10 @@ enum TerminalDefaults {
     static func storedFontSize(defaults: UserDefaults = .standard) -> Double {
         let stored = defaults.object(forKey: fontSizeKey) as? Double ?? defaultFontSize
         return clampedFontSize(stored)
+    }
+
+    static func sshAutoReconnectEnabled(defaults: UserDefaults = .standard) -> Bool {
+        (defaults.object(forKey: sshAutoReconnectKey) as? Bool) ?? true
     }
 
     static var defaultFontSize: Double {

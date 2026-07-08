@@ -166,7 +166,7 @@ struct TerminalSettingsView: View {
     // SSH settings
     @AppStorage("sshKeepAliveEnabled") private var keepAliveEnabled = true
     @AppStorage("sshKeepAliveInterval") private var keepAliveInterval = 30
-    @AppStorage("sshAutoReconnect") private var autoReconnect = true
+    @AppStorage(TerminalDefaults.sshAutoReconnectKey) private var autoReconnect = true
 
     // Cursor settings
     @AppStorage(TerminalDefaults.cursorStyleKey) private var cursorStyleRaw = TerminalDefaults.defaultCursorStyle.rawValue
