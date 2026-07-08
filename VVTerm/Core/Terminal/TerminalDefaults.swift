@@ -39,8 +39,8 @@ struct TerminalZoomResult: Hashable {
     let effectiveFontSize: Double
 }
 
-struct TerminalPresentationOverrides: Codable, Hashable {
-    static let empty = TerminalPresentationOverrides()
+struct TerminalPresentationOverrides: Codable, Hashable, Sendable {
+    nonisolated static let empty = TerminalPresentationOverrides()
 
     var fontSize: Double?
 
