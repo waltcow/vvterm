@@ -98,9 +98,42 @@ struct ThemeColorParser {
         return "fg=#\(fg),bg=#\(bg)"
     }
 
+    private struct CachedThemeContent {
+        let path: String
+        let modificationDate: Date?
+        let content: String
+    }
+
+    private nonisolated(unsafe) static var contentCache: [String: CachedThemeContent] = [:]
+    private static let contentCacheLock = NSLock()
+
+    nonisolated static func invalidateCache() {
+        contentCacheLock.lock()
+        contentCache.removeAll()
+        contentCacheLock.unlock()
+    }
+
     private nonisolated static func themeContent(for themeName: String) -> String? {
-        guard let themeFile = themeFilePath(for: themeName) else { return nil }
-        return try? String(contentsOfFile: themeFile, encoding: .utf8)
+        contentCacheLock.lock()
+        defer { contentCacheLock.unlock() }
+
+        if let cached = contentCache[themeName] {
+            return cached.content
+        }
+
+        guard let themeFile = themeFilePath(for: themeName),
+              let content = try? String(contentsOfFile: themeFile, encoding: .utf8) else {
+            contentCache.removeValue(forKey: themeName)
+            return nil
+        }
+
+        let modificationDate = (try? FileManager.default.attributesOfItem(atPath: themeFile))?[.modificationDate] as? Date
+        contentCache[themeName] = CachedThemeContent(
+            path: themeFile,
+            modificationDate: modificationDate,
+            content: content
+        )
+        return content
     }
 
     private nonisolated static func themeFilePath(for themeName: String) -> String? {
