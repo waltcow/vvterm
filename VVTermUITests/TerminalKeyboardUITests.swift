@@ -35,9 +35,14 @@ final class TerminalKeyboardUITests: XCTestCase {
         harnessHideButton.tap()
         let diagnostics = app.staticTexts["vvterm.keyboardTest.diagnostics"]
         wait(for: diagnostics, labelContaining: "hideRequests=1", timeout: 3, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "softwareInputActive=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "imeProxyFirstResponder=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "browse=true", timeout: 5, diagnostics: diagnosticsText(in: app))
         assertKeyboardAndAccessoryHidden(in: app)
 
         terminal.tap()
+        wait(for: diagnostics, labelContaining: "softwareInputActive=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "browse=true", timeout: 5, diagnostics: diagnosticsText(in: app))
         assertKeyboardAndAccessoryRemainHidden(in: app)
 
         app.buttons["vvterm.keyboardTest.showKeyboard"].tap()
@@ -86,6 +91,42 @@ final class TerminalKeyboardUITests: XCTestCase {
         wait(for: diagnostics, labelContaining: "imeComposing=false", timeout: 5, diagnostics: diagnosticsText(in: app))
         wait(for: diagnostics, labelContaining: "imeMarkedText=empty", timeout: 5, diagnostics: diagnosticsText(in: app))
         wait(for: diagnostics, labelContaining: "imeModelText=niho", timeout: 5, diagnostics: diagnosticsText(in: app))
+        assertKeyboardAndAccessoryVisible(in: app)
+    }
+
+    @MainActor
+    func testHardwareKeyboardFocusSuppressesAccessoryBar() throws {
+        let app = launchKeyboardHarness()
+        let terminal = waitForTerminal(in: app)
+
+        terminal.tap()
+        assertKeyboardAndAccessoryVisible(in: app)
+
+        app.buttons["vvterm.keyboardTest.hardwareFocus"].tap()
+        let diagnostics = app.staticTexts["vvterm.keyboardTest.diagnostics"]
+        wait(for: diagnostics, labelContaining: "softwareInputActive=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "accessorySuppressed=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "accessoryHidden=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "accessoryAttached=false", timeout: 5, diagnostics: diagnosticsText(in: app))
+    }
+
+    @MainActor
+    func testHardwareKeyboardAttachmentHidesAccessoryFromExistingSoftwareSession() throws {
+        let app = launchKeyboardHarness()
+        let terminal = waitForTerminal(in: app)
+
+        terminal.tap()
+        assertKeyboardAndAccessoryVisible(in: app)
+
+        app.buttons["vvterm.keyboardTest.hardware.attach"].tap()
+        let diagnostics = app.staticTexts["vvterm.keyboardTest.diagnostics"]
+        wait(for: diagnostics, labelContaining: "hardware=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "softwareInputActive=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "accessoryHidden=true", timeout: 5, diagnostics: diagnosticsText(in: app))
+        wait(for: diagnostics, labelContaining: "accessoryAttached=false", timeout: 5, diagnostics: diagnosticsText(in: app))
+
+        app.buttons["vvterm.keyboardTest.hardware.detach"].tap()
+        wait(for: diagnostics, labelContaining: "hardware=false", timeout: 5, diagnostics: diagnosticsText(in: app))
         assertKeyboardAndAccessoryVisible(in: app)
     }
 

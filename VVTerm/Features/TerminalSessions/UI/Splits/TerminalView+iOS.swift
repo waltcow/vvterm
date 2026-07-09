@@ -139,6 +139,7 @@ private struct SSHTerminalPaneRepresentable: UIViewRepresentable {
         terminalView.onZoomAction = { [paneId] action in
             TerminalTabManager.shared.handleTerminalZoom(action, for: paneId)
         }
+        terminalView.terminalContextMenuActions = terminalContextMenuActions
         terminalView.applyPresentationOverrides(TerminalTabManager.shared.presentationOverrides(for: paneId))
 
         coordinator.terminal = terminalView
@@ -185,6 +186,7 @@ private struct SSHTerminalPaneRepresentable: UIViewRepresentable {
             terminalView.applyPresentationOverrides(TerminalTabManager.shared.presentationOverrides(for: paneId))
         }
         terminalView.onVoiceButtonTapped = onVoiceTrigger
+        terminalView.terminalContextMenuActions = terminalContextMenuActions
         if size.width > 0, size.height > 0, size != context.coordinator.lastReportedSize {
             context.coordinator.lastReportedSize = size
             terminalView.sizeDidChange(size)
@@ -283,6 +285,7 @@ private struct SSHTerminalPaneRepresentable: UIViewRepresentable {
         terminal.onZoomAction = { [paneId] action in
             TerminalTabManager.shared.handleTerminalZoom(action, for: paneId)
         }
+        terminal.terminalContextMenuActions = terminalContextMenuActions
         terminal.applyPresentationOverrides(TerminalTabManager.shared.presentationOverrides(for: paneId))
         terminal.writeCallback = { [weak coordinator] data in
             coordinator?.sendToSSH(data)

@@ -121,15 +121,20 @@ final class TerminalKeyboardCoordinator: ObservableObject {
     }
 
     /// Whether the terminal should hold the text-input session (first
-    /// responder). Hardware keyboards are irrelevant here: key events need
-    /// an active responder either way, and UIKit decides on its own whether
-    /// the session also presents a software keyboard.
-    nonisolated static func desiredKeyboardVisible(inputs: StateInputs) -> Bool {
+    /// responder). Hardware keyboards and the user's software-keyboard hidden
+    /// preference are irrelevant here: key events need an active responder
+    /// either way, and UIKit decides on its own whether the session also
+    /// presents a software keyboard.
+    nonisolated static func desiredInputSessionActive(inputs: StateInputs) -> Bool {
         inputs.viewActive
             && inputs.activePaneConnected
             && inputs.activePaneWindowAttached
-            && !inputs.userHidKeyboard
             && !inputs.findNavigatorActive
+    }
+
+    nonisolated static func desiredKeyboardVisible(inputs: StateInputs) -> Bool {
+        desiredInputSessionActive(inputs: inputs)
+            && !inputs.userHidKeyboard
     }
 
     func setActivePane(_ paneId: UUID?) {
@@ -268,7 +273,8 @@ final class TerminalKeyboardCoordinator: ObservableObject {
         }
 
         let inputs = currentInputs
-        let desired = Self.desiredKeyboardVisible(inputs: inputs)
+        let inputSessionDesired = Self.desiredInputSessionActive(inputs: inputs)
+        let keyboardPresentationDesired = Self.desiredKeyboardVisible(inputs: inputs)
         let reason = pendingReason
 
         if let previousPaneId = lastManagedPaneId,
@@ -278,7 +284,8 @@ final class TerminalKeyboardCoordinator: ObservableObject {
             if before.isFirstResponder {
                 previousTerminal.releaseTerminalInput()
                 logCommand(
-                    desired: false,
+                    inputSessionDesired: false,
+                    keyboardPresentationDesired: false,
                     reason: reason,
                     inputs: inputs,
                     before: before,
@@ -290,7 +297,7 @@ final class TerminalKeyboardCoordinator: ObservableObject {
 
         guard let activePaneId,
               let terminal = terminalProvider?(activePaneId) else {
-            logNoActiveTerminal(desired: desired, inputs: inputs)
+            logNoActiveTerminal(inputSessionDesired: inputSessionDesired, inputs: inputs)
             return
         }
         lastManagedPaneId = activePaneId
@@ -302,8 +309,8 @@ final class TerminalKeyboardCoordinator: ObservableObject {
         // Compare against the software input session, not the combined
         // responder state: the view can hold first responder for native
         // selection, which must not read as "keyboard is up".
-        guard before.isSoftwareInputActive != desired else {
-            if desired,
+        guard before.isSoftwareInputActive != inputSessionDesired else {
+            if keyboardPresentationDesired,
                refreshRequested,
                before.isSoftwareInputActive,
                !isSoftwareKeyboardVisible,
@@ -320,28 +327,38 @@ final class TerminalKeyboardCoordinator: ObservableObject {
                 logAsyncRebuild(inputs: inputs, after: after)
                 return
             }
-            logSteady(desired: desired, inputs: inputs, before: before)
+            logSteady(
+                inputSessionDesired: inputSessionDesired,
+                keyboardPresentationDesired: keyboardPresentationDesired,
+                inputs: inputs,
+                before: before
+            )
             return
         }
 
-        if desired {
-            terminal.acquireTerminalInput()
+        if inputSessionDesired {
+            if inputs.userHidKeyboard {
+                terminal.focusTerminalInputWithoutShowingSoftwareKeyboard()
+            } else {
+                terminal.acquireTerminalInput()
+            }
         } else {
             terminal.releaseTerminalInput()
         }
 
         let after = terminal.keyboardCoordinatorDiagnosticSnapshot()
         logCommand(
-            desired: desired,
+            inputSessionDesired: inputSessionDesired,
+            keyboardPresentationDesired: keyboardPresentationDesired,
             reason: reason,
             inputs: inputs,
             before: before,
             after: after
         )
 
-        if desired, after.isSoftwareInputActive {
+        if keyboardPresentationDesired, after.isSoftwareInputActive {
             schedulePresentationVerify()
-        } else if !desired {
+        } else if !inputSessionDesired {
             presentationRefreshAttemptCount = 0
         }
     }
@@ -376,9 +393,9 @@ final class TerminalKeyboardCoordinator: ObservableObject {
         }
     }
 
-    private func logNoActiveTerminal(desired: Bool, inputs: StateInputs) {
+    private func logNoActiveTerminal(inputSessionDesired: Bool, inputs: StateInputs) {
         guard lifecycleLoggingEnabled else { return }
-        logger.info("command=none reason=\(self.pendingReason, privacy: .public) desired=\(desired) noActiveTerminal=true viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive)")
+        logger.info("command=none reason=\(self.pendingReason, privacy: .public) inputDesired=\(inputSessionDesired) noActiveTerminal=true viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive)")
     }
 
     private func logAsyncRebuild(
@@ -390,12 +407,13 @@ final class TerminalKeyboardCoordinator: ObservableObject {
     }
 
     private func logSteady(
-        desired: Bool,
+        inputSessionDesired: Bool,
+        keyboardPresentationDesired: Bool,
         inputs: StateInputs,
         before: TerminalKeyboardCoordinatorDiagnosticSnapshot
     ) {
         guard lifecycleLoggingEnabled else { return }
-        logger.info("command=steady reason=\(self.pendingReason, privacy: .public) desired=\(desired) viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive) window=\(before.windowAttached) keyWindow=\(before.windowIsKey) scene=\(before.sceneActivationState, privacy: .public) firstResponder=\(before.isFirstResponder) softwareInput=\(before.isSoftwareInputActive) kbVisible=\(self.isSoftwareKeyboardVisible)")
+        logger.info("command=steady reason=\(self.pendingReason, privacy: .public) inputDesired=\(inputSessionDesired) keyboardDesired=\(keyboardPresentationDesired) viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive) window=\(before.windowAttached) keyWindow=\(before.windowIsKey) scene=\(before.sceneActivationState, privacy: .public) firstResponder=\(before.isFirstResponder) softwareInput=\(before.isSoftwareInputActive) kbVisible=\(self.isSoftwareKeyboardVisible)")
     }
 
     private func logVerifySuppressed(
@@ -406,7 +424,8 @@ final class TerminalKeyboardCoordinator: ObservableObject {
     }
 
     private func logCommand(
-        desired: Bool,
+        inputSessionDesired: Bool,
+        keyboardPresentationDesired: Bool,
         reason: String,
         inputs: StateInputs,
         before: TerminalKeyboardCoordinatorDiagnosticSnapshot,
@@ -414,7 +433,7 @@ final class TerminalKeyboardCoordinator: ObservableObject {
     ) {
         guard lifecycleLoggingEnabled else { return }
         logger.info(
-            "command=\(desired ? "acquire" : "release", privacy: .public) desired=\(desired) reason=\(reason, privacy: .public) viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive) kbVisible=\(self.isSoftwareKeyboardVisible) beforeWindow=\(before.windowAttached) beforeKeyWindow=\(before.windowIsKey) beforeScene=\(before.sceneActivationState, privacy: .public) beforeFirstResponder=\(before.isFirstResponder) beforeSoftwareInput=\(before.isSoftwareInputActive) afterWindow=\(after.windowAttached) afterKeyWindow=\(after.windowIsKey) afterScene=\(after.sceneActivationState, privacy: .public) afterFirstResponder=\(after.isFirstResponder) afterSoftwareInput=\(after.isSoftwareInputActive)"
+            "command=\(inputSessionDesired ? "acquire" : "release", privacy: .public) inputDesired=\(inputSessionDesired) keyboardDesired=\(keyboardPresentationDesired) reason=\(reason, privacy: .public) viewActive=\(inputs.viewActive) connected=\(inputs.activePaneConnected) windowAttached=\(inputs.activePaneWindowAttached) userHidden=\(inputs.userHidKeyboard) find=\(inputs.findNavigatorActive) kbVisible=\(self.isSoftwareKeyboardVisible) beforeWindow=\(before.windowAttached) beforeKeyWindow=\(before.windowIsKey) beforeScene=\(before.sceneActivationState, privacy: .public) beforeFirstResponder=\(before.isFirstResponder) beforeSoftwareInput=\(before.isSoftwareInputActive) afterWindow=\(after.windowAttached) afterKeyWindow=\(after.windowIsKey) afterScene=\(after.sceneActivationState, privacy: .public) afterFirstResponder=\(after.isFirstResponder) afterSoftwareInput=\(after.isSoftwareInputActive)"
         )
     }
 }

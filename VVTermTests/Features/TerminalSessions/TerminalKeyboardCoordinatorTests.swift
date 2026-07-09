@@ -4,11 +4,12 @@ import Testing
 
 struct TerminalKeyboardCoordinatorTests {
     @Test
-    func desiredKeyboardVisibleContract() {
+    func desiredInputSessionAndKeyboardPresentationContract() {
         struct Case {
             let name: String
             let inputs: TerminalKeyboardCoordinator.StateInputs
-            let expected: Bool
+            let expectedInputSessionActive: Bool
+            let expectedKeyboardVisible: Bool
         }
 
         let visible = TerminalKeyboardCoordinator.StateInputs(
@@ -20,7 +21,12 @@ struct TerminalKeyboardCoordinatorTests {
         )
 
         let cases = [
-            Case(name: "connected active attached", inputs: visible, expected: true),
+            Case(
+                name: "connected active attached",
+                inputs: visible,
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: true
+            ),
             Case(
                 name: "user hidden",
                 inputs: .init(
@@ -30,12 +36,14 @@ struct TerminalKeyboardCoordinatorTests {
                     userHidKeyboard: true,
                     findNavigatorActive: false
                 ),
-                expected: false
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: false
             ),
             Case(
                 name: "user shown again",
                 inputs: visible,
-                expected: true
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: true
             ),
             Case(
                 name: "left terminal view",
@@ -46,7 +54,8 @@ struct TerminalKeyboardCoordinatorTests {
                     userHidKeyboard: false,
                     findNavigatorActive: false
                 ),
-                expected: false
+                expectedInputSessionActive: false,
+                expectedKeyboardVisible: false
             ),
             Case(
                 name: "window not attached",
@@ -57,12 +66,14 @@ struct TerminalKeyboardCoordinatorTests {
                     userHidKeyboard: false,
                     findNavigatorActive: false
                 ),
-                expected: false
+                expectedInputSessionActive: false,
+                expectedKeyboardVisible: false
             ),
             Case(
                 name: "window attached after mount",
                 inputs: visible,
-                expected: true
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: true
             ),
             Case(
                 name: "find navigator active",
@@ -73,12 +84,14 @@ struct TerminalKeyboardCoordinatorTests {
                     userHidKeyboard: false,
                     findNavigatorActive: true
                 ),
-                expected: false
+                expectedInputSessionActive: false,
+                expectedKeyboardVisible: false
             ),
             Case(
                 name: "reconnect restores when visible before",
                 inputs: visible,
-                expected: true
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: true
             ),
             Case(
                 name: "reconnect stays hidden when hidden before",
@@ -89,14 +102,19 @@ struct TerminalKeyboardCoordinatorTests {
                     userHidKeyboard: true,
                     findNavigatorActive: false
                 ),
-                expected: false
+                expectedInputSessionActive: true,
+                expectedKeyboardVisible: false
             ),
         ]
 
         for testCase in cases {
             #expect(
-                TerminalKeyboardCoordinator.desiredKeyboardVisible(inputs: testCase.inputs) == testCase.expected,
-                "\(testCase.name)"
+                TerminalKeyboardCoordinator.desiredInputSessionActive(inputs: testCase.inputs) == testCase.expectedInputSessionActive,
+                "\(testCase.name) input session"
+            )
+            #expect(
+                TerminalKeyboardCoordinator.desiredKeyboardVisible(inputs: testCase.inputs) == testCase.expectedKeyboardVisible,
+                "\(testCase.name) keyboard presentation"
             )
         }
     }

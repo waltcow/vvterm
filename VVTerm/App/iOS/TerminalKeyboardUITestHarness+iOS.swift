@@ -87,6 +87,21 @@ struct TerminalKeyboardUITestHarness: View {
                         terminalView?.keyboardUITestCommitMarkedText()
                     }
                     .accessibilityIdentifier("vvterm.keyboardTest.ime.commit")
+
+                    Button("Hardware") {
+                        terminalView?.keyboardUITestRequestHardwareKeyboardFocus()
+                    }
+                    .accessibilityIdentifier("vvterm.keyboardTest.hardwareFocus")
+
+                    Button("HW On") {
+                        terminalView?.keyboardUITestSetHardwareKeyboardAttached(true)
+                    }
+                    .accessibilityIdentifier("vvterm.keyboardTest.hardware.attach")
+
+                    Button("HW Off") {
+                        terminalView?.keyboardUITestSetHardwareKeyboardAttached(false)
+                    }
+                    .accessibilityIdentifier("vvterm.keyboardTest.hardware.detach")
                 }
             }
             .font(.system(size: 12, weight: .semibold))
@@ -214,6 +229,7 @@ private final class TerminalKeyboardHarnessContainerView: UIView {
         terminal.accessibilityLabel = "Terminal Keyboard Test Surface"
         terminal.isAccessibilityElement = true
         terminal.acceptsTerminalInput = true
+        terminal.keyboardUITestSetHardwareKeyboardAttached(false)
         terminal.writeCallback = { _ in }
         terminal.setupWriteCallback()
         terminal.onReady = { [weak self, weak terminal] in

@@ -217,4 +217,16 @@ struct TerminalHardwareTextInputRoutingPolicyTests {
             ) == false
         )
     }
+
+    @Test
+    func consumesShiftAndAltForInterpretedTextButKeepsControlAndCommandUnconsumed() {
+        let consumed = TerminalKeyInputModifierPolicy.consumedModifiers(
+            for: [.shift, .alt, .ctrl, .super]
+        )
+
+        #expect(consumed.contains(.shift))
+        #expect(consumed.contains(.alt))
+        #expect(consumed.contains(.ctrl) == false)
+        #expect(consumed.contains(.super) == false)
+    }
 }

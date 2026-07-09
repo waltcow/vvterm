@@ -60,3 +60,9 @@ enum TerminalHardwareTextInputRoutingPolicy {
         isTextInputModifierOnlyKey
     }
 }
+
+enum TerminalKeyInputModifierPolicy {
+    static func consumedModifiers(for mods: Ghostty.Input.Mods) -> Ghostty.Input.Mods {
+        mods.subtracting([.ctrl, .super])
+    }
+}
