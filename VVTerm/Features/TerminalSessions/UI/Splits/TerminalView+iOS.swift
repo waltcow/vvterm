@@ -208,17 +208,9 @@ private struct SSHTerminalPaneRepresentable: UIViewRepresentable {
         let shouldKeepExistingKeyboardFocus = terminalView.isFirstResponder && shouldRestoreKeyboardFocus
         terminalView.acceptsTerminalInput = state.isConnected
 
-        let autoReconnectEnabled = TerminalDefaults.sshAutoReconnectEnabled()
-        let shouldStartSSHConnection: Bool = {
-            switch state {
-            case .connecting, .reconnecting, .connected:
-                return true
-            case .disconnected:
-                return isActive && autoReconnectEnabled
-            case .failed, .idle:
-                return false
-            }
-        }()
+        let shouldStartSSHConnection = TerminalConnectionStartPolicy.shouldStart(
+            connectionState: state
+        )
 
         if shouldStartSSHConnection, context.coordinator.lastStartRequestState != state {
             let coordinator = context.coordinator
@@ -308,14 +300,10 @@ private struct SSHTerminalPaneRepresentable: UIViewRepresentable {
         guard UIApplication.shared.applicationState == .active else { return }
         guard !TerminalTabManager.shared.isSuspendingForBackground else { return }
 
-        let autoReconnectEnabled = TerminalDefaults.sshAutoReconnectEnabled()
         switch state {
         case .connecting, .reconnecting, .connected:
             break
-        case .disconnected:
-            guard isActive && autoReconnectEnabled else { return }
-            TerminalTabManager.shared.updatePaneState(paneId, connectionState: .connecting)
-        case .failed, .idle:
+        case .disconnected, .failed, .idle:
             return
         }
 

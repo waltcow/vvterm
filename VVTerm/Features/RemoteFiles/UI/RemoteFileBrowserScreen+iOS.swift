@@ -110,24 +110,40 @@ extension RemoteFileBrowserScreen {
 
     func platformBeginDownload(_ entry: RemoteFileEntry) {
         cleanupDownloadExport()
+        if let downloadTransferNoticeID {
+            noticeHost.dismiss(id: downloadTransferNoticeID.uuidString)
+        }
+
+        let transferID = UUID()
+        downloadTransferNoticeID = transferID
+
+        let temporaryURL: URL
+        do {
+            temporaryURL = try temporaryDownloadURL(for: entry)
+        } catch {
+            downloadTransferNoticeID = nil
+            presentOperationError(error)
+            return
+        }
 
         performTransfer(
+            id: transferID,
             title: String(localized: "Downloading"),
             initialMessage: String(localized: "Preparing remote file."),
-            successMessage: String(localized: "Download ready to export.")
+            successMessage: String(localized: "Download ready to export."),
+            completionLifetime: .persistent,
+            onSuccess: {
+                guard downloadTransferNoticeID == transferID else { return }
+                downloadExportDocument = RemoteFileDownloadDocument(sourceURL: temporaryURL)
+                downloadExportFilename = entry.name
+                isDownloadExporterPresented = true
+            }
         ) {
-            let temporaryURL = try temporaryDownloadURL(for: entry)
             try await browser.downloadFile(
                 at: entry.path,
                 to: temporaryURL,
                 server: server
             )
-
-            await MainActor.run {
-                downloadExportDocument = RemoteFileDownloadDocument(sourceURL: temporaryURL)
-                downloadExportFilename = entry.name
-                isDownloadExporterPresented = true
-            }
         }
     }
 
@@ -213,57 +229,59 @@ extension RemoteFileBrowserScreen {
         }
         .background(Color.clear)
         .navigationDestination(isPresented: previewBinding) {
-            RemoteFileInspectorView(
-                selectedEntry: snapshot.selectedEntry,
-                viewerPayload: snapshot.viewerPayload,
-                isLoadingViewer: snapshot.isLoadingViewer,
-                viewerError: snapshot.viewerError,
-                directoryError: snapshot.directoryError,
-                chrome: .sheet,
-                backgroundColor: Color(UIColor.systemGroupedBackground),
-                previewBackgroundColor: Color(UIColor.secondarySystemGroupedBackground),
-                sectionBackgroundColor: Color(UIColor.secondarySystemGroupedBackground),
-                onLoadPreview: { entry in
-                    Task { await browser.loadPreview(for: entry, in: fileTab, server: server) }
-                },
-                onDownloadPreview: { entry in
-                    Task {
-                        await browser.loadPreview(for: entry, in: fileTab, server: server, allowLargeDownloads: true)
+            fileNoticeHost {
+                RemoteFileInspectorView(
+                    selectedEntry: snapshot.selectedEntry,
+                    viewerPayload: snapshot.viewerPayload,
+                    isLoadingViewer: snapshot.isLoadingViewer,
+                    viewerError: snapshot.viewerError,
+                    directoryError: snapshot.directoryError,
+                    chrome: .sheet,
+                    backgroundColor: Color(UIColor.systemGroupedBackground),
+                    previewBackgroundColor: Color(UIColor.secondarySystemGroupedBackground),
+                    sectionBackgroundColor: Color(UIColor.secondarySystemGroupedBackground),
+                    onLoadPreview: { entry in
+                        Task { await browser.loadPreview(for: entry, in: fileTab, server: server) }
+                    },
+                    onDownloadPreview: { entry in
+                        Task {
+                            await browser.loadPreview(for: entry, in: fileTab, server: server, allowLargeDownloads: true)
+                        }
+                    },
+                    onDownload: { entry in
+                        beginDownload(entry)
+                    },
+                    onShare: { entry in
+                        beginShare(entry)
+                    },
+                    onRename: { entry in
+                        beginRename(entry)
+                    },
+                    onMove: { entry in
+                        beginMove(entry)
+                    },
+                    onEditPermissions: { entry in
+                        guard canEditPermissions(for: entry) else { return }
+                        beginEditPermissions(entry)
+                    },
+                    onDelete: { entry in
+                        deleteTargetEntry = entry
+                    },
+                    onClose: nil,
+                    onSaveText: { entry, text in
+                        try await browser.saveTextPreview(text, for: entry, in: fileTab, server: server)
                     }
-                },
-                onDownload: { entry in
-                    beginDownload(entry)
-                },
-                onShare: { entry in
-                    beginShare(entry)
-                },
-                onRename: { entry in
-                    beginRename(entry)
-                },
-                onMove: { entry in
-                    beginMove(entry)
-                },
-                onEditPermissions: { entry in
-                    guard canEditPermissions(for: entry) else { return }
-                    beginEditPermissions(entry)
-                },
-                onDelete: { entry in
-                    deleteTargetEntry = entry
-                },
-                onClose: nil,
-                onSaveText: { entry, text in
-                    try await browser.saveTextPreview(text, for: entry, in: fileTab, server: server)
-                }
-            )
-            .navigationTitle(snapshot.selectedEntry?.name ?? snapshot.viewerPayload?.entry.name ?? String(localized: "Preview"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if let entry = snapshot.selectedEntry ?? snapshot.viewerPayload?.entry {
-                        Menu {
-                            inspectorActionMenu(entry)
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                )
+                .navigationTitle(snapshot.selectedEntry?.name ?? snapshot.viewerPayload?.entry.name ?? String(localized: "Preview"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        if let entry = snapshot.selectedEntry ?? snapshot.viewerPayload?.entry {
+                            Menu {
+                                inspectorActionMenu(entry)
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                            }
                         }
                     }
                 }

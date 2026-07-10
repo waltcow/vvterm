@@ -804,6 +804,9 @@ final class TerminalTabManager: ObservableObject {
     func updatePaneState(_ paneId: UUID, connectionState: ConnectionState) {
         let serverId = paneStates[paneId]?.serverId
         paneStates[paneId]?.connectionState = connectionState
+        if connectionState.isConnected {
+            paneStates[paneId]?.markConnectionEstablished()
+        }
         #if os(iOS)
         keyboardCoordinator.setPaneConnected(connectionState.isConnected, for: paneId)
         #endif
@@ -1282,6 +1285,7 @@ final class TerminalTabManager: ObservableObject {
                         serverId: tab.serverId
                     )
                     paneState.connectionState = .disconnected
+                    paneState.markConnectionEstablished()
                     if !tmuxResolver.isTmuxEnabled(for: tab.serverId) {
                         paneState.tmuxStatus = .off
                     }

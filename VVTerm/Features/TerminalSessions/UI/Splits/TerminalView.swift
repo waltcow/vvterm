@@ -497,7 +497,6 @@ struct TerminalPaneView: View {
     @State private var reconnectInFlight = false
     @State private var terminalBackgroundColor: Color = Self.initialTerminalBackgroundColor()
     @State private var connectWatchdogToken = UUID()
-    @State private var hasEstablishedConnection = false
     @State private var showingRetrustHostConfirmation = false
     @StateObject private var richPasteUI = TerminalRichPasteUIModel()
 
@@ -560,16 +559,56 @@ struct TerminalPaneView: View {
         return paneState?.tmuxStatus == .off
     }
 
-    private var shouldUseInlineReconnectPresentation: Bool {
-        hasEstablishedConnection && terminalExists && connectionState.isConnecting
+    private var shouldUseReconnectBannerPresentation: Bool {
+        TerminalConnectionPresentationPolicy.usesReconnectBanner(
+            connectionState: connectionState,
+            hasEstablishedConnection: paneState?.hasEstablishedConnection == true,
+            autoReconnectEnabled: autoReconnectEnabled,
+            isReconnectPreparationInFlight: reconnectInFlight
+        )
+    }
+
+    private var isAwaitingTmuxSelection: Bool {
+        TerminalTabManager.shared.tmuxAttachPrompt?.id == paneId
     }
 
     private var noticeSurfaceStyle: NoticeSurfaceStyle {
-        .terminal(backgroundColor: terminalBackgroundColor)
+        .terminal(
+            backgroundColor: terminalBackgroundColor,
+            foregroundColor: ThemeColorParser.previewPalette(for: effectiveThemeName).foreground
+        )
+    }
+
+    private var disconnectedStatusMessage: String? {
+        if paneState?.tmuxStatus.indicatesTmux == true {
+            return String(localized: "tmux session is still running on the server.")
+        }
+
+        if shouldShowMoshDurabilityHint {
+            return String(localized: "Without tmux, app backgrounding can interrupt running commands.")
+        }
+
+        return nil
+    }
+
+    private var connectionStatusPresentation: TerminalConnectionStatusPresentation {
+        .resolve(
+            credentialLoadErrorMessage: credentialLoadErrorMessage,
+            connectionState: connectionState,
+            serverName: server.name,
+            hasEstablishedConnection: paneState?.hasEstablishedConnection == true,
+            autoReconnectEnabled: autoReconnectEnabled,
+            isReconnectPreparationInFlight: reconnectInFlight,
+            isAwaitingTmuxSelection: isAwaitingTmuxSelection,
+            terminalExists: terminalExists,
+            isReady: isReady,
+            disconnectedMessage: disconnectedStatusMessage,
+            isHostKeyVerificationFailure: isHostKeyVerificationFailure
+        )
     }
 
     private var reconnectBannerMessage: String? {
-        guard shouldUseInlineReconnectPresentation else { return nil }
+        guard shouldUseReconnectBannerPresentation else { return nil }
 
         if case .reconnecting(let attempt) = connectionState {
             return String(format: String(localized: "Reconnecting (attempt %lld)…"), Int64(attempt))
@@ -651,7 +690,13 @@ struct TerminalPaneView: View {
                     terminalSurface(credentials: credentials)
                 }
 
-                blockingOverlay
+                TerminalConnectionStatusView(
+                    presentation: connectionStatusPresentation,
+                    surfaceStyle: noticeSurfaceStyle,
+                    isActive: shouldFocus,
+                    onRetry: retryConnection,
+                    onTrustNewHostKey: { showingRetrustHostConfirmation = true }
+                )
 
                 if shouldShowFloatingVoiceButton {
                     voiceTriggerButton
@@ -669,10 +714,6 @@ struct TerminalPaneView: View {
             // If terminal exists, mark ready immediately
             if terminalExists {
                 isReady = true
-                hasEstablishedConnection = true
-            }
-            if connectionState.isConnected {
-                hasEstablishedConnection = true
             }
             do {
                 credentials = try KeychainManager.shared.getCredentials(for: server)
@@ -705,12 +746,6 @@ struct TerminalPaneView: View {
         }
         .onChange(of: connectionState) { state in
             if state.isConnecting || state.isConnected {
-                if terminalExists {
-                    hasEstablishedConnection = true
-                }
-                if state.isConnected {
-                    hasEstablishedConnection = true
-                }
                 reconnectInFlight = false
                 connectWatchdogToken = UUID()
                 startConnectWatchdog()
@@ -721,6 +756,12 @@ struct TerminalPaneView: View {
         .onChange(of: paneState?.tmuxStatus) { status in
             if status == .missing {
                 showingTmuxInstallPrompt = true
+            }
+        }
+        .onChange(of: isAwaitingTmuxSelection) { isAwaitingSelection in
+            connectWatchdogToken = UUID()
+            if !isAwaitingSelection {
+                startConnectWatchdog()
             }
         }
         .onChange(of: paneState?.moshFallbackReason) { _ in
@@ -831,120 +872,6 @@ struct TerminalPaneView: View {
         #endif
     }
 
-    @ViewBuilder
-    private var blockingOverlay: some View {
-        if let credentialLoadErrorMessage {
-            BlockingStatusView(surfaceStyle: noticeSurfaceStyle) {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.red)
-                    Text("Connection Failed")
-                        .font(.headline)
-                    Text(credentialLoadErrorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Retry") {
-                        retryConnection()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .multilineTextAlignment(.center)
-            }
-        } else {
-            switch connectionState {
-            case .connecting:
-                if !shouldUseInlineReconnectPresentation {
-                    BlockingStatusView(showsScrim: false, surfaceStyle: noticeSurfaceStyle) {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                            Text(String(format: String(localized: "Connecting to %@..."), server.name))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 6)
-                        .multilineTextAlignment(.center)
-                    }
-                }
-            case .reconnecting:
-                if !shouldUseInlineReconnectPresentation {
-                    BlockingStatusView(showsScrim: false, surfaceStyle: noticeSurfaceStyle) {
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                            Text("Reconnecting...")
-                                .foregroundStyle(.orange)
-                        }
-                        .multilineTextAlignment(.center)
-                    }
-                }
-            case .disconnected:
-                BlockingStatusView(surfaceStyle: noticeSurfaceStyle) {
-                    VStack(spacing: 16) {
-                        Image(systemName: "bolt.slash")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("Disconnected")
-                            .foregroundStyle(.secondary)
-                        if paneState?.tmuxStatus.indicatesTmux == true {
-                            Text("tmux session is still running on the server.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        } else if shouldShowMoshDurabilityHint {
-                            Text("Without tmux, app backgrounding can interrupt running commands.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        Button("Reconnect") {
-                            retryConnection()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .multilineTextAlignment(.center)
-                }
-            case .failed(let error):
-                BlockingStatusView(surfaceStyle: noticeSurfaceStyle) {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.largeTitle)
-                            .foregroundStyle(.red)
-                        Text("Connection Failed")
-                            .font(.headline)
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if isHostKeyVerificationFailure {
-                            Button("Trust New Host Key") {
-                                showingRetrustHostConfirmation = true
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                        Button("Retry") {
-                            retryConnection()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .multilineTextAlignment(.center)
-                }
-            case .connected, .idle:
-                if !isReady && !terminalExists {
-                    BlockingStatusView(showsScrim: false, surfaceStyle: noticeSurfaceStyle) {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                            Text(String(format: String(localized: "Connecting to %@..."), server.name))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 6)
-                        .multilineTextAlignment(.center)
-                    }
-                }
-            }
-        }
-    }
-
     private func disableTmuxForServer() {
         TerminalTabManager.shared.disableTmux(for: server.id)
     }
@@ -967,7 +894,6 @@ struct TerminalPaneView: View {
         guard !connectionState.isConnecting else { return }
         credentialLoadErrorMessage = nil
         operationNotice = nil
-        isReady = false
         if credentials == nil {
             do {
                 credentials = try KeychainManager.shared.getCredentials(for: server)
@@ -978,28 +904,44 @@ struct TerminalPaneView: View {
             }
         }
         reconnectInFlight = true
-        TerminalTabManager.shared.updatePaneState(paneId, connectionState: .connecting)
         connectWatchdogToken = UUID()
-        startConnectWatchdog()
-        reconnectToken = UUID()
         Task {
             await TerminalTabManager.shared.unregisterSSHClient(for: paneId)
-            await MainActor.run {
+            guard TerminalTabManager.shared.paneStates[paneId] != nil else {
                 reconnectInFlight = false
+                return
             }
+
+            isReady = false
+            let hasEstablishedConnection = paneState?.hasEstablishedConnection == true
+            TerminalTabManager.shared.updatePaneState(
+                paneId,
+                connectionState: TerminalConnectionAttemptPolicy.state(
+                    attempt: 1,
+                    hasEstablishedConnection: hasEstablishedConnection
+                )
+            )
+            reconnectToken = UUID()
+            reconnectInFlight = false
+            connectWatchdogToken = UUID()
+            startConnectWatchdog()
         }
     }
 
     private func startConnectWatchdog() {
-        let shouldWatchConnecting = connectionState.isConnecting
-        let shouldWatchConnectedNoTerminal = connectionState.isConnected && !isReady && !terminalExists
-        guard shouldWatchConnecting || shouldWatchConnectedNoTerminal else { return }
+        guard TerminalConnectionWatchdogPolicy.shouldMonitor(
+            connectionState: connectionState,
+            isReady: isReady,
+            terminalExists: terminalExists,
+            isAwaitingUserSelection: isAwaitingTmuxSelection
+        ) else { return }
         let token = connectWatchdogToken
         Task {
             try? await Task.sleep(for: .seconds(20))
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard token == connectWatchdogToken else { return }
+                guard !isAwaitingTmuxSelection else { return }
                 let stillConnecting = connectionState.isConnecting
                 let stillConnectedWithoutTerminal = connectionState.isConnected && !isReady && !terminalExists
                 guard stillConnecting || stillConnectedWithoutTerminal else { return }

@@ -68,6 +68,53 @@ struct VVTermApp: App {
     private var usesTerminalKeyboardUITestHarness: Bool {
         Foundation.ProcessInfo.processInfo.arguments.contains("--vvterm-ui-test-terminal-keyboard-harness")
     }
+
+    private var usesNoticePresentationUITestHarness: Bool {
+        Foundation.ProcessInfo.processInfo.arguments.contains("--vvterm-ui-test-notice-harness")
+    }
+    #endif
+
+    #if os(iOS)
+    @ViewBuilder
+    private var iOSRootContent: some View {
+        #if DEBUG
+        if usesNoticePresentationUITestHarness {
+            NoticePresentationUITestHarness()
+                .modifier(AppearanceModifier())
+        } else if usesTerminalKeyboardUITestHarness {
+            TerminalKeyboardUITestHarness()
+                .environmentObject(ghosttyApp)
+                .environmentObject(terminalThemeManager)
+                .environmentObject(terminalAccessoryPreferencesManager)
+                .modifier(AppearanceModifier())
+        } else {
+            iOSAppContent
+        }
+        #else
+        iOSAppContent
+        #endif
+    }
+
+    private var iOSAppContent: some View {
+        iOSContentView(
+            fileTabs: remoteFileTabManager,
+            fileBrowser: remoteFileBrowserStore
+        )
+            .environmentObject(ghosttyApp)
+            .environmentObject(terminalThemeManager)
+            .environmentObject(terminalAccessoryPreferencesManager)
+            .modifier(AppearanceModifier())
+            .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalCursorStyle)\(terminalCursorBlink)\(terminalThemeName)\(terminalThemeNameLight)\(usePerAppearanceTheme)\(activeCustomThemeVersionToken)") {
+                ghosttyApp.reloadConfig()
+            }
+            .sheet(isPresented: .init(
+                get: { !hasSeenWelcome },
+                set: { if !$0 { hasSeenWelcome = true } }
+            )) {
+                WelcomeView(hasSeenWelcome: $hasSeenWelcome)
+                    .adaptiveSoftScrollEdges()
+            }
+    }
     #endif
 
     var body: some Scene {
@@ -77,32 +124,7 @@ struct VVTermApp: App {
                 NoticeAppHost {
                     Group {
                         #if os(iOS)
-                        if usesTerminalKeyboardUITestHarness {
-                            TerminalKeyboardUITestHarness()
-                                .environmentObject(ghosttyApp)
-                                .environmentObject(terminalThemeManager)
-                                .environmentObject(terminalAccessoryPreferencesManager)
-                                .modifier(AppearanceModifier())
-                        } else {
-                            iOSContentView(
-                                fileTabs: remoteFileTabManager,
-                                fileBrowser: remoteFileBrowserStore
-                            )
-                                .environmentObject(ghosttyApp)
-                                .environmentObject(terminalThemeManager)
-                                .environmentObject(terminalAccessoryPreferencesManager)
-                                .modifier(AppearanceModifier())
-                                .task(id: "\(terminalFontName)\(terminalFontSize)\(terminalCursorStyle)\(terminalCursorBlink)\(terminalThemeName)\(terminalThemeNameLight)\(usePerAppearanceTheme)\(activeCustomThemeVersionToken)") {
-                                    ghosttyApp.reloadConfig()
-                                }
-                                .sheet(isPresented: .init(
-                                    get: { !hasSeenWelcome },
-                                    set: { if !$0 { hasSeenWelcome = true } }
-                                )) {
-                                    WelcomeView(hasSeenWelcome: $hasSeenWelcome)
-                                        .adaptiveSoftScrollEdges()
-                                }
-                        }
+                        iOSRootContent
                         #else
                         ContentView(
                             fileTabs: remoteFileTabManager,

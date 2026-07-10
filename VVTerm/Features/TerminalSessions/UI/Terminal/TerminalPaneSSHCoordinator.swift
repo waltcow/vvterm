@@ -124,6 +124,7 @@ final class TerminalPaneSSHCoordinator {
         let credentials = self.credentials
         let onProcessExit = self.onProcessExit
         let logger = self.logger
+        let hasEstablishedConnection = TerminalTabManager.shared.paneStates[paneId]?.hasEstablishedConnection == true
 
         shellTask = Task.detached(priority: .userInitiated) { [weak self, weak terminal, sshClient, server, credentials, paneId, onProcessExit, logger] in
             defer {
@@ -141,11 +142,13 @@ final class TerminalPaneSSHCoordinator {
                 terminal: terminal,
                 logger: logger,
                 onAttempt: { attempt in
-                    if attempt == 1 {
-                        TerminalTabManager.shared.updatePaneState(paneId, connectionState: .connecting)
-                    } else {
-                        TerminalTabManager.shared.updatePaneState(paneId, connectionState: .reconnecting(attempt: attempt))
-                    }
+                    TerminalTabManager.shared.updatePaneState(
+                        paneId,
+                        connectionState: TerminalConnectionAttemptPolicy.state(
+                            attempt: attempt,
+                            hasEstablishedConnection: hasEstablishedConnection
+                        )
+                    )
                 },
                 startupPlan: {
                     await TerminalTabManager.shared.tmuxStartupPlan(

@@ -69,6 +69,7 @@ struct TerminalPaneState {
     let tabId: UUID
     let serverId: UUID
     var connectionState: ConnectionState
+    private(set) var hasEstablishedConnection: Bool
     var lastActivity: Date
     var tmuxStatus: TmuxStatus
     var workingDirectory: String?
@@ -84,6 +85,7 @@ struct TerminalPaneState {
         self.tabId = tabId
         self.serverId = serverId
         self.connectionState = .connecting
+        self.hasEstablishedConnection = false
         self.lastActivity = Date()
         self.tmuxStatus = .unknown
         self.workingDirectory = nil
@@ -91,5 +93,9 @@ struct TerminalPaneState {
         self.seedPaneId = nil
         self.activeTransport = .ssh
         self.moshFallbackReason = nil
+    }
+
+    mutating func markConnectionEstablished() {
+        hasEstablishedConnection = true
     }
 }

@@ -129,7 +129,8 @@ Examples:
 - fatal file browser load state where content cannot be shown
 
 Presentation:
-- center card or full empty-state presentation
+- compact-detent native bottom sheet on iOS/iPadOS for initial connection and actionable recovery states
+- center card or full empty-state presentation on macOS
 - may disable underlying interaction
 - may include primary action like `Retry`
 
@@ -137,6 +138,10 @@ Rules:
 - this is not a toast
 - this remains screen-owned state
 - use a shared blocking-state component, not a global notification center
+- dismiss it before presenting a follow-up flow such as tmux session selection
+- automatic reconnect never uses this surface
+- on iOS/iPadOS, only the selected tab's focused pane may own the native connection sheet
+- initial-versus-reconnect presentation follows pane session history, not SwiftUI view lifetime
 
 ### 2. Persistent Top Banner
 Use for non-blocking ongoing status or degraded mode.
@@ -156,6 +161,7 @@ Presentation:
 Rules:
 - one banner lane per host
 - reconnecting should always use this lane once content already exists
+- the transient disconnected state immediately preceding automatic reconnect also uses this lane and never presents a reconnect action sheet
 - banner content should be concise and action-light
 
 ### 3. Bottom Operation Notice
@@ -209,17 +215,20 @@ Rules:
 
 | Current state | Target category | Notes |
 | --- | --- | --- |
-| Initial connect before terminal exists | Blocking Screen State | Keep center presentation |
+| Initial connect before terminal exists | Blocking Screen State | Compact-detent native sheet on iOS/iPadOS |
 | Reconnecting after terminal already existed | Persistent Top Banner | Remove center reconnect card in this case |
 | SSH fallback / degraded transport | Persistent Top Banner | Same lane as reconnect status |
 | Rich paste progress | Bottom Operation Notice | Merge into shared operation lane |
 | File upload/download progress | Bottom Operation Notice | Replace custom Files-only presenter with shared primitive |
 | Install tmux / install mosh | Bottom Operation Notice | Same operation lane as other long-running tasks |
-| Disconnected with retry | Blocking Screen State | Not a toast |
-| Connection failed | Blocking Screen State | Not a banner |
+| Disconnected with retry | Blocking Screen State | Compact-detent native sheet on iOS/iPadOS; centered card on macOS |
+| Connection failed | Blocking Screen State | Compact-detent native sheet on iOS/iPadOS; centered card on macOS |
 | Offline app state | Persistent Top Banner | App/root host |
 | Operation-specific failure after action started | Bottom Operation Notice | With optional retry/action when meaningful |
 | Delete / install prompts | Native Alert / Confirmation Dialog | Keep native |
+
+Concurrent bottom operations render as an ordered notification stack. Updating one operation preserves its position and does not replace or dismiss other active transfers. Closing an active upload or transfer requires native cancellation confirmation before its task is cancelled.
+The stack keeps visible separation between cards and shows an active-operation count whenever more than one operation is present.
 
 ## Architectural Direction
 

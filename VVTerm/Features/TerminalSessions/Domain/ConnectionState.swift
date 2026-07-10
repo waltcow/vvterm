@@ -44,3 +44,12 @@ enum ConnectionState: Hashable {
         }
     }
 }
+
+enum TerminalConnectionAttemptPolicy {
+    static func state(attempt: Int, hasEstablishedConnection: Bool) -> ConnectionState {
+        if hasEstablishedConnection || attempt > 1 {
+            return .reconnecting(attempt: attempt)
+        }
+        return .connecting
+    }
+}
