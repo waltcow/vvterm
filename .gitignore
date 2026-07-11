@@ -12,6 +12,11 @@ DerivedData/
 .build/
 .swiftpm/
 
+# Local build output (derived data, build logs)
+build/
+build_ios.log
+build_macos.log
+
 # macOS
 .DS_Store
 **/.DS_Store
