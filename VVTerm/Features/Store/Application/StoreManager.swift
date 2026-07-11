@@ -9,8 +9,9 @@ import os.log
 final class StoreManager: ObservableObject {
     static let shared = StoreManager()
     static let reviewModeCode = ReviewModeCode.value
+    static let defaultProAccessOverrideEnabled = true
 
-    @Published var isPro: Bool = false
+    @Published var isPro: Bool = StoreManager.defaultProAccessOverrideEnabled
     @Published var isLifetime: Bool = false
     @Published var subscriptionStatus: Product.SubscriptionInfo.Status?
     @Published var products: [Product] = []
@@ -341,10 +342,10 @@ final class StoreManager: ObservableObject {
         hasLifetime: Bool,
         status: Product.SubscriptionInfo.Status?
     ) {
-        isPro = hasAccess || isReviewModeEnabled
+        isPro = hasAccess || isReviewModeEnabled || Self.defaultProAccessOverrideEnabled
         isLifetime = hasLifetime
         subscriptionStatus = status
         AnalyticsTracker.shared.trackAppLaunched(isPro: isPro)
-        logger.info("Entitlements checked: isPro=\(hasAccess), isLifetime=\(hasLifetime), reviewMode=\(self.isReviewModeEnabled)")
+        logger.info("Entitlements checked: isPro=\(hasAccess), isLifetime=\(hasLifetime), reviewMode=\(self.isReviewModeEnabled), defaultProOverride=\(Self.defaultProAccessOverrideEnabled)")
     }
 }
