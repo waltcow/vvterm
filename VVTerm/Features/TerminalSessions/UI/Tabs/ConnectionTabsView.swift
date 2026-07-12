@@ -41,6 +41,7 @@ struct ConnectionTerminalContainer: View {
     @State var showingFileTabLimitAlert = false
     @State var showingSplitPaneUpgradeAlert = false
     @State var showingZenPanel = false
+    @State private var herdrMountState = HerdrTabMountState()
     #if os(macOS)
     @State var zenWindowSafeAreaInsets = EdgeInsets()
     #endif
@@ -165,6 +166,7 @@ struct ConnectionTerminalContainer: View {
             backgroundColor: backgroundColor
         )
             .onAppear {
+                herdrMountState.observe(isSelected: selectedView == ConnectionViewTab.herdr.id)
                 updateTerminalBackgroundColor()
                 repairSelectedTabSelectionIfNeeded()
                 handleSelectedViewChange(selectedView)
@@ -183,6 +185,7 @@ struct ConnectionTerminalContainer: View {
                 updateTerminalBackgroundColor()
             }
             .onChange(of: selectedView) { newValue in
+                herdrMountState.observe(isSelected: newValue == ConnectionViewTab.herdr.id)
                 handleSelectedViewChange(newValue)
                 ensureInitialFileTabIfNeeded()
             }
@@ -223,7 +226,7 @@ struct ConnectionTerminalContainer: View {
                 filesLayer
             }
 
-            if selectedView == ConnectionViewTab.herdr.id {
+            if herdrMountState.hasMounted {
                 herdrLayer
             }
 
@@ -233,8 +236,14 @@ struct ConnectionTerminalContainer: View {
 
     @ViewBuilder
     var herdrLayer: some View {
-        HerdrWorkspaceView(server: server)
-            .zIndex(1)
+        if herdrMountState.hasMounted {
+            let isVisible = selectedView == ConnectionViewTab.herdr.id
+            HerdrWorkspaceView(server: server, isVisible: isVisible)
+                .opacity(isVisible ? 1 : 0)
+                .allowsHitTesting(isVisible)
+                .accessibilityHidden(!isVisible)
+                .zIndex(isVisible ? 1 : 0)
+        }
     }
 
     @ViewBuilder
