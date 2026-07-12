@@ -64,6 +64,7 @@ struct TerminalKeyboardUITestHarness: View {
     @State private var keyboardShowTransitionCount = 0
     @State private var keyboardHideTransitionCount = 0
     @State private var keyboardAccessoryPairingObservation = KeyboardAccessoryPairingObservation.idle
+    @State private var keyboardUserHidden = false
     @State private var diagnostics = "notReady"
     @State private var lifecycleStatus = LifecycleStatus.initial
     @State private var receivedInputHex = "none"
@@ -91,6 +92,7 @@ struct TerminalKeyboardUITestHarness: View {
                 TerminalKeyboardHarnessRepresentable(
                     terminalView: $terminalView,
                     terminalReady: $terminalReady,
+                    keyboardUserHidden: $keyboardUserHidden,
                     focusRequestID: focusRequestID,
                     paneId: Self.paneId,
                     onInput: { data in
@@ -166,6 +168,7 @@ struct TerminalKeyboardUITestHarness: View {
                     .accessibilityIdentifier("vvterm.keyboardTest.hideViaToolbar")
 
                     Button("Keyboard") {
+                        keyboardUserHidden = false
                         requestSoftwareKeyboard()
                     }
                     .accessibilityIdentifier("vvterm.keyboardTest.showKeyboard")
@@ -304,6 +307,22 @@ struct TerminalKeyboardUITestHarness: View {
             .clipShape(Capsule())
             .frame(maxWidth: .infinity, alignment: .topTrailing)
             .padding(8)
+
+            if keyboardUserHidden {
+                TerminalFloatingInputControls(
+                    showsVoiceButton: true,
+                    showsReturnButton: false,
+                    onKeyboard: {
+                        keyboardUserHidden = false
+                        terminalView?.requestKeyboardFocus(for: .explicitUserRequest)
+                        focusRequestID += 1
+                    },
+                    onVoice: { },
+                    onReturn: { }
+                )
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
         }
         .background(Color.black)
         .task {
@@ -591,6 +610,7 @@ private struct TerminalKeyboardHarnessRepresentable: UIViewRepresentable {
     @EnvironmentObject private var ghosttyApp: Ghostty.App
     @Binding var terminalView: GhosttyTerminalView?
     @Binding var terminalReady: Bool
+    @Binding var keyboardUserHidden: Bool
     let focusRequestID: Int
     let paneId: UUID
     let onInput: (Data) -> Void
@@ -603,6 +623,11 @@ private struct TerminalKeyboardHarnessRepresentable: UIViewRepresentable {
         uiView.paneId = paneId
         uiView.onInput = onInput
         uiView.installTerminalIfNeeded(app: ghosttyApp.app, appWrapper: ghosttyApp)
+        uiView.onKeyboardHidden = {
+            DispatchQueue.main.async {
+                keyboardUserHidden = true
+            }
+        }
         uiView.requestKeyboardFocusIfNeeded(focusRequestID: focusRequestID)
 
         if let installedTerminal = uiView.terminalView, terminalView !== installedTerminal {
@@ -628,6 +653,7 @@ private final class TerminalKeyboardHarnessContainerView: UIView {
     var onInput: ((Data) -> Void)?
     private var lastHandledFocusRequestID: Int?
     private var pendingFocusRequestID = 0
+    var onKeyboardHidden: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -663,6 +689,9 @@ private final class TerminalKeyboardHarnessContainerView: UIView {
             }
         }
         terminal.setupWriteCallback()
+        terminal.onKeyboardAccessoryHideRequested = { [weak self] in
+            self?.onKeyboardHidden?()
+        }
         terminal.onReady = { [weak self, weak terminal] in
             guard let self, let terminal else { return }
             terminal.acceptsTerminalInput = true
