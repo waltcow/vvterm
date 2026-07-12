@@ -1,0 +1,4 @@
+module HerdrClientKit {
+    header "herdr_client_kit.h"
+    export *
+}
