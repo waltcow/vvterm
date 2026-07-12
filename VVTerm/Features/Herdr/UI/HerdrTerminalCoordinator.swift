@@ -3,7 +3,8 @@ import Foundation
 @MainActor
 final class HerdrTerminalCoordinator {
     private let server: Server
-    private var onStateChange: (HerdrWorkspacePreviewState) -> Void
+    private let sessionName = "vvterm"
+    private var onStateChange: (HerdrConnectionState) -> Void
 
     private weak var terminal: GhosttyTerminalView?
     private var sshClient: SSHClient?
@@ -12,19 +13,20 @@ final class HerdrTerminalCoordinator {
     private var resizeFlushTask: Task<Void, Never>?
     private var resizeCoalescer = HerdrResizeCoalescer()
     private var zoomState = HerdrZoomState()
-    private var generation = 0
+    private var stateMachine = HerdrConnectionStateMachine()
+    private var streamTaskConnectionID: UUID?
 
     private static let resizeThrottleInterval: Duration = .milliseconds(120)
 
     init(
         server: Server,
-        onStateChange: @escaping (HerdrWorkspacePreviewState) -> Void
+        onStateChange: @escaping (HerdrConnectionState) -> Void
     ) {
         self.server = server
         self.onStateChange = onStateChange
     }
 
-    func update(onStateChange: @escaping (HerdrWorkspacePreviewState) -> Void) {
+    func update(onStateChange: @escaping (HerdrConnectionState) -> Void) {
         self.onStateChange = onStateChange
     }
 
@@ -54,97 +56,106 @@ final class HerdrTerminalCoordinator {
     }
 
     func stop() {
-        generation += 1
-        streamTask?.cancel()
-        streamTask = nil
-        resizeFlushTask?.cancel()
-        resizeFlushTask = nil
-        resizeCoalescer.reset()
-
-        let connection = self.connection
-        let sshClient = self.sshClient
-        self.connection = nil
-        self.sshClient = nil
+        let resources = invalidateConnection(as: .idle)
         terminal?.writeCallback = nil
         terminal?.onResize = nil
 
         Task.detached(priority: .high) {
-            await connection?.close()
-            await sshClient?.disconnect()
+            await resources.connection?.close()
+            await resources.sshClient?.disconnect()
         }
     }
 
     private func startIfNeeded() {
-        guard streamTask == nil, let terminal else { return }
+        guard streamTask == nil,
+              let terminal,
+              let connectionID = stateMachine.begin() else { return }
 
-        generation += 1
-        let activeGeneration = generation
-        onStateChange(.connecting)
+        streamTaskConnectionID = connectionID
+        onStateChange(stateMachine.state)
         streamTask = Task { [weak self, weak terminal] in
             guard let self, let terminal else { return }
+            defer { completeStreamTask(for: connectionID) }
             do {
                 let credentials = try KeychainManager.shared.getCredentials(for: server)
                 let sshClient = SSHClient()
                 self.sshClient = sshClient
                 _ = try await sshClient.connect(to: server, credentials: credentials)
-                guard isCurrent(activeGeneration) else { return }
+                guard stateMachine.accepts(connectionID) else {
+                    await sshClient.disconnect()
+                    return
+                }
 
-                onStateChange(.handshaking)
+                publish(.handshaking, for: connectionID)
                 let size = terminal.terminalSize()
                 let cols = UInt16(clamping: size?.columns ?? 80)
                 let rows = UInt16(clamping: size?.rows ?? 24)
                 let transport = HerdrSSHTransport(
                     ssh: sshClient,
-                    commandBuilder: HerdrRemoteCommandBuilder(sessionName: "vvterm")
+                    commandBuilder: HerdrRemoteCommandBuilder(sessionName: sessionName)
                 )
                 let connection = try await transport.startWorkspaceConnection(cols: cols, rows: rows)
-                guard isCurrent(activeGeneration) else {
+                guard stateMachine.accepts(connectionID) else {
                     await connection.close()
+                    await sshClient.disconnect()
                     return
                 }
                 self.connection = connection
 
                 while !Task.isCancelled, let event = try await connection.nextEvent() {
-                    guard isCurrent(activeGeneration) else { return }
+                    guard stateMachine.accepts(connectionID) else { return }
                     switch event {
                     case .welcome:
-                        onStateChange(.handshaking)
+                        publish(.handshaking, for: connectionID)
                     case .ansi(_, _, _, _, let bytes):
                         terminal.feedData(bytes)
-                        onStateChange(.attached)
+                        publish(.attached, for: connectionID)
                     case .graphics:
                         continue
                     case .shutdown(let reason):
-                        onStateChange(.failed(reason ?? "The remote Herdr runtime stopped."))
+                        await finishConnection(
+                            connectionID,
+                            as: .failed(.runtimeStopped(reason))
+                        )
                         return
                     }
                 }
 
-                if isCurrent(activeGeneration), !Task.isCancelled {
-                    onStateChange(.failed("The Herdr connection closed."))
+                if stateMachine.accepts(connectionID), !Task.isCancelled {
+                    await finishConnection(
+                        connectionID,
+                        as: .failed(.sshInterrupted("The Herdr connection closed."))
+                    )
                 }
             } catch is CancellationError {
                 return
             } catch {
-                guard isCurrent(activeGeneration) else { return }
-                onStateChange(.failed(Self.failureMessage(for: error)))
+                await finishConnection(
+                    connectionID,
+                    as: .failed(Self.failure(for: error, sessionName: sessionName))
+                )
             }
         }
     }
 
     private func sendInput(_ data: Data) async {
-        guard let connection else { return }
+        guard let connectionID = stateMachine.activeConnectionID,
+              let connection else { return }
         do {
             try await connection.sendInput(data)
         } catch {
-            onStateChange(.failed(Self.failureMessage(for: error)))
+            await finishConnection(
+                connectionID,
+                as: .failed(Self.failure(for: error, sessionName: sessionName))
+            )
         }
     }
 
     private func queueResize(cols: Int, rows: Int) {
-        if let immediate = resizeCoalescer.offer(cols: cols, rows: rows) {
+        if let immediate = resizeCoalescer.offer(cols: cols, rows: rows),
+           let connectionID = stateMachine.activeConnectionID {
             Task { @MainActor [weak self] in
-                await self?.transmitResize(immediate)
+                await self?.transmitResize(immediate, connectionID: connectionID)
             }
         }
         scheduleResizeFlushIfNeeded()
@@ -163,8 +174,9 @@ final class HerdrTerminalCoordinator {
                 }
 
                 let flush = resizeCoalescer.flush()
-                if let size = flush.size {
-                    await transmitResize(size)
+                if let size = flush.size,
+                   let connectionID = stateMachine.activeConnectionID {
+                    await transmitResize(size, connectionID: connectionID)
                 }
                 if !flush.shouldContinue {
                     resizeFlushTask = nil
@@ -174,39 +186,93 @@ final class HerdrTerminalCoordinator {
         }
     }
 
-    private func transmitResize(_ size: HerdrTerminalSize) async {
-        guard let connection else { return }
+    private func transmitResize(
+        _ size: HerdrTerminalSize,
+        connectionID: UUID
+    ) async {
+        guard stateMachine.accepts(connectionID), let connection else { return }
         do {
             try await connection.resize(cols: size.cols, rows: size.rows)
         } catch {
-            onStateChange(.failed(Self.failureMessage(for: error)))
+            await finishConnection(
+                connectionID,
+                as: .failed(Self.failure(for: error, sessionName: sessionName))
+            )
         }
     }
 
-    private func isCurrent(_ candidate: Int) -> Bool {
-        candidate == generation
+    private func publish(_ state: HerdrConnectionState, for connectionID: UUID) {
+        guard stateMachine.transition(to: state, for: connectionID) else { return }
+        onStateChange(state)
     }
 
-    private static func failureMessage(for error: Error) -> String {
+    private func finishConnection(
+        _ connectionID: UUID,
+        as finalState: HerdrConnectionState
+    ) async {
+        guard stateMachine.finish(connectionID, as: finalState) else { return }
+
+        streamTask?.cancel()
+        streamTask = nil
+        streamTaskConnectionID = nil
+        resizeFlushTask?.cancel()
+        resizeFlushTask = nil
+        resizeCoalescer.reset()
+
+        let connection = self.connection
+        let sshClient = self.sshClient
+        self.connection = nil
+        self.sshClient = nil
+        onStateChange(finalState)
+
+        await connection?.close()
+        await sshClient?.disconnect()
+    }
+
+    private func completeStreamTask(for connectionID: UUID) {
+        guard streamTaskConnectionID == connectionID else { return }
+        streamTask = nil
+        streamTaskConnectionID = nil
+    }
+
+    private func invalidateConnection(
+        as state: HerdrConnectionState
+    ) -> (connection: HerdrWorkspaceConnection?, sshClient: SSHClient?) {
+        stateMachine.invalidate(as: state)
+        streamTask?.cancel()
+        streamTask = nil
+        streamTaskConnectionID = nil
+        resizeFlushTask?.cancel()
+        resizeFlushTask = nil
+        resizeCoalescer.reset()
+
+        let resources = (connection: connection, sshClient: sshClient)
+        self.connection = nil
+        self.sshClient = nil
+        onStateChange(state)
+        return resources
+    }
+
+    private static func failure(for error: Error, sessionName: String) -> HerdrFailure {
         if let transportError = error as? HerdrSSHTransportError,
            case .preflightFailed(let result) = transportError {
             switch result {
             case .binaryMissing:
-                return "Herdr 0.7.3 is not installed on this server."
+                return .binaryMissing
             case .runtimeUnavailable:
-                return "Start the named Herdr session 'vvterm' on the server, then retry."
+                return .runtimeUnavailable(sessionName: sessionName)
             case .bridgeUnavailable:
-                return "This Herdr installation does not provide the remote client bridge."
+                return .bridgeUnavailable
             case .versionMismatch(let client, let remote):
-                return "Herdr version mismatch: VVTerm expects \(client), server has \(remote)."
+                return .versionMismatch(client: client, remote: remote)
             case .protocolMismatch(let client, let remote):
-                return "Herdr protocol mismatch: VVTerm expects \(client), server has \(remote)."
+                return .protocolMismatch(client: client, remote: remote)
             case .invalidStatus:
-                return "Herdr returned an invalid status response."
+                return .invalidStatus
             case .compatible:
                 break
             }
         }
-        return error.localizedDescription
+        return .unknown(error.localizedDescription)
     }
 }
