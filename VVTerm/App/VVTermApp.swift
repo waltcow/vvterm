@@ -93,13 +93,20 @@ struct VVTermApp: App {
     private var usesNoticePresentationUITestHarness: Bool {
         Foundation.ProcessInfo.processInfo.arguments.contains("--vvterm-ui-test-notice-harness")
     }
+
+    private var usesHerdrLifecycleUITestHarness: Bool {
+        Foundation.ProcessInfo.processInfo.arguments.contains("--vvterm-ui-test-herdr-lifecycle-harness")
+    }
     #endif
 
     #if os(iOS)
     @ViewBuilder
     private var iOSRootContent: some View {
         #if DEBUG
-        if usesNoticePresentationUITestHarness {
+        if usesHerdrLifecycleUITestHarness {
+            HerdrLifecycleUITestHarness()
+                .modifier(AppearanceModifier())
+        } else if usesNoticePresentationUITestHarness {
             NoticePresentationUITestHarness()
                 .modifier(AppearanceModifier())
         } else if usesTerminalReconnectUITestHarness {
