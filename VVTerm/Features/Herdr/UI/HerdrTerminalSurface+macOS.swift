@@ -9,6 +9,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
     let isVisible: Bool
     let retryNonce: Int
     let networkSnapshot: HerdrNetworkSnapshot
+    let appActivity: HerdrAppActivity
     let onTerminalReady: (GhosttyTerminalView) -> Void
     let onKeyboardHidden: () -> Void
     let onVoiceInput: () -> Void
@@ -20,7 +21,8 @@ struct HerdrTerminalSurface: NSViewRepresentable {
             server: server,
             runtime: runtime,
             initialRetryNonce: retryNonce,
-            initialNetworkSnapshot: networkSnapshot
+            initialNetworkSnapshot: networkSnapshot,
+            initialAppActivity: appActivity
         ) { state = $0 }
     }
 
@@ -52,6 +54,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
         context.coordinator.setVisible(isVisible)
         context.coordinator.observeRetryNonce(retryNonce)
         context.coordinator.observeNetworkSnapshot(networkSnapshot)
+        context.coordinator.observeAppActivity(appActivity)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: HerdrTerminalCoordinator) {

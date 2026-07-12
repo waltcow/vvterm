@@ -19,6 +19,7 @@ struct HerdrWorkspaceView: View {
     @State private var pendingVoiceReturn = false
     @StateObject private var audioService = AudioService()
     @ObservedObject private var networkMonitor: NetworkMonitor
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("terminalVoiceButtonEnabled") private var voiceButtonEnabled = true
 
     init(
@@ -47,6 +48,7 @@ struct HerdrWorkspaceView: View {
                 isVisible: isVisible,
                 retryNonce: retryNonce,
                 networkSnapshot: networkSnapshot,
+                appActivity: appActivity,
                 onTerminalReady: { terminal = $0 },
                 onKeyboardHidden: { isKeyboardHidden = true },
                 onVoiceInput: startVoiceRecording
@@ -88,6 +90,12 @@ struct HerdrWorkspaceView: View {
         }
         .onChange(of: isVisible) { visible in
             guard !visible, showingVoiceRecording else { return }
+            audioService.cancelRecording()
+            showingVoiceRecording = false
+            voiceProcessing = false
+        }
+        .onChange(of: appActivity) { activity in
+            guard activity == .background, showingVoiceRecording else { return }
             audioService.cancelRecording()
             showingVoiceRecording = false
             voiceProcessing = false
@@ -178,6 +186,23 @@ struct HerdrWorkspaceView: View {
             isConnected: networkMonitor.isConnected,
             interface: interface
         )
+    }
+
+    private var appActivity: HerdrAppActivity {
+        #if os(iOS)
+        switch scenePhase {
+        case .active:
+            return .foreground
+        case .inactive:
+            return .inactive
+        case .background:
+            return .background
+        @unknown default:
+            return .inactive
+        }
+        #else
+        return .foreground
+        #endif
     }
 
     #if os(iOS)

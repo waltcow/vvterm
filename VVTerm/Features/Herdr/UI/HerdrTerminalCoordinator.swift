@@ -19,6 +19,8 @@ final class HerdrTerminalCoordinator {
     private var restartTask: Task<Void, Never>?
     private var networkPolicy: HerdrNetworkTransitionPolicy
     private var reconnectBackoff = HerdrReconnectBackoff()
+    private var appLifecyclePolicy: HerdrAppLifecyclePolicy
+    private var isVisible = true
 
     private static let resizeThrottleInterval: Duration = .milliseconds(120)
 
@@ -27,6 +29,7 @@ final class HerdrTerminalCoordinator {
         runtime: HerdrRuntimeReference,
         initialRetryNonce: Int,
         initialNetworkSnapshot: HerdrNetworkSnapshot,
+        initialAppActivity: HerdrAppActivity,
         onStateChange: @escaping (HerdrConnectionState) -> Void
     ) {
         self.server = server
@@ -34,6 +37,9 @@ final class HerdrTerminalCoordinator {
         self.retryRequestGate = HerdrRetryRequestGate(initialNonce: initialRetryNonce)
         self.networkPolicy = HerdrNetworkTransitionPolicy(
             initialSnapshot: initialNetworkSnapshot
+        )
+        self.appLifecyclePolicy = HerdrAppLifecyclePolicy(
+            initialActivity: initialAppActivity
         )
         self.onStateChange = onStateChange
     }
@@ -58,7 +64,11 @@ final class HerdrTerminalCoordinator {
         }
         terminal.setupWriteCallback()
         terminal.applyPresentationOverrides(zoomState.presentationOverrides)
-        if networkPolicy.snapshot.isConnected {
+        updateRenderingState()
+        if appLifecyclePolicy.isSuspendedForBackground {
+            stateMachine.invalidate(as: .suspended(.background))
+            onStateChange(.suspended(.background))
+        } else if networkPolicy.snapshot.isConnected {
             startIfNeeded()
         } else {
             stateMachine.invalidate(as: .suspended(.offline))
@@ -73,12 +83,8 @@ final class HerdrTerminalCoordinator {
     }
 
     func setVisible(_ isVisible: Bool) {
-        guard let terminal else { return }
-        if isVisible {
-            terminal.resumeRendering()
-        } else {
-            terminal.pauseRendering()
-        }
+        self.isVisible = isVisible
+        updateRenderingState()
     }
 
     func observeRetryNonce(_ nonce: Int) {
@@ -92,6 +98,7 @@ final class HerdrTerminalCoordinator {
             snapshot,
             hasStartedSession: terminal != nil && stateMachine.state != .idle
         )
+        guard !appLifecyclePolicy.isSuspendedForBackground else { return }
         switch action {
         case .none:
             return
@@ -110,6 +117,45 @@ final class HerdrTerminalCoordinator {
         }
     }
 
+    func observeAppActivity(_ activity: HerdrAppActivity) {
+        let action = appLifecyclePolicy.update(
+            activity,
+            hasStartedSession: terminal != nil && stateMachine.state != .idle
+        )
+        updateRenderingState()
+
+        switch action {
+        case .none:
+            return
+        case .suspendBackground:
+            restartTask?.cancel()
+            restartTask = nil
+            reconnectBackoff.reset()
+            let resources = invalidateConnection(as: .suspended(.background))
+            Task.detached(priority: .high) {
+                await resources.connection?.close()
+                await resources.sshClient?.disconnect()
+            }
+        case .resumeForeground:
+            reconnectBackoff.reset()
+            if networkPolicy.snapshot.isConnected {
+                restartConnection(attempt: 1, delayMilliseconds: 0)
+            } else {
+                stateMachine.invalidate(as: .suspended(.offline))
+                onStateChange(.suspended(.offline))
+            }
+        }
+    }
+
+    private func updateRenderingState() {
+        guard let terminal else { return }
+        if isVisible && !appLifecyclePolicy.isSuspendedForBackground {
+            terminal.resumeRendering()
+        } else {
+            terminal.pauseRendering()
+        }
+    }
+
     private func restartConnection(attempt: Int, delayMilliseconds: Int) {
         guard restartTask == nil else { return }
         let resources = invalidateConnection(as: .reconnecting(attempt: attempt))
@@ -119,6 +165,7 @@ final class HerdrTerminalCoordinator {
             await resources.sshClient?.disconnect()
             guard await waitForReconnectDelay(milliseconds: delayMilliseconds),
                   networkPolicy.snapshot.isConnected,
+                  !appLifecyclePolicy.isSuspendedForBackground,
                   terminal != nil else {
                 restartTask = nil
                 return
@@ -134,6 +181,7 @@ final class HerdrTerminalCoordinator {
             guard let self else { return }
             guard await waitForReconnectDelay(milliseconds: plan.delayMilliseconds),
                   networkPolicy.snapshot.isConnected,
+                  !appLifecyclePolicy.isSuspendedForBackground,
                   terminal != nil else {
                 restartTask = nil
                 return
@@ -167,7 +215,9 @@ final class HerdrTerminalCoordinator {
     }
 
     private func startIfNeeded(reconnectingAttempt: Int? = nil) {
-        guard streamTask == nil,
+        guard networkPolicy.snapshot.isConnected,
+              !appLifecyclePolicy.isSuspendedForBackground,
+              streamTask == nil,
               let terminal,
               let connectionID = stateMachine.begin(
                 reconnectingAttempt: reconnectingAttempt
