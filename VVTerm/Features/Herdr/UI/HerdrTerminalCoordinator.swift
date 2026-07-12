@@ -17,6 +17,7 @@ final class HerdrTerminalCoordinator {
     private var streamTaskConnectionID: UUID?
     private var retryRequestGate: HerdrRetryRequestGate
     private var restartTask: Task<Void, Never>?
+    private var restartGeneration = HerdrOperationGeneration()
     private var networkPolicy: HerdrNetworkTransitionPolicy
     private var reconnectBackoff = HerdrReconnectBackoff()
     private var appLifecyclePolicy: HerdrAppLifecyclePolicy
@@ -88,7 +89,8 @@ final class HerdrTerminalCoordinator {
     }
 
     func observeRetryNonce(_ nonce: Int) {
-        guard retryRequestGate.consume(nonce), restartTask == nil else { return }
+        guard retryRequestGate.consume(nonce) else { return }
+        cancelRestartTask()
         reconnectBackoff.reset()
         restartConnection(attempt: 1, delayMilliseconds: 0)
     }
@@ -103,8 +105,7 @@ final class HerdrTerminalCoordinator {
         case .none:
             return
         case .suspendOffline:
-            restartTask?.cancel()
-            restartTask = nil
+            cancelRestartTask()
             reconnectBackoff.reset()
             let resources = invalidateConnection(as: .suspended(.offline))
             Task.detached(priority: .high) {
@@ -112,6 +113,7 @@ final class HerdrTerminalCoordinator {
                 await resources.sshClient?.disconnect()
             }
         case .reconnect:
+            cancelRestartTask()
             reconnectBackoff.reset()
             restartConnection(attempt: 1, delayMilliseconds: 500)
         }
@@ -128,8 +130,7 @@ final class HerdrTerminalCoordinator {
         case .none:
             return
         case .suspendBackground:
-            restartTask?.cancel()
-            restartTask = nil
+            cancelRestartTask()
             reconnectBackoff.reset()
             let resources = invalidateConnection(as: .suspended(.background))
             Task.detached(priority: .high) {
@@ -159,6 +160,7 @@ final class HerdrTerminalCoordinator {
     private func restartConnection(attempt: Int, delayMilliseconds: Int) {
         guard restartTask == nil else { return }
         let resources = invalidateConnection(as: .reconnecting(attempt: attempt))
+        let taskID = restartGeneration.begin()
         restartTask = Task { @MainActor [weak self] in
             guard let self else { return }
             await resources.connection?.close()
@@ -167,28 +169,42 @@ final class HerdrTerminalCoordinator {
                   networkPolicy.snapshot.isConnected,
                   !appLifecyclePolicy.isSuspendedForBackground,
                   terminal != nil else {
-                restartTask = nil
+                clearRestartTask(ifCurrent: taskID)
                 return
             }
-            restartTask = nil
+            guard clearRestartTask(ifCurrent: taskID) else { return }
             startIfNeeded(reconnectingAttempt: attempt)
         }
     }
 
     private func scheduleReconnectStart(_ plan: HerdrReconnectPlan) {
         guard restartTask == nil else { return }
+        let taskID = restartGeneration.begin()
         restartTask = Task { @MainActor [weak self] in
             guard let self else { return }
             guard await waitForReconnectDelay(milliseconds: plan.delayMilliseconds),
                   networkPolicy.snapshot.isConnected,
                   !appLifecyclePolicy.isSuspendedForBackground,
                   terminal != nil else {
-                restartTask = nil
+                clearRestartTask(ifCurrent: taskID)
                 return
             }
-            restartTask = nil
+            guard clearRestartTask(ifCurrent: taskID) else { return }
             startIfNeeded(reconnectingAttempt: plan.attempt)
         }
+    }
+
+    private func cancelRestartTask() {
+        restartTask?.cancel()
+        restartTask = nil
+        restartGeneration.invalidate()
+    }
+
+    @discardableResult
+    private func clearRestartTask(ifCurrent taskID: UUID) -> Bool {
+        guard restartGeneration.finish(taskID) else { return false }
+        restartTask = nil
+        return true
     }
 
     private func waitForReconnectDelay(milliseconds: Int) async -> Bool {
@@ -202,8 +218,7 @@ final class HerdrTerminalCoordinator {
     }
 
     func stop() {
-        restartTask?.cancel()
-        restartTask = nil
+        cancelRestartTask()
         let resources = invalidateConnection(as: .idle)
         terminal?.writeCallback = nil
         terminal?.onResize = nil
