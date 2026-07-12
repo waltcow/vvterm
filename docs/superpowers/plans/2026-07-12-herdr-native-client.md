@@ -20,6 +20,10 @@
 - 2026-07-12 已增加独立 `Herdr` Connection View Tab、设置持久化、iOS/macOS 平台 Terminal Surface、Connecting/Failed/Attached 状态与 Retry。arm64 iOS Simulator、macOS arm64 和签名 iPhone device build 均通过，预览包已安装并完成设备侧人工确认。
 - Herdr terminal resize 已增加 120ms leading/trailing coalescing：首个有效尺寸立即发送，连续变化只保留最新尺寸，重复、无效和回到已发送尺寸的事件被丢弃；5 个确定性 XCTest 已通过。
 - 真机预览不使用显式 `herdr server` headless 启动。远端通过标准 `herdr --session <session>` TUI 启动真实 runtime，iPhone Herdr Tab 作为独立原生 bridge client 连接该 fixture。
+- Herdr Attachment 已完成连接代际隔离，旧连接的 frame、error、completion 和延迟重连任务不能污染或清空新连接。
+- Herdr Tab 首次挂载后会保留同一 coordinator、Ghostty terminal、远端 session identity 和输入状态；切到其他 Tab 只暂停渲染，不销毁连接或画面。
+- 用户 Retry、网络恢复和前台恢复都会复用当前 Herdr session；Wi-Fi/蜂窝变化及 SSH 中断进入明确的 suspended/reconnecting/failed 状态，并使用 500/1000/2000/5000 ms 有界退避。
+- iOS 后台会挂起连接和渲染，`inactive` 不会提前恢复，重新进入前台后才恢复同一 session；对应状态策略单测和 iOS UI 回归测试已通过。
 
 ## 实施原则
 
@@ -117,7 +121,7 @@ Phase 1 不依赖 Herdr 仓库。Phase 2 的协议基线已经确定：
 
 退出标准：生命周期压力测试无 channel 泄漏、旧帧或重复输入。
 
-当前状态：已实现首个 generation 失效和离开视图时 close/disconnect；前后台重连、退避、half-open timeout、Controller Ownership 与 UI regression tests 仍待完成。
+当前状态：已实现 generation 失效、重复连接抑制、重连任务代际隔离、前后台恢复、网络变化、SSH 中断分类、有界退避、Retry 保持 session、Tab/画面/输入状态保活，以及状态策略和 iOS UI regression tests。仍待完成主动 half-open timeout/heartbeat 和协议层 Controller Ownership/Takeover 保护。
 
 ## Batch 7：产品入口
 
@@ -130,7 +134,7 @@ Phase 1 不依赖 Herdr 仓库。Phase 2 的协议基线已经确定：
 
 退出标准：iOS/macOS 均可从正式入口打开、使用、detach 和恢复 Herdr Workspace。
 
-当前状态：独立 Tab 和首个预览 shell 已接入；localization 完整覆盖、Pro 限制、detach/reconnect 产品动作和 UI tests 仍待完成。
+当前状态：独立 Tab、首个预览 shell、Retry/reconnect 产品动作和生命周期 UI test 已接入；localization 完整覆盖、Pro 限制和显式 detach 产品动作仍待完成。
 
 ## 建议原子提交
 
