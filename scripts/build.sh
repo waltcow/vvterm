@@ -1,5 +1,5 @@
 #!/bin/bash
-# VVTerm vendor build (GhosttyKit + libssh2/OpenSSL)
+# VVTerm vendor build (GhosttyKit + libssh2/OpenSSL + HerdrClientKit)
 
 set -euo pipefail
 
@@ -8,6 +8,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 VENDOR_GHOSTTY="$PROJECT_ROOT/Vendor/libghostty"
 VENDOR_SSH="$PROJECT_ROOT/Vendor/libssh2"
+VENDOR_HERDR_CLIENT_KIT="$PROJECT_ROOT/Vendor/HerdrClientKit"
 BUILD_DIR_SSH="$PROJECT_ROOT/.build/ssh"
 
 OPENSSL_VERSION="3.2.0"
@@ -40,9 +41,11 @@ VVTerm Build Script
 Usage: $0 [command]
 
 Commands:
-  all       Build GhosttyKit + libssh2/OpenSSL (default)
+  all       Build GhosttyKit + libssh2/OpenSSL + HerdrClientKit (default)
   ghostty   Build GhosttyKit.xcframework and copy .a libs
   ssh       Build libssh2 + OpenSSL (macOS + iOS + simulator)
+  herdr-client-kit
+            Build HerdrClientKit.xcframework (macOS + iOS + simulator)
   clean     Remove .build + Vendor libraries
   help      Show this help message
 
@@ -73,6 +76,11 @@ check_deps_ssh() {
     require_cmd cmake
     require_cmd make
     require_cmd xcrun
+}
+
+check_deps_herdr_client_kit() {
+    require_cmd rustup
+    require_cmd xcodebuild
 }
 
 strip_lib() {
@@ -455,11 +463,20 @@ build_ssh() {
     log_info "  iOS Simulator: $(ls -lh "${VENDOR_SSH}/ios-simulator/lib/libssh2.a" | awk '{print $5}')"
 }
 
+build_herdr_client_kit() {
+    log_section "HerdrClientKit"
+    "${VENDOR_HERDR_CLIENT_KIT}/scripts/build-xcframework.sh"
+    log_info "HerdrClientKit done"
+    log_info "  XCFramework: ${VENDOR_HERDR_CLIENT_KIT}/build/HerdrClientKit.xcframework"
+}
+
 clean() {
     log_section "Clean"
     rm -rf "${PROJECT_ROOT}/.build"
     rm -rf "${VENDOR_GHOSTTY}"
     rm -rf "${VENDOR_SSH}"
+    rm -rf "${VENDOR_HERDR_CLIENT_KIT}/target"
+    rm -rf "${VENDOR_HERDR_CLIENT_KIT}/build"
     log_info "Clean complete"
 }
 
@@ -469,8 +486,10 @@ case "${COMMAND}" in
     all)
         check_deps_ghostty
         check_deps_ssh
+        check_deps_herdr_client_kit
         build_ghosttykit
         build_ssh
+        build_herdr_client_kit
         ;;
     ghostty)
         check_deps_ghostty
@@ -479,6 +498,10 @@ case "${COMMAND}" in
     ssh)
         check_deps_ssh
         build_ssh
+        ;;
+    herdr-client-kit)
+        check_deps_herdr_client_kit
+        build_herdr_client_kit
         ;;
     clean)
         clean
