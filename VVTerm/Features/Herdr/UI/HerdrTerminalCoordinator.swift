@@ -17,6 +17,8 @@ final class HerdrTerminalCoordinator {
     private var streamTaskConnectionID: UUID?
     private var retryRequestGate: HerdrRetryRequestGate
     private var restartTask: Task<Void, Never>?
+    private var networkPolicy: HerdrNetworkTransitionPolicy
+    private var reconnectBackoff = HerdrReconnectBackoff()
 
     private static let resizeThrottleInterval: Duration = .milliseconds(120)
 
@@ -24,11 +26,15 @@ final class HerdrTerminalCoordinator {
         server: Server,
         runtime: HerdrRuntimeReference,
         initialRetryNonce: Int,
+        initialNetworkSnapshot: HerdrNetworkSnapshot,
         onStateChange: @escaping (HerdrConnectionState) -> Void
     ) {
         self.server = server
         self.runtime = runtime
         self.retryRequestGate = HerdrRetryRequestGate(initialNonce: initialRetryNonce)
+        self.networkPolicy = HerdrNetworkTransitionPolicy(
+            initialSnapshot: initialNetworkSnapshot
+        )
         self.onStateChange = onStateChange
     }
 
@@ -52,7 +58,12 @@ final class HerdrTerminalCoordinator {
         }
         terminal.setupWriteCallback()
         terminal.applyPresentationOverrides(zoomState.presentationOverrides)
-        startIfNeeded()
+        if networkPolicy.snapshot.isConnected {
+            startIfNeeded()
+        } else {
+            stateMachine.invalidate(as: .suspended(.offline))
+            onStateChange(.suspended(.offline))
+        }
     }
 
     func handleZoom(_ action: TerminalZoomAction) -> TerminalZoomResult {
@@ -72,17 +83,73 @@ final class HerdrTerminalCoordinator {
 
     func observeRetryNonce(_ nonce: Int) {
         guard retryRequestGate.consume(nonce), restartTask == nil else { return }
+        reconnectBackoff.reset()
+        restartConnection(attempt: 1, delayMilliseconds: 0)
+    }
+
+    func observeNetworkSnapshot(_ snapshot: HerdrNetworkSnapshot) {
+        let action = networkPolicy.update(
+            snapshot,
+            hasStartedSession: terminal != nil && stateMachine.state != .idle
+        )
+        switch action {
+        case .none:
+            return
+        case .suspendOffline:
+            restartTask?.cancel()
+            restartTask = nil
+            reconnectBackoff.reset()
+            let resources = invalidateConnection(as: .suspended(.offline))
+            Task.detached(priority: .high) {
+                await resources.connection?.close()
+                await resources.sshClient?.disconnect()
+            }
+        case .reconnect:
+            reconnectBackoff.reset()
+            restartConnection(attempt: 1, delayMilliseconds: 500)
+        }
+    }
+
+    private func restartConnection(attempt: Int, delayMilliseconds: Int) {
+        guard restartTask == nil else { return }
+        let resources = invalidateConnection(as: .reconnecting(attempt: attempt))
         restartTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let resources = invalidateConnection(as: .reconnecting(attempt: 1))
             await resources.connection?.close()
             await resources.sshClient?.disconnect()
-            guard !Task.isCancelled, terminal != nil else {
+            guard await waitForReconnectDelay(milliseconds: delayMilliseconds),
+                  networkPolicy.snapshot.isConnected,
+                  terminal != nil else {
                 restartTask = nil
                 return
             }
             restartTask = nil
-            startIfNeeded(reconnectingAttempt: 1)
+            startIfNeeded(reconnectingAttempt: attempt)
+        }
+    }
+
+    private func scheduleReconnectStart(_ plan: HerdrReconnectPlan) {
+        guard restartTask == nil else { return }
+        restartTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard await waitForReconnectDelay(milliseconds: plan.delayMilliseconds),
+                  networkPolicy.snapshot.isConnected,
+                  terminal != nil else {
+                restartTask = nil
+                return
+            }
+            restartTask = nil
+            startIfNeeded(reconnectingAttempt: plan.attempt)
+        }
+    }
+
+    private func waitForReconnectDelay(milliseconds: Int) async -> Bool {
+        guard milliseconds > 0 else { return !Task.isCancelled }
+        do {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+            return !Task.isCancelled
+        } catch {
+            return false
         }
     }
 
@@ -157,17 +224,17 @@ final class HerdrTerminalCoordinator {
                 }
 
                 if stateMachine.accepts(connectionID), !Task.isCancelled {
-                    await finishConnection(
-                        connectionID,
-                        as: .failed(.sshInterrupted("The Herdr connection closed."))
+                    await handleConnectionFailure(
+                        .sshInterrupted("The SSH connection was interrupted."),
+                        connectionID: connectionID
                     )
                 }
             } catch is CancellationError {
                 return
             } catch {
-                await finishConnection(
-                    connectionID,
-                    as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
+                await handleConnectionFailure(
+                    HerdrFailureClassifier.classify(error, sessionName: runtime.sessionName),
+                    connectionID: connectionID
                 )
             }
         }
@@ -179,9 +246,9 @@ final class HerdrTerminalCoordinator {
         do {
             try await connection.sendInput(data)
         } catch {
-            await finishConnection(
-                connectionID,
-                as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
+            await handleConnectionFailure(
+                HerdrFailureClassifier.classify(error, sessionName: runtime.sessionName),
+                connectionID: connectionID
             )
         }
     }
@@ -229,16 +296,38 @@ final class HerdrTerminalCoordinator {
         do {
             try await connection.resize(cols: size.cols, rows: size.rows)
         } catch {
-            await finishConnection(
-                connectionID,
-                as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
+            await handleConnectionFailure(
+                HerdrFailureClassifier.classify(error, sessionName: runtime.sessionName),
+                connectionID: connectionID
             )
         }
     }
 
     private func publish(_ state: HerdrConnectionState, for connectionID: UUID) {
         guard stateMachine.transition(to: state, for: connectionID) else { return }
+        if state == .attached {
+            reconnectBackoff.reset()
+        }
         onStateChange(state)
+    }
+
+    private func handleConnectionFailure(
+        _ failure: HerdrFailure,
+        connectionID: UUID
+    ) async {
+        guard stateMachine.accepts(connectionID) else { return }
+
+        if failure.allowsAutomaticReconnect,
+           networkPolicy.snapshot.isConnected,
+           let plan = reconnectBackoff.next() {
+            await finishConnection(
+                connectionID,
+                as: .reconnecting(attempt: plan.attempt)
+            )
+            scheduleReconnectStart(plan)
+        } else {
+            await finishConnection(connectionID, as: .failed(failure))
+        }
     }
 
     private func finishConnection(
@@ -288,26 +377,4 @@ final class HerdrTerminalCoordinator {
         return resources
     }
 
-    private static func failure(for error: Error, sessionName: String) -> HerdrFailure {
-        if let transportError = error as? HerdrSSHTransportError,
-           case .preflightFailed(let result) = transportError {
-            switch result {
-            case .binaryMissing:
-                return .binaryMissing
-            case .runtimeUnavailable:
-                return .runtimeUnavailable(sessionName: sessionName)
-            case .bridgeUnavailable:
-                return .bridgeUnavailable
-            case .versionMismatch(let client, let remote):
-                return .versionMismatch(client: client, remote: remote)
-            case .protocolMismatch(let client, let remote):
-                return .protocolMismatch(client: client, remote: remote)
-            case .invalidStatus:
-                return .invalidStatus
-            case .compatible:
-                break
-            }
-        }
-        return .unknown(error.localizedDescription)
-    }
 }
