@@ -23,7 +23,13 @@ struct ConnectionViewTab: Identifiable, Hashable, Codable, Equatable {
         icon: "folder"
     )
 
-    static let defaultOrder: [ConnectionViewTab] = [.stats, .terminal, .files]
+    static let herdr = ConnectionViewTab(
+        id: "herdr",
+        localizedKey: "Herdr",
+        icon: "square.stack.3d.up"
+    )
+
+    static let defaultOrder: [ConnectionViewTab] = [.stats, .terminal, .files, .herdr]
     static let allTabs: [ConnectionViewTab] = defaultOrder
 
     static func from(id: String) -> ConnectionViewTab? {
