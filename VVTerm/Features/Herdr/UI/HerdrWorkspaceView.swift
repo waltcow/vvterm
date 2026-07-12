@@ -3,17 +3,10 @@ import SwiftUI
 import UIKit
 #endif
 
-enum HerdrWorkspacePreviewState: Equatable {
-    case connecting
-    case handshaking
-    case attached
-    case failed(String)
-}
-
 struct HerdrWorkspaceView: View {
     let server: Server
 
-    @State private var state: HerdrWorkspacePreviewState = .connecting
+    @State private var state: HerdrConnectionState = .idle
     @State private var retryToken = UUID()
     @State private var terminal: GhosttyTerminalView?
     @State private var isKeyboardHidden = false
@@ -83,20 +76,28 @@ struct HerdrWorkspaceView: View {
     @ViewBuilder
     private var statusOverlay: some View {
         switch state {
+        case .idle:
+            progressCard(title: "Preparing Herdr…")
         case .attached:
             EmptyView()
         case .connecting:
             progressCard(title: "Connecting to Herdr…")
         case .handshaking:
             progressCard(title: "Opening Herdr workspace…")
-        case .failed(let message):
+        case .reconnecting(let attempt):
+            progressCard(title: "Reconnecting to Herdr (attempt \(attempt))…")
+        case .suspended(.background):
+            progressCard(title: "Herdr is paused in the background")
+        case .suspended(.offline):
+            progressCard(title: "Waiting for network…")
+        case .failed(let failure):
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title2)
                     .foregroundStyle(.orange)
                 Text("Herdr is unavailable")
                     .font(.headline)
-                Text(message)
+                Text(failure.message)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

@@ -4,7 +4,7 @@ import AppKit
 
 struct HerdrTerminalSurface: NSViewRepresentable {
     let server: Server
-    @Binding var state: HerdrWorkspacePreviewState
+    @Binding var state: HerdrConnectionState
     let onTerminalReady: (GhosttyTerminalView) -> Void
     let onKeyboardHidden: () -> Void
     let onVoiceInput: () -> Void

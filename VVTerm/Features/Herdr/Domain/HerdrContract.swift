@@ -28,24 +28,56 @@ nonisolated struct HerdrAttachment: Identifiable, Hashable, Sendable {
     let mode: HerdrAttachmentMode
 }
 
-nonisolated enum HerdrConnectionFailure: Error, Equatable, Sendable {
+nonisolated enum HerdrSuspensionReason: Equatable, Sendable {
+    case background
+    case offline
+}
+
+nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     case binaryMissing
-    case runtimeUnavailable
+    case runtimeUnavailable(sessionName: String)
     case bridgeUnavailable
     case versionMismatch(client: String, remote: String)
     case protocolMismatch(client: Int, remote: Int)
     case invalidStatus
-    case sshDisconnected
+    case authenticationFailed
+    case sshInterrupted(String)
+    case runtimeStopped(String?)
     case protocolError(String)
-    case runtimeClosed(String?)
+    case unknown(String)
+
+    var message: String {
+        switch self {
+        case .binaryMissing:
+            return "Herdr 0.7.3 is not installed on this server."
+        case .runtimeUnavailable(let sessionName):
+            return "Start the named Herdr session '\(sessionName)' on the server, then retry."
+        case .bridgeUnavailable:
+            return "This Herdr installation does not provide the remote client bridge."
+        case .versionMismatch(let client, let remote):
+            return "Herdr version mismatch: VVTerm expects \(client), server has \(remote)."
+        case .protocolMismatch(let client, let remote):
+            return "Herdr protocol mismatch: VVTerm expects \(client), server has \(remote)."
+        case .invalidStatus:
+            return "Herdr returned an invalid status response."
+        case .authenticationFailed:
+            return "SSH authentication failed."
+        case .sshInterrupted(let message):
+            return message.isEmpty ? "The SSH connection was interrupted." : message
+        case .runtimeStopped(let reason):
+            return reason ?? "The remote Herdr runtime stopped."
+        case .protocolError(let message), .unknown(let message):
+            return message
+        }
+    }
 }
 
 nonisolated enum HerdrConnectionState: Equatable, Sendable {
     case idle
-    case preflighting
     case connecting
     case handshaking
     case attached
-    case reconnecting
-    case failed(HerdrConnectionFailure)
+    case suspended(HerdrSuspensionReason)
+    case reconnecting(attempt: Int)
+    case failed(HerdrFailure)
 }
