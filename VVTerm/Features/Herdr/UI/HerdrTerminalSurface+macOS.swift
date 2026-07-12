@@ -4,8 +4,10 @@ import AppKit
 
 struct HerdrTerminalSurface: NSViewRepresentable {
     let server: Server
+    let runtime: HerdrRuntimeReference
     @Binding var state: HerdrConnectionState
     let isVisible: Bool
+    let retryNonce: Int
     let onTerminalReady: (GhosttyTerminalView) -> Void
     let onKeyboardHidden: () -> Void
     let onVoiceInput: () -> Void
@@ -13,7 +15,11 @@ struct HerdrTerminalSurface: NSViewRepresentable {
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
     func makeCoordinator() -> HerdrTerminalCoordinator {
-        HerdrTerminalCoordinator(server: server) { state = $0 }
+        HerdrTerminalCoordinator(
+            server: server,
+            runtime: runtime,
+            initialRetryNonce: retryNonce
+        ) { state = $0 }
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -42,6 +48,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update { state = $0 }
         context.coordinator.setVisible(isVisible)
+        context.coordinator.observeRetryNonce(retryNonce)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: HerdrTerminalCoordinator) {

@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class HerdrTerminalCoordinator {
     private let server: Server
-    private let sessionName = "vvterm"
+    private let runtime: HerdrRuntimeReference
     private var onStateChange: (HerdrConnectionState) -> Void
 
     private weak var terminal: GhosttyTerminalView?
@@ -15,14 +15,20 @@ final class HerdrTerminalCoordinator {
     private var zoomState = HerdrZoomState()
     private var stateMachine = HerdrConnectionStateMachine()
     private var streamTaskConnectionID: UUID?
+    private var retryRequestGate: HerdrRetryRequestGate
+    private var restartTask: Task<Void, Never>?
 
     private static let resizeThrottleInterval: Duration = .milliseconds(120)
 
     init(
         server: Server,
+        runtime: HerdrRuntimeReference,
+        initialRetryNonce: Int,
         onStateChange: @escaping (HerdrConnectionState) -> Void
     ) {
         self.server = server
+        self.runtime = runtime
+        self.retryRequestGate = HerdrRetryRequestGate(initialNonce: initialRetryNonce)
         self.onStateChange = onStateChange
     }
 
@@ -64,7 +70,25 @@ final class HerdrTerminalCoordinator {
         }
     }
 
+    func observeRetryNonce(_ nonce: Int) {
+        guard retryRequestGate.consume(nonce), restartTask == nil else { return }
+        restartTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let resources = invalidateConnection(as: .reconnecting(attempt: 1))
+            await resources.connection?.close()
+            await resources.sshClient?.disconnect()
+            guard !Task.isCancelled, terminal != nil else {
+                restartTask = nil
+                return
+            }
+            restartTask = nil
+            startIfNeeded(reconnectingAttempt: 1)
+        }
+    }
+
     func stop() {
+        restartTask?.cancel()
+        restartTask = nil
         let resources = invalidateConnection(as: .idle)
         terminal?.writeCallback = nil
         terminal?.onResize = nil
@@ -75,10 +99,12 @@ final class HerdrTerminalCoordinator {
         }
     }
 
-    private func startIfNeeded() {
+    private func startIfNeeded(reconnectingAttempt: Int? = nil) {
         guard streamTask == nil,
               let terminal,
-              let connectionID = stateMachine.begin() else { return }
+              let connectionID = stateMachine.begin(
+                reconnectingAttempt: reconnectingAttempt
+              ) else { return }
 
         streamTaskConnectionID = connectionID
         onStateChange(stateMachine.state)
@@ -101,7 +127,7 @@ final class HerdrTerminalCoordinator {
                 let rows = UInt16(clamping: size?.rows ?? 24)
                 let transport = HerdrSSHTransport(
                     ssh: sshClient,
-                    commandBuilder: HerdrRemoteCommandBuilder(sessionName: sessionName)
+                    commandBuilder: HerdrRemoteCommandBuilder(sessionName: runtime.sessionName)
                 )
                 let connection = try await transport.startWorkspaceConnection(cols: cols, rows: rows)
                 guard stateMachine.accepts(connectionID) else {
@@ -141,7 +167,7 @@ final class HerdrTerminalCoordinator {
             } catch {
                 await finishConnection(
                     connectionID,
-                    as: .failed(Self.failure(for: error, sessionName: sessionName))
+                    as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
                 )
             }
         }
@@ -155,7 +181,7 @@ final class HerdrTerminalCoordinator {
         } catch {
             await finishConnection(
                 connectionID,
-                as: .failed(Self.failure(for: error, sessionName: sessionName))
+                as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
             )
         }
     }
@@ -205,7 +231,7 @@ final class HerdrTerminalCoordinator {
         } catch {
             await finishConnection(
                 connectionID,
-                as: .failed(Self.failure(for: error, sessionName: sessionName))
+                as: .failed(Self.failure(for: error, sessionName: runtime.sessionName))
             )
         }
     }
