@@ -5,6 +5,7 @@ import AppKit
 struct HerdrTerminalSurface: NSViewRepresentable {
     let server: Server
     @Binding var state: HerdrConnectionState
+    let isVisible: Bool
     let onTerminalReady: (GhosttyTerminalView) -> Void
     let onKeyboardHidden: () -> Void
     let onVoiceInput: () -> Void
@@ -29,6 +30,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
         terminal.onReady = { [weak terminal, weak coordinator = context.coordinator] in
             guard let terminal, let coordinator else { return }
             coordinator.bind(to: terminal)
+            coordinator.setVisible(isVisible)
             onTerminalReady(terminal)
         }
         terminal.onZoomAction = { [weak coordinator = context.coordinator] action in
@@ -39,6 +41,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update { state = $0 }
+        context.coordinator.setVisible(isVisible)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: HerdrTerminalCoordinator) {

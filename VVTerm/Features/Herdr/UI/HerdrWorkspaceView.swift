@@ -5,6 +5,7 @@ import UIKit
 
 struct HerdrWorkspaceView: View {
     let server: Server
+    let isVisible: Bool
 
     @State private var state: HerdrConnectionState = .idle
     @State private var retryToken = UUID()
@@ -23,6 +24,7 @@ struct HerdrWorkspaceView: View {
             HerdrTerminalSurface(
                 server: server,
                 state: $state,
+                isVisible: isVisible,
                 onTerminalReady: { terminal = $0 },
                 onKeyboardHidden: { isKeyboardHidden = true },
                 onVoiceInput: startVoiceRecording
@@ -62,6 +64,12 @@ struct HerdrWorkspaceView: View {
             guard let error else { return }
             permissionErrorMessage = AudioService.formattedRecordingErrorMessage(error)
             showingPermissionError = true
+        }
+        .onChange(of: isVisible) { visible in
+            guard !visible, showingVoiceRecording else { return }
+            audioService.cancelRecording()
+            showingVoiceRecording = false
+            voiceProcessing = false
         }
         .onDisappear {
             if showingVoiceRecording {

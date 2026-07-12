@@ -54,17 +54,21 @@ extension ConnectionTerminalContainer {
 
     @ViewBuilder
     var platformContentStack: some View {
-        switch selectedView {
-        case ConnectionViewTab.stats.id:
-            statsLayer
-        case ConnectionViewTab.files.id:
-            filesLayer
-        case ConnectionViewTab.terminal.id:
-            terminalLayer
-        case ConnectionViewTab.herdr.id:
+        ZStack {
+            switch selectedView {
+            case ConnectionViewTab.stats.id:
+                statsLayer
+            case ConnectionViewTab.files.id:
+                filesLayer
+            case ConnectionViewTab.terminal.id:
+                terminalLayer
+            case ConnectionViewTab.herdr.id:
+                Color.clear
+            default:
+                UnsupportedConnectionView(tabID: selectedView)
+            }
+
             herdrLayer
-        default:
-            UnsupportedConnectionView(tabID: selectedView)
         }
     }
 

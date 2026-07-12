@@ -55,6 +55,15 @@ final class HerdrTerminalCoordinator {
         return result
     }
 
+    func setVisible(_ isVisible: Bool) {
+        guard let terminal else { return }
+        if isVisible {
+            terminal.resumeRendering()
+        } else {
+            terminal.pauseRendering()
+        }
+    }
+
     func stop() {
         let resources = invalidateConnection(as: .idle)
         terminal?.writeCallback = nil
