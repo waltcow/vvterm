@@ -5,6 +5,9 @@ import AppKit
 struct HerdrTerminalSurface: NSViewRepresentable {
     let server: Server
     @Binding var state: HerdrWorkspacePreviewState
+    let onTerminalReady: (GhosttyTerminalView) -> Void
+    let onKeyboardHidden: () -> Void
+    let onVoiceInput: () -> Void
 
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
@@ -26,6 +29,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
         terminal.onReady = { [weak terminal, weak coordinator = context.coordinator] in
             guard let terminal, let coordinator else { return }
             coordinator.bind(to: terminal)
+            onTerminalReady(terminal)
         }
         terminal.onZoomAction = { [weak coordinator = context.coordinator] action in
             coordinator?.handleZoom(action)

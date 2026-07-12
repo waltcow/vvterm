@@ -5,6 +5,9 @@ import UIKit
 struct HerdrTerminalSurface: UIViewRepresentable {
     let server: Server
     @Binding var state: HerdrWorkspacePreviewState
+    let onTerminalReady: (GhosttyTerminalView) -> Void
+    let onKeyboardHidden: () -> Void
+    let onVoiceInput: () -> Void
 
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
@@ -26,10 +29,13 @@ struct HerdrTerminalSurface: UIViewRepresentable {
         terminal.onReady = { [weak terminal, weak coordinator = context.coordinator] in
             guard let terminal, let coordinator else { return }
             coordinator.bind(to: terminal)
+            onTerminalReady(terminal)
         }
         terminal.onZoomAction = { [weak coordinator = context.coordinator] action in
             coordinator?.handleZoom(action)
         }
+        terminal.onKeyboardAccessoryHideRequested = onKeyboardHidden
+        terminal.onVoiceButtonTapped = onVoiceInput
         return terminal
     }
 
@@ -41,6 +47,8 @@ struct HerdrTerminalSurface: UIViewRepresentable {
         coordinator.stop()
         if let terminal = uiView as? GhosttyTerminalView {
             terminal.onZoomAction = nil
+            terminal.onKeyboardAccessoryHideRequested = nil
+            terminal.onVoiceButtonTapped = nil
             terminal.cleanup()
         }
     }

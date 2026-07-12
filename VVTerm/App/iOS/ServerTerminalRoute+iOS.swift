@@ -33,7 +33,6 @@ struct ServerTerminalRoute: View {
     @SceneStorage("vvterm.zenMode.ios") private var isZenModeEnabled = false
     @AppStorage(PrivacyModeSettings.enabledKey) private var privacyModeEnabled = false
     @AppStorage("terminalVoiceButtonEnabled") private var terminalVoiceButtonEnabled = true
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
 
     init(
@@ -498,90 +497,12 @@ struct ServerTerminalRoute: View {
 
     @ViewBuilder
     private var floatingTerminalControls: some View {
-        HStack(spacing: 10) {
-            floatingKeyboardVoiceControls(showsTitle: true)
-                .layoutPriority(1)
-            if shouldShowFloatingReturnButton {
-                Spacer(minLength: 14)
-                floatingReturnControl()
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: shouldShowFloatingReturnButton ? .infinity : nil)
-    }
-
-    @ViewBuilder
-    private func floatingKeyboardVoiceControls(showsTitle: Bool) -> some View {
-        HStack(spacing: 10) {
-            floatingKeyboardControl(showsTitle: showsTitle)
-            if shouldShowFloatingVoiceButton {
-                floatingVoiceControl(showsTitle: showsTitle)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func floatingKeyboardControl(showsTitle: Bool) -> some View {
-        floatingTerminalControlButton(
-            title: "Keyboard",
-            systemImage: "keyboard",
-            accessibilityLabel: "Show Keyboard",
-            showsTitle: showsTitle,
-            action: showKeyboardForFocusedTerminal
-        )
-    }
-
-    @ViewBuilder
-    private func floatingVoiceControl(showsTitle: Bool) -> some View {
-        floatingTerminalControlButton(
-            title: "Voice input",
-            systemImage: "mic.fill",
-            accessibilityLabel: "Voice input",
-            showsTitle: showsTitle,
-            action: startVoiceInputForFocusedTerminal
-        )
-    }
-
-    @ViewBuilder
-    private func floatingReturnControl() -> some View {
-        floatingTerminalControlButton(
-            title: "Enter",
-            systemImage: "arrow.turn.down.left",
-            accessibilityLabel: "Enter",
-            showsTitle: false,
-            isPrimary: true,
-            action: sendReturnForFocusedTerminal
-        )
-    }
-
-    @ViewBuilder
-    private func floatingTerminalControlButton(
-        title: LocalizedStringKey,
-        systemImage: String,
-        accessibilityLabel: LocalizedStringKey,
-        showsTitle: Bool,
-        isPrimary: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: showsTitle ? 6 : 0) {
-                Image(systemName: systemImage)
-                if showsTitle {
-                    Text(title)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-            }
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(isPrimary ? Color.accentColor : Color.primary)
-            .padding(.horizontal, showsTitle ? 2 : 0)
-        }
-        .accessibilityLabel(Text(accessibilityLabel))
-        .modifier(
-            FloatingTerminalControlButtonStyle(
-                isPrimary: isPrimary,
-                colorScheme: colorScheme
-            )
+        TerminalFloatingInputControls(
+            showsVoiceButton: shouldShowFloatingVoiceButton,
+            showsReturnButton: shouldShowFloatingReturnButton,
+            onKeyboard: showKeyboardForFocusedTerminal,
+            onVoice: startVoiceInputForFocusedTerminal,
+            onReturn: sendReturnForFocusedTerminal
         )
     }
 
@@ -667,38 +588,6 @@ struct ServerTerminalRoute: View {
             .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct FloatingTerminalControlButtonStyle: ViewModifier {
-    let isPrimary: Bool
-    let colorScheme: ColorScheme
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            if isPrimary {
-                content
-                    .tint(Color.accentColor)
-                    .buttonStyle(SwiftUI.GlassButtonStyle())
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.large)
-            } else {
-                content
-                    .buttonStyle(SwiftUI.GlassButtonStyle())
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.large)
-            }
-        } else {
-            content
-                .buttonStyle(
-                    .glass(
-                        tint: Color.accentColor.opacity(
-                            isPrimary ? 0.5 : (colorScheme == .dark ? 0.24 : 0.14)
-                        )
-                    )
-                )
-        }
     }
 }
 #endif
