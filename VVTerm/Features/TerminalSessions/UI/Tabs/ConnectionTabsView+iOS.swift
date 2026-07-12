@@ -61,8 +61,10 @@ extension ConnectionTerminalContainer {
             filesLayer
         case ConnectionViewTab.terminal.id:
             terminalLayer
+        case ConnectionViewTab.herdr.id:
+            herdrLayer
         default:
-            terminalLayer
+            UnsupportedConnectionView(tabID: selectedView)
         }
     }
 
@@ -146,6 +148,22 @@ extension ConnectionTerminalContainer {
         }
 
         return String(localized: "All terminal tabs for this server will be closed.")
+    }
+}
+
+private struct UnsupportedConnectionView: View {
+    let tabID: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "questionmark.square.dashed")
+                .font(.largeTitle)
+            Text("Unsupported server view")
+                .font(.headline)
+            Text(tabID)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

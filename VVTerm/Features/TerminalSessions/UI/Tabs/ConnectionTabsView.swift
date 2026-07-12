@@ -229,8 +229,18 @@ struct ConnectionTerminalContainer: View {
                 filesLayer
             }
 
+            if selectedView == ConnectionViewTab.herdr.id {
+                herdrLayer
+            }
+
             terminalLayer
         }
+    }
+
+    @ViewBuilder
+    var herdrLayer: some View {
+        HerdrWorkspaceView(server: server)
+            .zIndex(1)
     }
 
     @ViewBuilder
