@@ -6,9 +6,10 @@ import UIKit
 struct HerdrWorkspaceView: View {
     let server: Server
     let isVisible: Bool
+    private let runtime: HerdrRuntimeReference
 
     @State private var state: HerdrConnectionState = .idle
-    @State private var retryToken = UUID()
+    @State private var retryNonce = 0
     @State private var terminal: GhosttyTerminalView?
     @State private var isKeyboardHidden = false
     @State private var showingVoiceRecording = false
@@ -19,17 +20,27 @@ struct HerdrWorkspaceView: View {
     @StateObject private var audioService = AudioService()
     @AppStorage("terminalVoiceButtonEnabled") private var voiceButtonEnabled = true
 
+    init(server: Server, isVisible: Bool, sessionName: String = "vvterm") {
+        self.server = server
+        self.isVisible = isVisible
+        self.runtime = HerdrRuntimeReference(
+            serverId: server.id,
+            sessionName: sessionName
+        )
+    }
+
     var body: some View {
         ZStack {
             HerdrTerminalSurface(
                 server: server,
+                runtime: runtime,
                 state: $state,
                 isVisible: isVisible,
+                retryNonce: retryNonce,
                 onTerminalReady: { terminal = $0 },
                 onKeyboardHidden: { isKeyboardHidden = true },
                 onVoiceInput: startVoiceRecording
             )
-                .id(retryToken)
 
             statusOverlay
 
@@ -110,11 +121,9 @@ struct HerdrWorkspaceView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                 Button("Retry") {
-                    state = .connecting
-                    terminal = nil
                     isKeyboardHidden = false
                     pendingVoiceReturn = false
-                    retryToken = UUID()
+                    retryNonce += 1
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("herdr.retry")
