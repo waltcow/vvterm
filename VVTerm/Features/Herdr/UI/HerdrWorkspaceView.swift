@@ -18,11 +18,20 @@ struct HerdrWorkspaceView: View {
     @State private var permissionErrorMessage = ""
     @State private var pendingVoiceReturn = false
     @StateObject private var audioService = AudioService()
+    @ObservedObject private var networkMonitor: NetworkMonitor
     @AppStorage("terminalVoiceButtonEnabled") private var voiceButtonEnabled = true
 
-    init(server: Server, isVisible: Bool, sessionName: String = "vvterm") {
+    init(
+        server: Server,
+        isVisible: Bool,
+        sessionName: String = "vvterm",
+        networkMonitor: NetworkMonitor? = nil
+    ) {
         self.server = server
         self.isVisible = isVisible
+        self._networkMonitor = ObservedObject(
+            wrappedValue: networkMonitor ?? NetworkMonitor.shared
+        )
         self.runtime = HerdrRuntimeReference(
             serverId: server.id,
             sessionName: sessionName
@@ -37,6 +46,7 @@ struct HerdrWorkspaceView: View {
                 state: $state,
                 isVisible: isVisible,
                 retryNonce: retryNonce,
+                networkSnapshot: networkSnapshot,
                 onTerminalReady: { terminal = $0 },
                 onKeyboardHidden: { isKeyboardHidden = true },
                 onVoiceInput: startVoiceRecording
@@ -150,6 +160,24 @@ struct HerdrWorkspaceView: View {
 
     private var isAttached: Bool {
         state == .attached
+    }
+
+    private var networkSnapshot: HerdrNetworkSnapshot {
+        let interface: HerdrNetworkInterface
+        switch networkMonitor.connectionType {
+        case .wifi:
+            interface = .wifi
+        case .cellular:
+            interface = .cellular
+        case .ethernet:
+            interface = .ethernet
+        case .unknown:
+            interface = .unknown
+        }
+        return HerdrNetworkSnapshot(
+            isConnected: networkMonitor.isConnected,
+            interface: interface
+        )
     }
 
     #if os(iOS)

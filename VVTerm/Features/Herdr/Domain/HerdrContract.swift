@@ -41,6 +41,7 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     case protocolMismatch(client: Int, remote: Int)
     case invalidStatus
     case authenticationFailed
+    case hostKeyVerificationFailed
     case sshInterrupted(String)
     case runtimeStopped(String?)
     case protocolError(String)
@@ -62,6 +63,8 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
             return "Herdr returned an invalid status response."
         case .authenticationFailed:
             return "SSH authentication failed."
+        case .hostKeyVerificationFailed:
+            return "SSH host verification failed. Check the saved host fingerprint."
         case .sshInterrupted(let message):
             return message.isEmpty ? "The SSH connection was interrupted." : message
         case .runtimeStopped(let reason):
@@ -69,6 +72,13 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
         case .protocolError(let message), .unknown(let message):
             return message
         }
+    }
+
+    var allowsAutomaticReconnect: Bool {
+        if case .sshInterrupted = self {
+            return true
+        }
+        return false
     }
 }
 

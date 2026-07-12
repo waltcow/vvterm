@@ -8,6 +8,7 @@ struct HerdrTerminalSurface: UIViewRepresentable {
     @Binding var state: HerdrConnectionState
     let isVisible: Bool
     let retryNonce: Int
+    let networkSnapshot: HerdrNetworkSnapshot
     let onTerminalReady: (GhosttyTerminalView) -> Void
     let onKeyboardHidden: () -> Void
     let onVoiceInput: () -> Void
@@ -18,7 +19,8 @@ struct HerdrTerminalSurface: UIViewRepresentable {
         HerdrTerminalCoordinator(
             server: server,
             runtime: runtime,
-            initialRetryNonce: retryNonce
+            initialRetryNonce: retryNonce,
+            initialNetworkSnapshot: networkSnapshot
         ) { state = $0 }
     }
 
@@ -51,6 +53,7 @@ struct HerdrTerminalSurface: UIViewRepresentable {
         context.coordinator.update { state = $0 }
         context.coordinator.setVisible(isVisible)
         context.coordinator.observeRetryNonce(retryNonce)
+        context.coordinator.observeNetworkSnapshot(networkSnapshot)
     }
 
     static func dismantleUIView(_ uiView: UIView, coordinator: HerdrTerminalCoordinator) {
