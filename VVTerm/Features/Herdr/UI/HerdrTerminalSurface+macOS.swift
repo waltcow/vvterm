@@ -27,6 +27,9 @@ struct HerdrTerminalSurface: NSViewRepresentable {
             guard let terminal, let coordinator else { return }
             coordinator.bind(to: terminal)
         }
+        terminal.onZoomAction = { [weak coordinator = context.coordinator] action in
+            coordinator?.handleZoom(action)
+        }
         return terminal
     }
 
@@ -37,6 +40,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
     static func dismantleNSView(_ nsView: NSView, coordinator: HerdrTerminalCoordinator) {
         coordinator.stop()
         if let terminal = nsView as? GhosttyTerminalView {
+            terminal.onZoomAction = nil
             terminal.cleanup()
         }
     }

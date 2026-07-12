@@ -9,7 +9,12 @@ final class HerdrTerminalCoordinator {
     private var sshClient: SSHClient?
     private var connection: HerdrWorkspaceConnection?
     private var streamTask: Task<Void, Never>?
+    private var resizeFlushTask: Task<Void, Never>?
+    private var resizeCoalescer = HerdrResizeCoalescer()
+    private var zoomState = HerdrZoomState()
     private var generation = 0
+
+    private static let resizeThrottleInterval: Duration = .milliseconds(120)
 
     init(
         server: Server,
@@ -32,20 +37,36 @@ final class HerdrTerminalCoordinator {
                 await self?.sendInput(data)
             }
         }
+        terminal.onResize = { [weak self] cols, rows in
+            Task { @MainActor [weak self] in
+                self?.queueResize(cols: cols, rows: rows)
+            }
+        }
         terminal.setupWriteCallback()
+        terminal.applyPresentationOverrides(zoomState.presentationOverrides)
         startIfNeeded()
+    }
+
+    func handleZoom(_ action: TerminalZoomAction) -> TerminalZoomResult {
+        let result = zoomState.apply(action)
+        terminal?.applyPresentationOverrides(result.presentationOverrides)
+        return result
     }
 
     func stop() {
         generation += 1
         streamTask?.cancel()
         streamTask = nil
+        resizeFlushTask?.cancel()
+        resizeFlushTask = nil
+        resizeCoalescer.reset()
 
         let connection = self.connection
         let sshClient = self.sshClient
         self.connection = nil
         self.sshClient = nil
         terminal?.writeCallback = nil
+        terminal?.onResize = nil
 
         Task.detached(priority: .high) {
             await connection?.close()
@@ -115,6 +136,48 @@ final class HerdrTerminalCoordinator {
         guard let connection else { return }
         do {
             try await connection.sendInput(data)
+        } catch {
+            onStateChange(.failed(Self.failureMessage(for: error)))
+        }
+    }
+
+    private func queueResize(cols: Int, rows: Int) {
+        if let immediate = resizeCoalescer.offer(cols: cols, rows: rows) {
+            Task { @MainActor [weak self] in
+                await self?.transmitResize(immediate)
+            }
+        }
+        scheduleResizeFlushIfNeeded()
+    }
+
+    private func scheduleResizeFlushIfNeeded() {
+        guard resizeCoalescer.isThrottleWindowOpen, resizeFlushTask == nil else { return }
+
+        resizeFlushTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: Self.resizeThrottleInterval)
+                } catch {
+                    return
+                }
+
+                let flush = resizeCoalescer.flush()
+                if let size = flush.size {
+                    await transmitResize(size)
+                }
+                if !flush.shouldContinue {
+                    resizeFlushTask = nil
+                    return
+                }
+            }
+        }
+    }
+
+    private func transmitResize(_ size: HerdrTerminalSize) async {
+        guard let connection else { return }
+        do {
+            try await connection.resize(cols: size.cols, rows: size.rows)
         } catch {
             onStateChange(.failed(Self.failureMessage(for: error)))
         }
