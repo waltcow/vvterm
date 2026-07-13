@@ -4,7 +4,7 @@ import Foundation
 final class HerdrTerminalCoordinator {
     private let server: Server
     private let runtime: HerdrRuntimeReference
-    private var onStateChange: (HerdrConnectionState) -> Void
+    private let stateDelivery: HerdrStateDelivery<HerdrConnectionState>
 
     private weak var terminal: GhosttyTerminalView?
     private var sshClient: SSHClient?
@@ -42,11 +42,11 @@ final class HerdrTerminalCoordinator {
         self.appLifecyclePolicy = HerdrAppLifecyclePolicy(
             initialActivity: initialAppActivity
         )
-        self.onStateChange = onStateChange
+        self.stateDelivery = HerdrStateDelivery(callback: onStateChange)
     }
 
     func update(onStateChange: @escaping (HerdrConnectionState) -> Void) {
-        self.onStateChange = onStateChange
+        stateDelivery.update(callback: onStateChange)
     }
 
     func bind(to terminal: GhosttyTerminalView) {
@@ -68,12 +68,12 @@ final class HerdrTerminalCoordinator {
         updateRenderingState()
         if appLifecyclePolicy.isSuspendedForBackground {
             stateMachine.invalidate(as: .suspended(.background))
-            onStateChange(.suspended(.background))
+            stateDelivery.enqueue(.suspended(.background))
         } else if networkPolicy.snapshot.isConnected {
             startIfNeeded()
         } else {
             stateMachine.invalidate(as: .suspended(.offline))
-            onStateChange(.suspended(.offline))
+            stateDelivery.enqueue(.suspended(.offline))
         }
     }
 
@@ -143,7 +143,7 @@ final class HerdrTerminalCoordinator {
                 restartConnection(attempt: 1, delayMilliseconds: 0)
             } else {
                 stateMachine.invalidate(as: .suspended(.offline))
-                onStateChange(.suspended(.offline))
+                stateDelivery.enqueue(.suspended(.offline))
             }
         }
     }
@@ -218,6 +218,7 @@ final class HerdrTerminalCoordinator {
     }
 
     func stop() {
+        stateDelivery.invalidate()
         cancelRestartTask()
         let resources = invalidateConnection(as: .idle)
         terminal?.writeCallback = nil
@@ -239,7 +240,7 @@ final class HerdrTerminalCoordinator {
               ) else { return }
 
         streamTaskConnectionID = connectionID
-        onStateChange(stateMachine.state)
+        stateDelivery.enqueue(stateMachine.state)
         streamTask = Task { [weak self, weak terminal] in
             guard let self, let terminal else { return }
             defer { completeStreamTask(for: connectionID) }
@@ -373,7 +374,7 @@ final class HerdrTerminalCoordinator {
         if state == .attached {
             reconnectBackoff.reset()
         }
-        onStateChange(state)
+        stateDelivery.enqueue(state)
     }
 
     private func handleConnectionFailure(
@@ -412,7 +413,7 @@ final class HerdrTerminalCoordinator {
         let sshClient = self.sshClient
         self.connection = nil
         self.sshClient = nil
-        onStateChange(finalState)
+        stateDelivery.enqueue(finalState)
 
         await connection?.close()
         await sshClient?.disconnect()
@@ -438,7 +439,7 @@ final class HerdrTerminalCoordinator {
         let resources = (connection: connection, sshClient: sshClient)
         self.connection = nil
         self.sshClient = nil
-        onStateChange(state)
+        stateDelivery.enqueue(state)
         return resources
     }
 
