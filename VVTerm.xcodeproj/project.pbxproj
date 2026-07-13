@@ -13,6 +13,7 @@
 		D1A7B0C12EAB100100A00001 /* MoshCore in Frameworks */ = {isa = PBXBuildFile; productRef = D1A7B0C12EAB100100A00011 /* MoshCore */; };
 		D1A7B0C12EAB100100A00002 /* MoshBootstrap in Frameworks */ = {isa = PBXBuildFile; productRef = D1A7B0C12EAB100100A00012 /* MoshBootstrap */; };
 		E7C4A10031BB100100C00001 /* Umami in Frameworks */ = {isa = PBXBuildFile; productRef = E7C4A10031BB100100C00011 /* Umami */; };
+		F0A7D00131C1000100A00001 /* HerdrClientKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0A7D00131C1000100A00002 /* HerdrClientKit.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,7 @@
 		CC83129C2F0CD84E006804BF /* VVTermUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VVTermUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC837B372F0E62F2006804BF /* VVTermStoreKit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = VVTermStoreKit.storekit; sourceTree = "<group>"; };
 		F3220D94C71F0D68A0DF623E /* VVTermLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VVTermLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0A7D00131C1000100A00002 /* HerdrClientKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Vendor/HerdrClientKit/build/HerdrClientKit.xcframework; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -126,6 +128,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8E5D7C9695EF4C72AD9AB276 /* AppIntents.framework in Frameworks */,
+				F0A7D00131C1000100A00001 /* HerdrClientKit.xcframework in Frameworks */,
 				82B734D4923B7DD325984127 /* ZIPFoundation in Frameworks */,
 				D1A7B0C12EAB100100A00001 /* MoshCore in Frameworks */,
 				D1A7B0C12EAB100100A00002 /* MoshBootstrap in Frameworks */,
@@ -154,6 +157,7 @@
 			isa = PBXGroup;
 			children = (
 				CC837B372F0E62F2006804BF /* VVTermStoreKit.storekit */,
+				F0A7D00131C1000100A00002 /* HerdrClientKit.xcframework */,
 				CC8312802F0CD84D006804BF /* VVTerm */,
 				07A189989926A7D4F3FAE363 /* VVTermShared */,
 				7448DABBC8B1AB31C2800F73 /* VVTermLiveActivity */,

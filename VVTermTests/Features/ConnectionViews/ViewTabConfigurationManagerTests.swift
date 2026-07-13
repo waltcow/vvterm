@@ -22,6 +22,7 @@ final class ViewTabConfigurationManagerTests: XCTestCase {
         let manager = ViewTabConfigurationManager(defaults: makeDefaults())
         manager.setVisibility(for: ConnectionViewTab.terminal.id, isVisible: false)
         manager.setVisibility(for: ConnectionViewTab.files.id, isVisible: false)
+        manager.setVisibility(for: ConnectionViewTab.herdr.id, isVisible: false)
         manager.setVisibility(for: ConnectionViewTab.stats.id, isVisible: false)
 
         XCTAssertTrue(manager.showStatsTab)

@@ -54,15 +54,21 @@ extension ConnectionTerminalContainer {
 
     @ViewBuilder
     var platformContentStack: some View {
-        switch selectedView {
-        case ConnectionViewTab.stats.id:
-            statsLayer
-        case ConnectionViewTab.files.id:
-            filesLayer
-        case ConnectionViewTab.terminal.id:
-            terminalLayer
-        default:
-            terminalLayer
+        ZStack {
+            switch selectedView {
+            case ConnectionViewTab.stats.id:
+                statsLayer
+            case ConnectionViewTab.files.id:
+                filesLayer
+            case ConnectionViewTab.terminal.id:
+                terminalLayer
+            case ConnectionViewTab.herdr.id:
+                Color.clear
+            default:
+                UnsupportedConnectionView(tabID: selectedView)
+            }
+
+            herdrLayer
         }
     }
 
@@ -146,6 +152,22 @@ extension ConnectionTerminalContainer {
         }
 
         return String(localized: "All terminal tabs for this server will be closed.")
+    }
+}
+
+private struct UnsupportedConnectionView: View {
+    let tabID: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "questionmark.square.dashed")
+                .font(.largeTitle)
+            Text("Unsupported server view")
+                .font(.headline)
+            Text(tabID)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

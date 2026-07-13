@@ -40,13 +40,19 @@ final class TerminalKeyboardUITests: XCTestCase {
         wait(for: diagnostics, labelContaining: "browse=true", timeout: 5, diagnostics: diagnosticsText(in: app))
         assertKeyboardAndAccessoryHidden(in: app)
 
+        let floatingKeyboard = app.buttons["vvterm.floating.keyboard"]
+        let floatingVoice = app.buttons["vvterm.floating.voice"]
+        XCTAssertTrue(floatingKeyboard.waitForExistence(timeout: 5), diagnosticsText(in: app))
+        XCTAssertTrue(floatingVoice.waitForExistence(timeout: 5), diagnosticsText(in: app))
+
         terminal.tap()
         wait(for: diagnostics, labelContaining: "softwareInputActive=true", timeout: 5, diagnostics: diagnosticsText(in: app))
         wait(for: diagnostics, labelContaining: "browse=true", timeout: 5, diagnostics: diagnosticsText(in: app))
         assertKeyboardAndAccessoryRemainHidden(in: app)
 
-        app.buttons["vvterm.keyboardTest.showKeyboard"].tap()
+        floatingKeyboard.tap()
         assertKeyboardAndAccessoryVisible(in: app)
+        XCTAssertTrue(floatingKeyboard.waitForNonExistence(timeout: 5), diagnosticsText(in: app))
     }
 
     @MainActor

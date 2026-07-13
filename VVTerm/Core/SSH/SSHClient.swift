@@ -229,6 +229,46 @@ actor SSHClient {
         }
     }
 
+    func executeResult(_ command: String, timeout: Duration? = nil) async throws -> SSHExecResult {
+        guard !_isAborted else {
+            throw SSHError.notConnected
+        }
+        guard let session = session else {
+            throw SSHError.notConnected
+        }
+        let effectiveTimeout = timeout ?? execTimeout
+        return try await SSHClient.runWithTimeout(effectiveTimeout) {
+            try Task.checkCancellation()
+            return try await session.executeResult(command)
+        }
+    }
+
+    // MARK: - Exec Streams
+
+    func startExecStream(command: String) async throws -> SSHExecStreamHandle {
+        guard !_isAborted, let session else {
+            throw SSHError.notConnected
+        }
+        return try await session.startExecStream(command: command)
+    }
+
+    func writeExecStream(_ data: Data, to streamId: UUID) async throws {
+        guard !_isAborted, let session else {
+            throw SSHError.notConnected
+        }
+        try await session.writeExecStream(data, to: streamId)
+    }
+
+    func finishExecStreamInput(_ streamId: UUID) async {
+        guard !_isAborted, let session else { return }
+        await session.finishExecStreamInput(streamId)
+    }
+
+    func closeExecStream(_ streamId: UUID) async {
+        guard let session else { return }
+        await session.closeExecStream(streamId)
+    }
+
     func upload(
         _ data: Data,
         to remotePath: String,
@@ -832,13 +872,13 @@ actor SSHSession {
     private final class ExecRequest {
         let id: UUID
         let command: String
-        let continuation: CheckedContinuation<String, Error>
+        let continuation: CheckedContinuation<SSHExecResult, Error>
         var channel: OpaquePointer?
         var output = Data()
         var stderr = Data()
         var isStarted = false
 
-        init(id: UUID, command: String, continuation: CheckedContinuation<String, Error>) {
+        init(id: UUID, command: String, continuation: CheckedContinuation<SSHExecResult, Error>) {
             self.id = id
             self.command = command
             self.continuation = continuation
@@ -860,6 +900,36 @@ actor SSHSession {
         }
     }
 
+    private final class ExecStreamState {
+        let id: UUID
+        let command: String
+        let stdout: SSHExecByteStream
+        let stderr: SSHExecByteStream
+        var channel: OpaquePointer?
+        var isStarted = false
+        var pendingStdout: Data?
+        var pendingStderr: Data?
+        var writes: SSHExecPendingWriteQueue
+        var writeContinuations: [UUID: CheckedContinuation<Void, Error>] = [:]
+        var inputFinishRequested = false
+        var inputFinished = false
+        var inputFinishContinuations: [CheckedContinuation<Void, Never>] = []
+
+        init(
+            id: UUID,
+            command: String,
+            readBufferBytes: Int,
+            stderrBufferBytes: Int,
+            writeBufferBytes: Int
+        ) {
+            self.id = id
+            self.command = command
+            stdout = SSHExecByteStream(maxBufferedBytes: readBufferBytes)
+            stderr = SSHExecByteStream(maxBufferedBytes: stderrBufferBytes)
+            writes = SSHExecPendingWriteQueue(maxPendingBytes: writeBufferBytes)
+        }
+    }
+
     let config: SSHSessionConfig
     private var libssh2Session: OpaquePointer?
     private var sftpSession: OpaquePointer?
@@ -868,6 +938,7 @@ actor SSHSession {
     private var isActive = false
     private var ioTask: Task<Void, Never>?
     private var execRequests: [UUID: ExecRequest] = [:]
+    private var execStreams: [UUID: ExecStreamState] = [:]
     private var connectedPeerAddress: String?
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "VVTerm", category: "SSHSession")
 
@@ -1192,6 +1263,7 @@ actor SSHSession {
 
         // Fail any pending exec requests
         failAllExecRequests(error: SSHError.notConnected)
+        await failAllExecStreams(error: SSHError.notConnected)
 
         // Close socket first to abort any blocking I/O in libssh2
         atomicSocket.closeImmediately()
@@ -1211,6 +1283,7 @@ actor SSHSession {
         closeSFTPSession()
         closeAllShellChannels()
         closeAllExecChannels()
+        closeAllExecStreamChannels()
 
         if let session = libssh2Session {
             libssh2_session_disconnect_ex(session, 11, "Normal shutdown", "")
@@ -1888,7 +1961,11 @@ actor SSHSession {
                 }
             }
 
-            if shellChannels.isEmpty, execRequests.isEmpty {
+            if !execStreams.isEmpty, await processExecStreams() {
+                didWork = true
+            }
+
+            if shellChannels.isEmpty, execRequests.isEmpty, execStreams.isEmpty {
                 break
             }
 
@@ -1902,7 +1979,173 @@ actor SSHSession {
         }
 
         closeAllShellChannels()
+        if !execStreams.isEmpty {
+            await failAllExecStreams(error: SSHError.notConnected)
+        }
         stopIOLoop()
+    }
+
+    private func processExecStreams() async -> Bool {
+        var didWork = false
+        var buffer = [CChar](repeating: 0, count: 32768)
+        let states = Array(execStreams.values)
+
+        for state in states {
+            guard execStreams[state.id] === state else { continue }
+
+            do {
+                guard try ensureExecStreamChannelReady(state), let channel = state.channel else {
+                    continue
+                }
+
+                if let pending = state.pendingStdout,
+                   await state.stdout.offer(pending) {
+                    guard execStreams[state.id] === state else { continue }
+                    state.pendingStdout = nil
+                    didWork = true
+                }
+
+                if state.pendingStdout == nil {
+                    let bytesRead = libssh2_channel_read_ex(channel, 0, &buffer, buffer.count)
+                    if bytesRead > 0 {
+                        let data = Data(bytes: buffer, count: Int(bytesRead))
+                        let accepted = await state.stdout.offer(data)
+                        guard execStreams[state.id] === state else { continue }
+                        if !accepted {
+                            state.pendingStdout = data
+                        }
+                        didWork = true
+                    } else if bytesRead < 0, bytesRead != Int(LIBSSH2_ERROR_EAGAIN) {
+                        throw SSHError.socketError("Exec stream stdout read failed: \(bytesRead)")
+                    }
+                }
+
+                if let pending = state.pendingStderr,
+                   await state.stderr.offer(pending) {
+                    guard execStreams[state.id] === state else { continue }
+                    state.pendingStderr = nil
+                    didWork = true
+                }
+
+                if state.pendingStderr == nil {
+                    let bytesRead = libssh2_channel_read_ex(channel, 1, &buffer, buffer.count)
+                    if bytesRead > 0 {
+                        let data = Data(bytes: buffer, count: Int(bytesRead))
+                        let accepted = await state.stderr.offer(data)
+                        guard execStreams[state.id] === state else { continue }
+                        if !accepted {
+                            state.pendingStderr = data
+                        }
+                        didWork = true
+                    } else if bytesRead < 0, bytesRead != Int(LIBSSH2_ERROR_EAGAIN) {
+                        throw SSHError.socketError("Exec stream stderr read failed: \(bytesRead)")
+                    }
+                }
+
+                if let write = state.writes.current {
+                    let bytes = write.remainingData
+                    let written = bytes.withUnsafeBytes { rawBuffer -> Int in
+                        guard let baseAddress = rawBuffer.baseAddress else { return 0 }
+                        return Int(libssh2_channel_write_ex(
+                            channel,
+                            0,
+                            baseAddress.assumingMemoryBound(to: CChar.self),
+                            bytes.count
+                        ))
+                    }
+
+                    if written > 0 {
+                        if let completedId = try state.writes.didWrite(written) {
+                            state.writeContinuations.removeValue(forKey: completedId)?.resume()
+                        }
+                        didWork = true
+                    } else if written < 0, written != Int(LIBSSH2_ERROR_EAGAIN) {
+                        throw SSHError.socketError("Exec stream write failed: \(written)")
+                    }
+                }
+
+                if state.inputFinishRequested, state.writes.isEmpty, !state.inputFinished {
+                    let result = libssh2_channel_send_eof(channel)
+                    if result == 0 {
+                        state.inputFinished = true
+                        let continuations = state.inputFinishContinuations
+                        state.inputFinishContinuations.removeAll()
+                        continuations.forEach { $0.resume() }
+                        didWork = true
+                    } else if result != Int32(LIBSSH2_ERROR_EAGAIN) {
+                        throw SSHError.socketError("Exec stream stdin close failed: \(result)")
+                    }
+                }
+
+                if libssh2_channel_eof(channel) != 0,
+                   state.pendingStdout == nil,
+                   state.pendingStderr == nil {
+                    let exitStatus = libssh2_channel_get_exit_status(channel)
+                    await finishExecStream(
+                        state.id,
+                        streamFailure: exitStatus == 0 ? nil : .remoteExit(status: exitStatus),
+                        operationError: exitStatus == 0
+                            ? SSHError.notConnected
+                            : SSHExecStreamFailure.remoteExit(status: exitStatus)
+                    )
+                    didWork = true
+                }
+            } catch {
+                await finishExecStream(
+                    state.id,
+                    streamFailure: .transport(error.localizedDescription),
+                    operationError: error
+                )
+            }
+        }
+
+        return didWork
+    }
+
+    private func ensureExecStreamChannelReady(_ state: ExecStreamState) throws -> Bool {
+        guard let session = libssh2Session else {
+            throw SSHError.notConnected
+        }
+
+        if state.channel == nil {
+            state.channel = libssh2_channel_open_ex(
+                session,
+                "session",
+                UInt32("session".utf8.count),
+                2 * 1024 * 1024,
+                32768,
+                nil,
+                0
+            )
+            if state.channel == nil {
+                let lastError = libssh2_session_last_errno(session)
+                if lastError == LIBSSH2_ERROR_EAGAIN {
+                    return false
+                }
+                throw SSHError.channelOpenFailed
+            }
+        }
+
+        if !state.isStarted, let channel = state.channel {
+            let result = state.command.withCString { command in
+                libssh2_channel_process_startup(
+                    channel,
+                    "exec",
+                    4,
+                    command,
+                    UInt32(state.command.utf8.count)
+                )
+            }
+            if result == Int32(LIBSSH2_ERROR_EAGAIN) {
+                return false
+            }
+            guard result == 0 else {
+                throw SSHError.unknown("Exec stream startup failed: \(result)")
+            }
+            state.isStarted = true
+        }
+
+        return true
     }
 
     func closeShell(_ shellId: UUID) async {
@@ -1941,6 +2184,65 @@ actor SSHSession {
             }
         }
         execRequests.removeAll()
+    }
+
+    private func finishExecStream(
+        _ streamId: UUID,
+        streamFailure: SSHExecStreamFailure?,
+        operationError: Error
+    ) async {
+        guard let state = execStreams.removeValue(forKey: streamId) else { return }
+
+        if let channel = state.channel {
+            libssh2_channel_close(channel)
+            libssh2_channel_free(channel)
+            state.channel = nil
+        }
+
+        _ = state.writes.removeAll()
+        let writeContinuations = Array(state.writeContinuations.values)
+        state.writeContinuations.removeAll()
+        writeContinuations.forEach { $0.resume(throwing: operationError) }
+
+        let finishContinuations = state.inputFinishContinuations
+        state.inputFinishContinuations.removeAll()
+        finishContinuations.forEach { $0.resume() }
+
+        await state.stdout.finish(throwing: streamFailure)
+        await state.stderr.finish(throwing: streamFailure)
+    }
+
+    private func failAllExecStreams(error: Error) async {
+        let streamIds = Array(execStreams.keys)
+        for streamId in streamIds {
+            await finishExecStream(
+                streamId,
+                streamFailure: .transport(error.localizedDescription),
+                operationError: error
+            )
+        }
+    }
+
+    private func closeAllExecStreamChannels() {
+        let states = Array(execStreams.values)
+        execStreams.removeAll()
+        for state in states {
+            if let channel = state.channel {
+                libssh2_channel_close(channel)
+                libssh2_channel_free(channel)
+                state.channel = nil
+            }
+            _ = state.writes.removeAll()
+            let continuations = Array(state.writeContinuations.values)
+            state.writeContinuations.removeAll()
+            continuations.forEach { $0.resume(throwing: SSHError.notConnected) }
+            state.inputFinishContinuations.forEach { $0.resume() }
+            state.inputFinishContinuations.removeAll()
+            Task {
+                await state.stdout.finish(throwing: .transport(SSHError.notConnected.localizedDescription))
+                await state.stderr.finish(throwing: .transport(SSHError.notConnected.localizedDescription))
+            }
+        }
     }
 
     private func failAllExecRequests(error: Error) {
@@ -2013,6 +2315,7 @@ actor SSHSession {
     private func finishExecRequest(_ requestId: UUID, error: Error?) {
         guard let request = execRequests.removeValue(forKey: requestId) else { return }
 
+        let exitStatus = request.channel.map(libssh2_channel_get_exit_status) ?? -1
         if let channel = request.channel {
             libssh2_channel_close(channel)
             libssh2_channel_free(channel)
@@ -2028,8 +2331,11 @@ actor SSHSession {
                !stderr.isEmpty {
                 logger.debug("Exec command stderr: \(stderr, privacy: .public)")
             }
-            let output = String(data: request.output, encoding: .utf8) ?? ""
-            request.continuation.resume(returning: output)
+            request.continuation.resume(returning: SSHExecResult(
+                stdout: request.output,
+                stderr: request.stderr,
+                exitStatus: exitStatus
+            ))
         }
     }
 
@@ -2420,6 +2726,11 @@ actor SSHSession {
     // MARK: - Execute Command
 
     func execute(_ command: String) async throws -> String {
+        let result = try await executeResult(command)
+        return String(data: result.stdout, encoding: .utf8) ?? ""
+    }
+
+    func executeResult(_ command: String) async throws -> SSHExecResult {
         guard libssh2Session != nil else {
             throw SSHError.notConnected
         }
@@ -2436,6 +2747,79 @@ actor SSHSession {
                 await self?.cancelExecRequest(requestId, error: CancellationError())
             }
         })
+    }
+
+    // MARK: - Exec Streams
+
+    func startExecStream(command: String) throws -> SSHExecStreamHandle {
+        guard libssh2Session != nil else {
+            throw SSHError.notConnected
+        }
+
+        let id = UUID()
+        let state = ExecStreamState(
+            id: id,
+            command: command,
+            readBufferBytes: 256 * 1024,
+            stderrBufferBytes: 64 * 1024,
+            writeBufferBytes: 4 * 1024 * 1024
+        )
+        execStreams[id] = state
+        startIOLoop()
+        return SSHExecStreamHandle(id: id, stdout: state.stdout, stderr: state.stderr)
+    }
+
+    func writeExecStream(_ data: Data, to streamId: UUID) async throws {
+        guard !data.isEmpty else { return }
+        guard let state = execStreams[streamId] else {
+            throw SSHError.notConnected
+        }
+
+        let writeId = UUID()
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { continuation in
+                do {
+                    try state.writes.enqueue(data, id: writeId)
+                    state.writeContinuations[writeId] = continuation
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }, onCancel: { [weak self] in
+            Task {
+                await self?.cancelExecStreamWrite(streamId: streamId, writeId: writeId)
+            }
+        })
+    }
+
+    func finishExecStreamInput(_ streamId: UUID) async {
+        guard let state = execStreams[streamId], !state.inputFinished else { return }
+        await withCheckedContinuation { continuation in
+            state.inputFinishRequested = true
+            state.inputFinishContinuations.append(continuation)
+        }
+    }
+
+    func closeExecStream(_ streamId: UUID) async {
+        await finishExecStream(
+            streamId,
+            streamFailure: nil,
+            operationError: CancellationError()
+        )
+    }
+
+    private func cancelExecStreamWrite(streamId: UUID, writeId: UUID) async {
+        guard let state = execStreams[streamId] else { return }
+        if state.writes.hasStarted(id: writeId) {
+            await finishExecStream(
+                streamId,
+                streamFailure: .transport("Exec stream write cancelled after partial transmission"),
+                operationError: CancellationError()
+            )
+            return
+        }
+        guard state.writes.remove(id: writeId) else { return }
+        state.writeContinuations.removeValue(forKey: writeId)?.resume(throwing: CancellationError())
     }
 
     // MARK: - Keep Alive
