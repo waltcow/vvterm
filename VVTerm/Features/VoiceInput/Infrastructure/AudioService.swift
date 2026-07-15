@@ -62,17 +62,26 @@ class AudioService: NSObject, ObservableObject {
 
     // MARK: - Recording Control
 
-    func startRecording() async throws {
+    func startRecording(lifecycleState: () -> AudioCaptureLifecycleState) async throws {
+        guard lifecycleState().allowsCapture else {
+            throw RecordingError.inactiveLifecycle
+        }
         let requestedProvider = TranscriptionSettingsStore.currentProvider()
         let effectiveProvider = resolveProvider(for: requestedProvider)
         activeProvider = effectiveProvider
 
         let needsSpeech = effectiveProvider == .system
         let hasPermissions = await checkPermissions(includeSpeech: needsSpeech)
+        guard lifecycleState().allowsCapture else {
+            throw RecordingError.inactiveLifecycle
+        }
         if !hasPermissions {
             let granted = await requestPermissions(includeSpeech: needsSpeech)
             guard granted else {
                 throw RecordingError.permissionDenied
+            }
+            guard lifecycleState().allowsCapture else {
+                throw RecordingError.inactiveLifecycle
             }
         }
 
@@ -84,9 +93,9 @@ class AudioService: NSObject, ObservableObject {
         // Start services
         switch effectiveProvider {
         case .system:
-            try await startAppleSpeech()
+            try await startAppleSpeech(lifecycleState: lifecycleState)
         case .doubaoASR:
-            try await startDoubaoASR()
+            try await startDoubaoASR(lifecycleState: lifecycleState)
         }
 
         isRecording = true
@@ -140,6 +149,8 @@ class AudioService: NSObject, ObservableObject {
         case permissionDenied
         case speechRecognitionUnavailable
         case recordingFailed
+        case inactiveLifecycle
+        case inputUnavailable
         case missingDoubaoCredentials
         case invalidDoubaoEndpoint
         case doubaoNetworkUnavailable
@@ -155,6 +166,10 @@ class AudioService: NSObject, ObservableObject {
                 return String(localized: "Speech recognition is not available. Please enable Siri in System Settings > Siri & Spotlight.")
             case .recordingFailed:
                 return String(localized: "Failed to start recording. Please check microphone permissions in System Settings > Privacy & Security > Microphone.")
+            case .inactiveLifecycle:
+                return String(localized: "Voice recording is only available while VVTerm is active.")
+            case .inputUnavailable:
+                return String(localized: "Audio input is temporarily unavailable. Please check the current microphone or audio route and try again.")
             case .missingDoubaoCredentials:
                 return String(localized: "Doubao ASR App ID and Access Token are required.")
             case .invalidDoubaoEndpoint:
@@ -178,7 +193,9 @@ class AudioService: NSObject, ObservableObject {
                 return String(localized: "Open Transcription settings and enter your Doubao ASR App ID and Access Token.")
             case .invalidDoubaoEndpoint:
                 return String(localized: "Use a wss://openspeech.bytedance.com endpoint or leave the endpoint field empty.")
-            case .doubaoNetworkUnavailable,
+            case .inactiveLifecycle,
+                 .inputUnavailable,
+                 .doubaoNetworkUnavailable,
                  .doubaoConnectionFailed,
                  .doubaoConnectionLost,
                  .doubaoServerError:
@@ -200,7 +217,7 @@ class AudioService: NSObject, ObservableObject {
 
     // MARK: - Apple Speech
 
-    private func startAppleSpeech() async throws {
+    private func startAppleSpeech(lifecycleState: () -> AudioCaptureLifecycleState) async throws {
         guard speechRecognitionService.isAvailable else {
             throw RecordingError.speechRecognitionUnavailable
         }
@@ -209,17 +226,22 @@ class AudioService: NSObject, ObservableObject {
             speechRecognitionService?.appendAudioBuffer(buffer)
         }
 
-        try await speechRecognitionService.startRecognition()
         do {
-            try audioCaptureService.start()
+            try await speechRecognitionService.startRecognition()
+            guard lifecycleState().allowsCapture else {
+                throw RecordingError.inactiveLifecycle
+            }
+            try audioCaptureService.start(lifecycleState: lifecycleState)
         } catch {
-            throw RecordingError.recordingFailed
+            speechRecognitionService.cancelRecognition()
+            audioCaptureService.cancel()
+            throw recordingError(for: error)
         }
     }
 
     // MARK: - Doubao ASR
 
-    private func startDoubaoASR() async throws {
+    private func startDoubaoASR(lifecycleState: () -> AudioCaptureLifecycleState) async throws {
         guard NetworkMonitor.shared.isConnected else {
             throw RecordingError.doubaoNetworkUnavailable
         }
@@ -253,7 +275,10 @@ class AudioService: NSObject, ObservableObject {
                     await self?.handleDoubaoRuntimeFailure(error)
                 }
             )
-            try audioCaptureService.start()
+            guard lifecycleState().allowsCapture else {
+                throw RecordingError.inactiveLifecycle
+            }
+            try audioCaptureService.start(lifecycleState: lifecycleState)
         } catch let error as RecordingError {
             audioCaptureService.bufferHandler = nil
             await doubaoProvider.cancel()
@@ -261,7 +286,27 @@ class AudioService: NSObject, ObservableObject {
         } catch {
             audioCaptureService.bufferHandler = nil
             await doubaoProvider.cancel()
+            if error is AudioCaptureService.RecordingError {
+                throw recordingError(for: error)
+            }
             throw RecordingError.doubaoConnectionFailed(error.localizedDescription)
+        }
+    }
+
+    private func recordingError(for error: Error) -> RecordingError {
+        if let recordingError = error as? RecordingError {
+            return recordingError
+        }
+        guard let captureError = error as? AudioCaptureService.RecordingError else {
+            return .recordingFailed
+        }
+        switch captureError {
+        case .inactiveLifecycle:
+            return .inactiveLifecycle
+        case .inputUnavailable:
+            return .inputUnavailable
+        case .converterUnavailable:
+            return .recordingFailed
         }
     }
 
