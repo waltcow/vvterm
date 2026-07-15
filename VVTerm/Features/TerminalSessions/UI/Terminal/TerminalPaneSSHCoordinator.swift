@@ -195,7 +195,7 @@ final class TerminalPaneSSHCoordinator {
                             excluding: paneId
                         )
                         return !hasOtherRegistrations
-                    case .authenticationFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
+                    case .authenticationFailed, .hostKeyVerificationFailed, .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .moshInvalidEndpoint, .moshUDPTimeout, .moshClientSessionFailed, .unknown:
                         return false
                     }
                 },
