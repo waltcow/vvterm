@@ -1,7 +1,7 @@
-//! Herdr v0.7.3 private client protocol definitions.
+//! Herdr v0.7.4 private client protocol definitions.
 //!
 //! Variant order and field order are wire ABI. Keep this file synchronized with
-//! Herdr revision d0111c9f9022e0ec26d8f03236a91b026b567d45.
+//! Herdr revision 50aaa2ec046ee26ff407c20f49de496f522512a8.
 
 use serde::{Deserialize, Serialize};
 

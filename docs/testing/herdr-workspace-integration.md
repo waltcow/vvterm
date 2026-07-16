@@ -6,7 +6,7 @@ This opt-in XCTest validates the real no-PTY path through VVTerm's own stack:
 SSHClient/libssh2 -> HerdrWorkspaceConnection -> HerdrClientKit
 ```
 
-It requires a disposable, already-running Herdr 0.7.3 named session. The test
+It requires a disposable, already-running Herdr 0.7.4 named session. The test
 verifies protocol 16 Welcome, the initial full ANSI redraw, resize, input, and
 detach. It stops the named server during cleanup, so never point it at a user
 session that must remain running.
@@ -50,7 +50,7 @@ running.
 
 This fixture intentionally separates validation of the native protocol path
 from the unresolved remote server bootstrap lifecycle. A production entry must
-not assume that Herdr 0.7.3 auto-start is reliable over every no-PTY SSH client.
+not assume that Herdr auto-start is reliable over every no-PTY SSH client.
 
 Use short session names for disposable fixtures. Long names combined with the
 Herdr config directory can exceed macOS `sockaddr_un.sun_path` capacity; Herdr

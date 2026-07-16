@@ -9,7 +9,7 @@
 - Batch 1 已完成：有界异步字节流、写队列及确定性测试已落地。
 - Batch 2 已完成首版：无 PTY Exec Stream 已接入 libssh2 I/O loop，并覆盖写入、半关闭、关闭和错误生命周期。
 - Batch 3 已完成 fixture 和 opt-in 集成测试代码；仍需在配置了真实 SSH fixture 的环境执行，才能满足该 Batch 的退出标准。
-- Phase 0 契约审计已完成：固定 Herdr `v0.7.3` / revision `d0111c9f9022e0ec26d8f03236a91b026b567d45` / protocol 16，并记录完整 Workspace 私有 bridge 与公开单终端 NDJSON 的边界。
+- Phase 0 契约审计已刷新到当前 stable：固定 Herdr `v0.7.4` / revision `50aaa2ec046ee26ff407c20f49de496f522512a8` / protocol 16，并确认完整 Workspace 私有 bridge 与公开单终端 NDJSON 的边界未变。
 - Batch 4 已完成首版：Rust protocol/core、panic-safe C ABI、三个 Apple arm64 slice、按需构建的 XCFramework、Swift Adapter、golden fixture tests 和 opt-in real bridge smoke test 已落地。
 - 2026-07-12 已在隔离的 macOS SSH fixture 上对 Herdr 0.7.3 运行 real bridge smoke：完成 protocol 16 Welcome、首帧 `seq=1/full=true` ANSI redraw、resize、input 和 detach，临时命名 session 已停止。该结果确认 ClientKit 与真实远端 wire contract 兼容，但不替代 VVTerm libssh2 pump 和真机验证。
 - 2026-07-12 已在预启动的 disposable session 上通过真实 XCTest：`VVTerm SSHClient/libssh2 -> HerdrWorkspaceConnection -> HerdrClientKit` 完成 Welcome、首帧 Full Redraw、resize、input 和 detach，1 test passed。测试随后停止临时 server。
@@ -38,7 +38,7 @@
 
 Phase 1 不依赖 Herdr 仓库。Phase 2 的协议基线已经确定：
 
-- 固定 source tag 为 `v0.7.3`，revision 为 `d0111c9f9022e0ec26d8f03236a91b026b567d45`。
+- 固定 source tag 为 `v0.7.4`，revision 为 `50aaa2ec046ee26ff407c20f49de496f522512a8`。
 - 完整 Workspace 使用内部 `remote-client-bridge` 透明代理 private client protocol 16。
 - 协议 framing 为 u32 little-endian length + bincode 2 standard config；普通 2 MiB，graphics 32 MiB。
 - 公开 `terminal session observe/control` 是单 terminal NDJSON，不替代完整 Workspace ClientKit。

@@ -209,7 +209,7 @@ fn c_abi_transfers_and_frees_owned_buffers() {
 
 #[cfg(target_os = "macos")]
 #[test]
-#[ignore = "requires Herdr v0.7.3 locally or an authenticated SSH control socket"]
+#[ignore = "requires Herdr v0.7.4 locally or an authenticated SSH control socket"]
 fn installed_bridge_completes_real_handshake_and_full_redraw() {
     let herdr = std::env::var("HERDR_BIN").unwrap_or_else(|_| "herdr".to_owned());
     let session = format!("vvterm-client-kit-smoke-{}", std::process::id());

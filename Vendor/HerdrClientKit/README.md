@@ -3,8 +3,8 @@
 `HerdrClientKit` is VVTerm's transport-independent client core for the Herdr
 private workspace protocol. It is pinned to:
 
-- Herdr tag: `v0.7.3`
-- Herdr revision: `d0111c9f9022e0ec26d8f03236a91b026b567d45`
+- Herdr tag: `v0.7.4`
+- Herdr revision: `50aaa2ec046ee26ff407c20f49de496f522512a8`
 - Protocol version: `16`
 - Wire format: `u32` little-endian length followed by a bincode 2 standard
   configuration payload

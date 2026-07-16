@@ -1,15 +1,15 @@
-# Herdr Native Client Contract — v0.7.3
+# Herdr Native Client Contract — v0.7.4
 
-日期：2026-07-12
+日期：2026-07-16
 
 本文件固定 VVTerm Herdr 原生客户端 Spike 的外部契约。后续实现不得仅根据已安装二进制的字符串或面向人的 CLI 输出推断协议。
 
 ## 固定基线
 
-- Herdr source tag：`v0.7.3`
-- Herdr Git revision：`d0111c9f9022e0ec26d8f03236a91b026b567d45`
-- Release archive SHA-256：`86f4ade98e4fa048b99ad59d1453da00b691dcdf559bbd18441f495b448c02fc`
-- Binary version：`0.7.3`
+- Herdr source tag：`v0.7.4`
+- Herdr Git revision：`50aaa2ec046ee26ff407c20f49de496f522512a8`
+- Release archive SHA-256：`7b6c1994a8c07e7efcfe50e2f60af1906372fb6ec697ad3a98a36a279ef422b8`
+- Binary version：`0.7.4`
 - Private client protocol：`16`
 - Source license：`AGPL-3.0-or-later`，另提供商业许可证
 
@@ -17,7 +17,7 @@ Revision、archive hash 和协议常量分别由官方 Git tag、Homebrew formul
 
 ## 完整 Workspace Bridge
 
-v0.7.3 没有公开的 `herdr bridge client --stdio` 命令。当前可用入口是内部命令：
+v0.7.4 没有公开的 `herdr bridge client --stdio` 命令。当前可用入口是内部命令：
 
 ```sh
 herdr --session <session> remote-client-bridge
@@ -56,7 +56,7 @@ Swift 端不应手写或复制 bincode 2 ABI。Phase 2 仍需从固定 revision 
 
 ## 公开 Terminal Session NDJSON
 
-v0.7.3 提供公开、面向第三方 bridge 的单终端接口：
+v0.7.4 提供公开、面向第三方 bridge 的单终端接口：
 
 ```sh
 herdr --session <session> terminal session observe <target> --cols <n> --rows <n>
@@ -93,7 +93,7 @@ herdr --session <session> status --json
 - `server.running`、`server.version`、`server.protocol`、`server.compatible`；
 - 当前 session 和 server capabilities。
 
-第一版只接受 client version `0.7.3`、client protocol `16`、server running、server version `0.7.3`、server protocol `16`。Binary 缺失和命令失败由 Exec 退出状态映射，不解析面向人的 stderr。
+第一版只接受 client version `0.7.4`、client protocol `16`、server running、server version `0.7.4`、server protocol `16`。Binary 缺失和命令失败由 Exec 退出状态映射，不解析面向人的 stderr。
 
 ## 授权记录
 

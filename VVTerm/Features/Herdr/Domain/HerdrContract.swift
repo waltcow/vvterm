@@ -1,9 +1,9 @@
 import Foundation
 
 nonisolated enum HerdrPinnedContract {
-    static let sourceTag = "v0.7.3"
-    static let sourceRevision = "d0111c9f9022e0ec26d8f03236a91b026b567d45"
-    static let binaryVersion = "0.7.3"
+    static let sourceTag = "v0.7.4"
+    static let sourceRevision = "50aaa2ec046ee26ff407c20f49de496f522512a8"
+    static let binaryVersion = "0.7.4"
     static let protocolVersion = 16
 
     static let maxProtocolFrameBytes = 2 * 1024 * 1024
@@ -50,7 +50,7 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     var message: String {
         switch self {
         case .binaryMissing:
-            return "Herdr 0.7.3 is not installed on this server."
+            return "Herdr 0.7.4 is not installed on this server."
         case .runtimeUnavailable(let sessionName):
             return "Start the named Herdr session '\(sessionName)' on the server, then retry."
         case .bridgeUnavailable:

@@ -288,13 +288,13 @@ stdout 和 stderr Stream 必须各自且仅结束一次。所有 Pending Writer 
 
 ## 远程 Bridge 契约
 
-固定 Herdr v0.7.3 后确认，当前完整 Workspace 入口是内部命令：
+固定 Herdr v0.7.4 后确认，当前完整 Workspace 入口是内部命令：
 
 ```sh
 herdr --session vvterm remote-client-bridge
 ```
 
-准确 revision、protocol 16、framing、frame 上限、公开 NDJSON 单终端接口和授权门槛见 `docs/specs/herdr-native-client-contract-v0.7.3.md`。期望的公开 `bridge client --stdio` 在该版本不存在，因此命令必须封装在唯一的 Command Builder 中。
+准确 revision、protocol 16、framing、frame 上限、公开 NDJSON 单终端接口和授权门槛见 `docs/specs/herdr-native-client-contract-v0.7.4.md`。期望的公开 `bridge client --stdio` 在该版本不存在，因此命令必须封装在唯一的 Command Builder 中。
 
 Bridge 必须：
 
@@ -613,7 +613,7 @@ Render Protocol 不应演变为通用 UI 数据 API；面向人的 CLI 输出也
 - Reconnect 和 Full Redraw
 - C ABI Allocation/Release
 
-另提供默认跳过的 real bridge smoke test。它可直接启动本机 Herdr，也可复用已认证的隔离 SSH fixture；测试必须使用唯一命名 session，并在结束时停止临时 server。Herdr 0.7.3 已验证 protocol 16 Welcome、首帧 `seq=1/full=true`、Resize、Input 和 Detach。该测试验证真实 wire contract，不替代 VVTerm libssh2 transport 与真机 UI 验证。
+另提供默认跳过的 real bridge smoke test。它可直接启动本机 Herdr，也可复用已认证的隔离 SSH fixture；测试必须使用唯一命名 session，并在结束时停止临时 server。Herdr 0.7.3 已完成 protocol 16 Welcome、首帧 `seq=1/full=true`、Resize、Input 和 Detach 的真实链路验证；v0.7.4 源码审计确认仍使用 protocol 16 和 `remote-client-bridge`，升级后的真实 smoke 仍需执行。该测试验证真实 wire contract，不替代 VVTerm libssh2 transport 与真机 UI 验证。
 
 ### VVTerm Application Test
 
@@ -770,7 +770,7 @@ Spike 遇到以下任一情况，应暂停产品化并重新评估：
 
 - 第一个 Spike 使用的 Herdr 源码路径和固定 Revision 是什么？
 - 该 Revision 的 stdio bridge 命令和 Wire Handshake 是什么？
-- 重连和 Takeover 后，Server 是否仍保证发送 Full Redraw？首次新 session handshake 已在 Herdr 0.7.3 真实远端验证。
+- 重连和 Takeover 后，Server 是否仍保证发送 Full Redraw？首次新 session handshake 已在 Herdr 0.7.3 真实远端验证，v0.7.4 仍需复验。
 - Reconnect 和 Takeover 时如何表达 Terminal Controller Ownership？
 - 嵌入式客户端允许的最大 Inbound Frame Size 是多少？
 - 第一版正式入口应是独立 Connection Tab，还是 Server-level Remote Experience Mode？

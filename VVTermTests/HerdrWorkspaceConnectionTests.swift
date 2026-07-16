@@ -16,7 +16,7 @@ private actor FakeHerdrWorkspaceSSH: HerdrSSHExecuting {
     func executeResult(_ command: String, timeout: Duration?) async throws -> SSHExecResult {
         commands.append(command)
         return SSHExecResult(
-            stdout: Data(#"{"client":{"version":"0.7.3","protocol":16,"binary":"herdr"},"server":{"running":true,"version":"0.7.3","protocol":16,"compatible":true}}"#.utf8),
+            stdout: Data(#"{"client":{"version":"0.7.4","protocol":16,"binary":"herdr"},"server":{"running":true,"version":"0.7.4","protocol":16,"compatible":true}}"#.utf8),
             stderr: Data(),
             exitStatus: 0
         )

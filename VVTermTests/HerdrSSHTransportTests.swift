@@ -57,7 +57,7 @@ private actor FakeHerdrSSHExecutor: HerdrSSHExecuting {
 }
 
 struct HerdrSSHTransportTests {
-    private static let compatibleStatus = Data(#"{"client":{"version":"0.7.3","protocol":16,"binary":"herdr"},"server":{"running":true,"version":"0.7.3","protocol":16,"compatible":true}}"#.utf8)
+    private static let compatibleStatus = Data(#"{"client":{"version":"0.7.4","protocol":16,"binary":"herdr"},"server":{"running":true,"version":"0.7.4","protocol":16,"compatible":true}}"#.utf8)
 
     @Test
     func preflightUsesStructuredExecResultAndPinnedCommand() async throws {
@@ -93,7 +93,7 @@ struct HerdrSSHTransportTests {
     @Test
     func workspaceConnectionRejectsStoppedRuntimeBeforeOpeningBridge() async {
         let fake = FakeHerdrSSHExecutor(result: SSHExecResult(
-            stdout: Data(#"{"client":{"version":"0.7.3","protocol":16,"binary":"herdr"},"server":{"running":false,"version":null,"protocol":null,"compatible":null}}"#.utf8),
+            stdout: Data(#"{"client":{"version":"0.7.4","protocol":16,"binary":"herdr"},"server":{"running":false,"version":null,"protocol":null,"compatible":null}}"#.utf8),
             stderr: Data(),
             exitStatus: 0
         ))
