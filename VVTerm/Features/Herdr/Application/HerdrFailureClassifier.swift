@@ -40,7 +40,9 @@ enum HerdrFailureClassifier {
             case .notConnected, .connectionFailed, .timeout, .channelOpenFailed,
                  .shellRequestFailed, .socketError:
                 return .sshInterrupted(sshError.localizedDescription)
-            case .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed, .unknown:
+            case .moshServerMissing, .moshBootstrapFailed, .moshSessionFailed,
+                 .moshInvalidEndpoint, .moshUDPTimeout, .moshClientSessionFailed,
+                 .unknown:
                 return .unknown(sshError.localizedDescription)
             }
         }

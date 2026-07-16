@@ -104,4 +104,28 @@ struct HerdrFailureClassifierTests {
             Issue.record("ClientKit errors must be classified as protocol failures")
         }
     }
+
+    @Test
+    func treatsMoshOnlyFailuresAsUnrelatedUnknownErrors() {
+        let errors: [SSHError] = [
+            .moshServerMissing,
+            .moshBootstrapFailed("bootstrap"),
+            .moshSessionFailed("session"),
+            .moshInvalidEndpoint,
+            .moshUDPTimeout,
+            .moshClientSessionFailed("client"),
+        ]
+
+        for error in errors {
+            let failure = HerdrFailureClassifier.classify(
+                error,
+                sessionName: "session"
+            )
+            guard case .unknown = failure else {
+                Issue.record("Mosh-only failures must not be treated as Herdr SSH failures")
+                continue
+            }
+            #expect(!failure.allowsAutomaticReconnect)
+        }
+    }
 }
