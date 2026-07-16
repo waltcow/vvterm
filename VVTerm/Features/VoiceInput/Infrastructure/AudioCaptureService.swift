@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import AVFoundation
 
-private struct AudioPCMBufferSnapshot {
+struct AudioPCMBufferSnapshot {
     let format: AVAudioFormat
     let frameLength: AVAudioFrameCount
     let buffers: [Data]
@@ -24,10 +24,16 @@ private struct AudioPCMBufferSnapshot {
         }
         let destinations = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
         guard destinations.count == buffers.count else { return nil }
+        let bytesPerFrame = Int(format.streamDescription.pointee.mBytesPerFrame)
+        let (bufferCapacity, overflow) = Int(frameLength).multipliedReportingOverflow(by: bytesPerFrame)
+        guard !overflow, bufferCapacity >= 0 else { return nil }
 
         for index in buffers.indices {
             let data = buffers[index]
-            guard data.count <= Int(destinations[index].mDataByteSize) else { return nil }
+            // AVAudioPCMBuffer initializes mDataByteSize to zero even though mData
+            // points at storage sized for frameCapacity. Validate against that
+            // allocation instead of treating the current payload length as capacity.
+            guard data.count <= bufferCapacity else { return nil }
             if !data.isEmpty {
                 guard let destination = destinations[index].mData else { return nil }
                 data.copyBytes(

@@ -533,6 +533,7 @@ class AudioService: NSObject, ObservableObject {
     private func handleDoubaoRuntimeFailure(_ error: Error) async {
         guard isRecording, recordingState.provider == .doubaoASR else { return }
 
+        logger.error("Doubao ASR runtime failure: \(error.localizedDescription, privacy: .public)")
         recordingState = .idle
         audioCaptureService.bufferHandler = nil
         audioCaptureService.cancel()

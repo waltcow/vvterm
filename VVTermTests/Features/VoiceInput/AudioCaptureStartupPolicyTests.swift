@@ -200,6 +200,43 @@ struct AudioCaptureStartupPolicyTests {
         _ = service.stop()
     }
 
+    @Test
+    func audioSnapshotRebuildsAFreshPCMBuffer() throws {
+        let format = try #require(
+            AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: false
+            )
+        )
+        let samples: [Float] = [0.25, -0.5, 0.75, -1]
+        let source = try #require(
+            AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: AVAudioFrameCount(samples.count)
+            )
+        )
+        source.frameLength = AVAudioFrameCount(samples.count)
+        let sourceChannel = try #require(source.floatChannelData?[0])
+        sourceChannel.update(from: samples, count: samples.count)
+        let sourceBuffers = UnsafeMutableAudioBufferListPointer(source.mutableAudioBufferList)
+        sourceBuffers[0].mDataByteSize = UInt32(samples.count * MemoryLayout<Float>.size)
+
+        let rebuilt = try #require(AudioPCMBufferSnapshot(source).makeBuffer())
+        let rebuiltChannel = try #require(rebuilt.floatChannelData?[0])
+        let rebuiltSamples = Array(
+            UnsafeBufferPointer(start: rebuiltChannel, count: Int(rebuilt.frameLength))
+        )
+
+        #expect(rebuilt.frameLength == source.frameLength)
+        #expect(rebuiltSamples == samples)
+        #expect(
+            UnsafeMutableAudioBufferListPointer(rebuilt.mutableAudioBufferList)[0].mDataByteSize
+                == UInt32(samples.count * MemoryLayout<Float>.size)
+        )
+    }
+
     private var activeLifecycle: AudioCaptureLifecycleState {
         AudioCaptureLifecycleState(applicationIsActive: true, sceneIsActive: true)
     }
