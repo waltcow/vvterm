@@ -1,6 +1,8 @@
 import SwiftUI
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 struct HerdrWorkspaceView: View {
@@ -18,6 +20,7 @@ struct HerdrWorkspaceView: View {
     @State private var permissionErrorMessage = ""
     @State private var pendingVoiceReturn = false
     @StateObject private var audioService = AudioService()
+    @StateObject private var voiceRecordingOperation = VoiceRecordingOperationCoordinator()
     @ObservedObject private var networkMonitor: NetworkMonitor
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("terminalVoiceButtonEnabled") private var voiceButtonEnabled = true
@@ -90,22 +93,14 @@ struct HerdrWorkspaceView: View {
         }
         .onChange(of: isVisible) { visible in
             guard !visible, showingVoiceRecording else { return }
-            audioService.cancelRecording()
-            showingVoiceRecording = false
-            voiceProcessing = false
+            cancelVoiceRecording()
         }
         .onChange(of: appActivity) { activity in
             guard activity == .background, showingVoiceRecording else { return }
-            audioService.cancelRecording()
-            showingVoiceRecording = false
-            voiceProcessing = false
+            cancelVoiceRecording()
         }
         .onDisappear {
-            if showingVoiceRecording {
-                audioService.cancelRecording()
-            }
-            showingVoiceRecording = false
-            voiceProcessing = false
+            cancelVoiceRecording()
             terminal = nil
         }
     }
@@ -229,15 +224,8 @@ struct HerdrWorkspaceView: View {
     private var voiceOverlay: some View {
         VoiceRecordingView(
             audioService: audioService,
-            onSend: { text in
-                sendTranscription(text)
-                showingVoiceRecording = false
-                voiceProcessing = false
-            },
-            onCancel: {
-                showingVoiceRecording = false
-                voiceProcessing = false
-            },
+            onStop: finishVoiceRecording,
+            onCancel: cancelVoiceRecording,
             isProcessing: $voiceProcessing
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -249,13 +237,36 @@ struct HerdrWorkspaceView: View {
     private func startVoiceRecording() {
         guard isAttached, voiceButtonEnabled, !showingVoiceRecording else { return }
         pendingVoiceReturn = false
-        Task {
-            do {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    showingVoiceRecording = true
-                }
-                try await audioService.startRecording()
-            } catch {
+        voiceRecordingOperation.cancel()
+        audioService.cancelRecording()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            showingVoiceRecording = true
+        }
+        #if os(iOS)
+        let activeTerminal = terminal
+        let lifecycleState: @MainActor @Sendable () -> AudioCaptureLifecycleState = { [weak activeTerminal] in
+            AudioCaptureLifecycleState(
+                applicationIsActive: UIApplication.shared.applicationState == .active,
+                sceneIsActive: activeTerminal?.window?.windowScene?.activationState == .foregroundActive
+            )
+        }
+        #else
+        let lifecycleState: @MainActor @Sendable () -> AudioCaptureLifecycleState = {
+            AudioCaptureLifecycleState(
+                applicationIsActive: NSApplication.shared.isActive,
+                sceneIsActive: NSApplication.shared.isActive
+            )
+        }
+        #endif
+        voiceRecordingOperation.start(
+            operation: { [audioService] operationID in
+                try await audioService.startRecording(
+                    operationID: operationID,
+                    lifecycleState: lifecycleState
+                )
+            },
+            onSuccess: { _ in },
+            onFailure: { error in
                 showingVoiceRecording = false
                 voiceProcessing = false
                 if let recordingError = error as? AudioService.RecordingError {
@@ -265,7 +276,34 @@ struct HerdrWorkspaceView: View {
                 }
                 showingPermissionError = true
             }
-        }
+        )
+    }
+
+    private func cancelVoiceRecording() {
+        voiceRecordingOperation.cancel()
+        audioService.cancelRecording()
+        showingVoiceRecording = false
+        voiceProcessing = false
+    }
+
+    private func finishVoiceRecording() {
+        guard !voiceProcessing else { return }
+        voiceProcessing = true
+        voiceRecordingOperation.start(
+            operation: { [audioService] operationID in
+                await audioService.stopRecording(operationID: operationID)
+            },
+            onSuccess: { text in
+                let fallback = text.isEmpty ? audioService.partialTranscription : text
+                sendTranscription(fallback)
+                showingVoiceRecording = false
+                voiceProcessing = false
+            },
+            onFailure: { _ in
+                showingVoiceRecording = false
+                voiceProcessing = false
+            }
+        )
     }
 
     private func sendTranscription(_ text: String) {
