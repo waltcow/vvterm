@@ -1,5 +1,10 @@
 import Foundation
 
+enum StoreFeaturePolicy {
+    static let proAccessEnabledByDefault = true
+    static let paywallPresentationEnabled = false
+}
+
 enum PurchaseState: Equatable {
     case idle
     case purchasing

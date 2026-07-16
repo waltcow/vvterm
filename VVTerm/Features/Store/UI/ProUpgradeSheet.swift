@@ -636,8 +636,21 @@ struct ProUpgradePresentationModifier: ViewModifier {
     @Binding var isPresented: Bool
     let source: PaywallSource
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        platformBody(content: content)
+        if StoreFeaturePolicy.paywallPresentationEnabled {
+            platformBody(content: content)
+        } else {
+            content
+                .onAppear {
+                    isPresented = false
+                }
+                .onChangeCompat(of: isPresented) { shouldPresent in
+                    if shouldPresent {
+                        isPresented = false
+                    }
+                }
+        }
     }
 }
 

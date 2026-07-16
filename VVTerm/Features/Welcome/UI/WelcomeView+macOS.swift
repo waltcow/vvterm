@@ -10,7 +10,6 @@ extension WelcomeView {
 
 private struct WelcomeContent: View {
     @Binding var hasSeenWelcome: Bool
-    @State private var showingProUpgrade = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,19 +91,9 @@ private struct WelcomeContent: View {
                 .buttonBorderShapeCompat()
                 .tint(Color(red: 1.0, green: 0.27, blue: 0.35))
                 .controlSize(.large)
-
-                Button {
-                    showingProUpgrade = true
-                } label: {
-                    Text("Explore Pro")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 48)
             .padding(.bottom, 28)
-            .proUpgradePresentation(isPresented: $showingProUpgrade, source: .welcome)
         }
         .frame(minWidth: 520, minHeight: 560)
         .background(Color(nsColor: .windowBackgroundColor))

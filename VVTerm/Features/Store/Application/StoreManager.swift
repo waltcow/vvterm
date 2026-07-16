@@ -9,7 +9,7 @@ import os.log
 final class StoreManager: ObservableObject {
     static let shared = StoreManager()
     static let reviewModeCode = ReviewModeCode.value
-    static let defaultProAccessOverrideEnabled = true
+    static let defaultProAccessOverrideEnabled = StoreFeaturePolicy.proAccessEnabledByDefault
 
     @Published var isPro: Bool = StoreManager.defaultProAccessOverrideEnabled
     @Published var isLifetime: Bool = false
