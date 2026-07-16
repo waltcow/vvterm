@@ -5,8 +5,47 @@ import AVFoundation
 
 @MainActor
 class AudioService: NSObject, ObservableObject {
+    typealias StartupOperation = @MainActor (
+        UUID,
+        @escaping @MainActor () -> AudioCaptureLifecycleState
+    ) async throws -> Void
+
+    private enum RecordingState {
+        case idle
+        case starting(operationID: UUID, provider: TranscriptionProvider)
+        case recording(operationID: UUID, provider: TranscriptionProvider)
+        case processing(operationID: UUID, provider: TranscriptionProvider)
+
+        var operationID: UUID? {
+            switch self {
+            case .idle:
+                return nil
+            case .starting(let operationID, _),
+                 .recording(let operationID, _),
+                 .processing(let operationID, _):
+                return operationID
+            }
+        }
+
+        var provider: TranscriptionProvider? {
+            switch self {
+            case .idle:
+                return nil
+            case .starting(_, let provider),
+                 .recording(_, let provider),
+                 .processing(_, let provider):
+                return provider
+            }
+        }
+
+        var isRecording: Bool {
+            if case .recording = self { return true }
+            return false
+        }
+    }
+
     private let logger = Logger.audio
-    @Published var isRecording = false
+    @Published private var recordingState: RecordingState = .idle
     @Published var transcribedText = ""
     @Published var partialTranscription = ""
     @Published var audioLevel: Float = 0.0
@@ -17,13 +56,26 @@ class AudioService: NSObject, ObservableObject {
     // Services
     private let permissionManager = AudioPermissionManager()
     private let speechRecognitionService = SpeechRecognitionService()
-    private let audioCaptureService = AudioCaptureService()
+    private let audioCaptureService: AudioCaptureService
     private let doubaoProvider = DoubaoASRProvider()
     private let doubaoCredentialStore = DoubaoASRCredentialStore()
+    private let startupOperation: StartupOperation?
 
-    private var activeProvider: TranscriptionProvider = .system
+    var isRecording: Bool { recordingState.isRecording }
 
     override init() {
+        audioCaptureService = AudioCaptureService()
+        startupOperation = nil
+        super.init()
+        setupBindings()
+    }
+
+    init(
+        audioCaptureService: AudioCaptureService,
+        startupOperation: @escaping StartupOperation
+    ) {
+        self.audioCaptureService = audioCaptureService
+        self.startupOperation = startupOperation
         super.init()
         setupBindings()
     }
@@ -56,83 +108,117 @@ class AudioService: NSObject, ObservableObject {
         return await permissionManager.requestPermissions(includeSpeech: includeSpeech)
     }
 
-    func checkPermissions(includeSpeech: Bool) async -> Bool {
-        return await permissionManager.checkPermissions(includeSpeech: includeSpeech)
+    func checkPermissions(includeSpeech: Bool) -> Bool {
+        permissionManager.checkPermissions(includeSpeech: includeSpeech)
     }
 
     // MARK: - Recording Control
 
-    func startRecording(lifecycleState: () -> AudioCaptureLifecycleState) async throws {
-        guard lifecycleState().allowsCapture else {
-            throw RecordingError.inactiveLifecycle
-        }
+    func startRecording(
+        operationID: UUID,
+        lifecycleState: @escaping @MainActor () -> AudioCaptureLifecycleState
+    ) async throws {
+        try Task.checkCancellation()
         let requestedProvider = TranscriptionSettingsStore.currentProvider()
         let effectiveProvider = resolveProvider(for: requestedProvider)
-        activeProvider = effectiveProvider
+        runtimeRecordingError = nil
+        recordingState = .starting(operationID: operationID, provider: effectiveProvider)
 
         let needsSpeech = effectiveProvider == .system
-        let hasPermissions = await checkPermissions(includeSpeech: needsSpeech)
-        guard lifecycleState().allowsCapture else {
-            throw RecordingError.inactiveLifecycle
-        }
-        if !hasPermissions {
-            let granted = await requestPermissions(includeSpeech: needsSpeech)
-            guard granted else {
-                throw RecordingError.permissionDenied
+        do {
+            if let startupOperation {
+                try await startupOperation(operationID, lifecycleState)
+            } else {
+                try await Self.runStartupSequence(
+                    lifecycleState: lifecycleState,
+                    operationIsCurrent: { [weak self] in
+                        self?.recordingState.operationID == operationID
+                    },
+                    checkPermissions: { [weak self] in
+                        self?.checkPermissions(includeSpeech: needsSpeech) ?? false
+                    },
+                    requestPermissions: { [weak self] in
+                        await self?.requestPermissions(includeSpeech: needsSpeech) ?? false
+                    },
+                    startServices: { [weak self] in
+                        guard let self else { throw CancellationError() }
+
+                        self.speechRecognitionService.resetTranscriptions()
+                        self.audioCaptureService.cancel()
+
+                        switch effectiveProvider {
+                        case .system:
+                            try self.startAppleSpeech(lifecycleState: lifecycleState)
+                        case .doubaoASR:
+                            try await self.startDoubaoASR(lifecycleState: lifecycleState)
+                        }
+                    }
+                )
             }
-            guard lifecycleState().allowsCapture else {
-                throw RecordingError.inactiveLifecycle
+
+            guard recordingState.operationID == operationID else {
+                throw CancellationError()
             }
+            recordingState = .recording(operationID: operationID, provider: effectiveProvider)
+        } catch {
+            guard recordingState.operationID == operationID else {
+                throw CancellationError()
+            }
+            recordingState = .idle
+            audioCaptureService.cancel()
+            speechRecognitionService.cancelRecognition()
+            await doubaoProvider.cancel()
+            if error is CancellationError {
+                throw error
+            }
+            throw recordingError(for: error)
         }
-
-        // Reset state
-        runtimeRecordingError = nil
-        speechRecognitionService.resetTranscriptions()
-        audioCaptureService.cancel()
-
-        // Start services
-        switch effectiveProvider {
-        case .system:
-            try await startAppleSpeech(lifecycleState: lifecycleState)
-        case .doubaoASR:
-            try await startDoubaoASR(lifecycleState: lifecycleState)
-        }
-
-        isRecording = true
     }
 
-    func stopRecording() async -> String {
-        isRecording = false
-        audioCaptureService.bufferHandler = nil
+    func stopRecording(operationID: UUID) async -> String {
+        let provider = recordingState.provider ?? .system
+        recordingState = .processing(operationID: operationID, provider: provider)
 
+        audioCaptureService.bufferHandler = nil
         _ = audioCaptureService.stop()
 
-        switch activeProvider {
+        switch provider {
         case .system:
             let finalText = await speechRecognitionService.stopRecognition()
+            guard finishProcessing(operationID) else { return "" }
             speechRecognitionService.resetTranscriptions()
             return finalText
         case .doubaoASR:
-            do {
-                let finalText = try await doubaoProvider.finishAndWaitForFinal(timeoutSeconds: 2.0)
-                transcribedText = finalText
-                partialTranscription = ""
-                return finalText
-            } catch {
-                logger.error("Doubao ASR finalization failed: \(error.localizedDescription)")
-                await doubaoProvider.cancel()
-                let bestEffortText = transcribedText.isEmpty ? partialTranscription : transcribedText
-                partialTranscription = ""
-                return bestEffortText
+            let text = await Self.runProcessingSequence(
+                operationIsCurrent: { [weak self] in
+                    self?.processingIsCurrent(operationID) == true
+                },
+                transcribe: { [doubaoProvider] in
+                    try await doubaoProvider.finishAndWaitForFinal(timeoutSeconds: 2.0)
+                },
+                fallback: { [weak self, doubaoProvider] error in
+                    guard let self else { return nil }
+                    self.logger.error("Doubao ASR finalization failed: \(error.localizedDescription)")
+                    await doubaoProvider.cancel()
+                    return self.transcribedText.isEmpty
+                        ? self.partialTranscription
+                        : self.transcribedText
+                }
+            )
+            guard let text, finishProcessing(operationID) else {
+                cancelProcessingIfCurrent(operationID)
+                return ""
             }
+            transcribedText = text
+            partialTranscription = ""
+            return text
         }
     }
 
     func cancelRecording() {
-        isRecording = false
+        recordingState = .idle
         runtimeRecordingError = nil
         audioCaptureService.bufferHandler = nil
-
         audioCaptureService.cancel()
         speechRecognitionService.cancelRecognition()
         Task { [doubaoProvider] in
@@ -141,6 +227,71 @@ class AudioService: NSObject, ObservableObject {
         speechRecognitionService.resetTranscriptions()
         transcribedText = ""
         partialTranscription = ""
+    }
+
+    static func runStartupSequence(
+        lifecycleState: @escaping @MainActor () -> AudioCaptureLifecycleState,
+        operationIsCurrent: @escaping @MainActor () -> Bool,
+        checkPermissions: @escaping @MainActor () -> Bool,
+        requestPermissions: @escaping @MainActor () async -> Bool,
+        startServices: @escaping @MainActor () async throws -> Void
+    ) async throws {
+        try validateStartup(
+            lifecycleState: lifecycleState,
+            operationIsCurrent: operationIsCurrent
+        )
+
+        let hasPermissions = checkPermissions()
+        try validateStartup(
+            lifecycleState: lifecycleState,
+            operationIsCurrent: operationIsCurrent
+        )
+        if !hasPermissions {
+            let granted = await requestPermissions()
+            try validateStartup(
+                lifecycleState: lifecycleState,
+                operationIsCurrent: operationIsCurrent
+            )
+            guard granted else { throw RecordingError.permissionDenied }
+        }
+
+        try validateStartup(
+            lifecycleState: lifecycleState,
+            operationIsCurrent: operationIsCurrent
+        )
+        try await startServices()
+        try validateStartup(
+            lifecycleState: lifecycleState,
+            operationIsCurrent: operationIsCurrent
+        )
+    }
+
+    static func runProcessingSequence(
+        operationIsCurrent: @escaping @MainActor () -> Bool,
+        transcribe: @escaping @MainActor () async throws -> String,
+        fallback: @escaping @MainActor (Error) async -> String?
+    ) async -> String? {
+        do {
+            let text = try await transcribe()
+            guard operationIsCurrent(), !Task.isCancelled else { return nil }
+            return text
+        } catch {
+            guard operationIsCurrent(), !Task.isCancelled else { return nil }
+            let fallbackText = await fallback(error)
+            guard operationIsCurrent(), !Task.isCancelled else { return nil }
+            return fallbackText
+        }
+    }
+
+    private static func validateStartup(
+        lifecycleState: @MainActor () -> AudioCaptureLifecycleState,
+        operationIsCurrent: @MainActor () -> Bool
+    ) throws {
+        try Task.checkCancellation()
+        guard operationIsCurrent() else { throw CancellationError() }
+        guard lifecycleState().allowsCapture else {
+            throw RecordingError.inactiveLifecycle
+        }
     }
 
     // MARK: - Errors
@@ -217,7 +368,7 @@ class AudioService: NSObject, ObservableObject {
 
     // MARK: - Apple Speech
 
-    private func startAppleSpeech(lifecycleState: () -> AudioCaptureLifecycleState) async throws {
+    private func startAppleSpeech(lifecycleState: () -> AudioCaptureLifecycleState) throws {
         guard speechRecognitionService.isAvailable else {
             throw RecordingError.speechRecognitionUnavailable
         }
@@ -226,17 +377,11 @@ class AudioService: NSObject, ObservableObject {
             speechRecognitionService?.appendAudioBuffer(buffer)
         }
 
-        do {
-            try await speechRecognitionService.startRecognition()
-            guard lifecycleState().allowsCapture else {
-                throw RecordingError.inactiveLifecycle
-            }
-            try audioCaptureService.start(lifecycleState: lifecycleState)
-        } catch {
-            speechRecognitionService.cancelRecognition()
-            audioCaptureService.cancel()
-            throw recordingError(for: error)
+        try speechRecognitionService.startRecognition()
+        guard lifecycleState().allowsCapture else {
+            throw RecordingError.inactiveLifecycle
         }
+        try audioCaptureService.start(lifecycleState: lifecycleState)
     }
 
     // MARK: - Doubao ASR
@@ -310,6 +455,26 @@ class AudioService: NSObject, ObservableObject {
         }
     }
 
+    private func processingIsCurrent(_ operationID: UUID) -> Bool {
+        guard case .processing(let currentID, _) = recordingState else { return false }
+        return currentID == operationID
+    }
+
+    private func finishProcessing(_ operationID: UUID) -> Bool {
+        guard processingIsCurrent(operationID), !Task.isCancelled else {
+            cancelProcessingIfCurrent(operationID)
+            return false
+        }
+        recordingState = .idle
+        return true
+    }
+
+    private func cancelProcessingIfCurrent(_ operationID: UUID) {
+        if processingIsCurrent(operationID) {
+            recordingState = .idle
+        }
+    }
+
     private func doubaoConfiguration() throws -> DoubaoASRProviderConfiguration {
         let appID = TranscriptionSettingsStore.currentDoubaoAppID()
         guard !appID.isEmpty else {
@@ -366,9 +531,9 @@ class AudioService: NSObject, ObservableObject {
     }
 
     private func handleDoubaoRuntimeFailure(_ error: Error) async {
-        guard isRecording, activeProvider == .doubaoASR else { return }
+        guard isRecording, recordingState.provider == .doubaoASR else { return }
 
-        isRecording = false
+        recordingState = .idle
         audioCaptureService.bufferHandler = nil
         audioCaptureService.cancel()
         await doubaoProvider.cancel()
