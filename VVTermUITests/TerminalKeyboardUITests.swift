@@ -440,7 +440,10 @@ final class TerminalKeyboardUITests: XCTestCase {
 
     @MainActor
     func testDockedFloatingDockedGeometryClearsStaleSurfacePreservation() throws {
-        let app = launchKeyboardHarness(preservesTerminalSize: true)
+        let app = launchKeyboardHarness(
+            preservesTerminalSize: true,
+            simulatesKeyboardFrames: true
+        )
         let terminal = waitForTerminal(in: app)
         terminal.tap()
 
