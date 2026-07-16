@@ -28,7 +28,6 @@ struct ServerTerminalRoute: View {
     @State private var isRouteVisible = false
     @State private var showingSettings = false
     @State private var serverToEdit: Server?
-    @State private var showingTabLimitAlert = false
     @State private var showingFileTabLimitAlert = false
     @SceneStorage("vvterm.zenMode.ios") private var isZenModeEnabled = false
     @AppStorage(PrivacyModeSettings.enabledKey) private var privacyModeEnabled = false
@@ -157,7 +156,6 @@ struct ServerTerminalRoute: View {
             .navigationBarBackButtonHidden(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { navigationToolbar }
-            .limitReachedAlert(.tabs, isPresented: $showingTabLimitAlert)
             .limitReachedAlert(.fileTabs, isPresented: $showingFileTabLimitAlert)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -288,14 +286,6 @@ struct ServerTerminalRoute: View {
         }
 
         ToolbarItemGroup(placement: .navigationBarTrailing) {
-            if let server = selectedServer, selectedView == ConnectionViewTab.terminal.id {
-                Button {
-                    openNewTab(for: server)
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-
             if let server = selectedServer, selectedView == ConnectionViewTab.files.id {
                 Button {
                     openNewFileTab(for: server)
@@ -524,26 +514,6 @@ struct ServerTerminalRoute: View {
         if currentServerId == nil && !isConnecting {
             isZenModeEnabled = false
             onBack()
-        }
-    }
-
-    private func openNewTab(for server: Server) {
-        guard tabManager.canOpenNewTab else {
-            showingTabLimitAlert = true
-            return
-        }
-
-        Task {
-            do {
-                let tab = try await tabManager.openTab(for: server)
-                await MainActor.run {
-                    currentServerId = server.id
-                    tabManager.selectedViewByServer[server.id] = viewTabConfig.effectiveView(for: ConnectionViewTab.terminal.id)
-                    tabManager.selectedTabByServer[server.id] = tab.id
-                }
-            } catch {
-                // No-op: user cancelled biometric auth or open failed.
-            }
         }
     }
 
