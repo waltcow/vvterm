@@ -1,3 +1,4 @@
+#if os(iOS)
 import XCTest
 
 final class TerminalKeyboardUITests: XCTestCase {
@@ -1131,3 +1132,4 @@ final class TerminalKeyboardUITests: XCTestCase {
         case missing(String)
     }
 }
+#endif

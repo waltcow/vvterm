@@ -1,3 +1,4 @@
+#if os(iOS)
 import XCTest
 
 final class TerminalReconnectUITests: XCTestCase {
@@ -567,3 +568,4 @@ final class TerminalReconnectUITests: XCTestCase {
         return diagnostics.exists ? diagnostics.label : "diagnostics unavailable; app state=\(app.state.rawValue)"
     }
 }
+#endif
