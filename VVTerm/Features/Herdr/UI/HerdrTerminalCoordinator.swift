@@ -277,10 +277,7 @@ final class HerdrTerminalCoordinator {
                         publish(.handshaking, for: connectionID)
                     case .ansi(_, _, _, _, let bytes):
                         terminal.feedData(bytes)
-                        publish(
-                            .attached(versionWarning: connection.versionWarning),
-                            for: connectionID
-                        )
+                        publish(.attached, for: connectionID)
                     case .graphics:
                         continue
                     case .shutdown(let reason):

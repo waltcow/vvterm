@@ -43,20 +43,6 @@ nonisolated enum HerdrSuspensionReason: Equatable, Sendable {
     case offline
 }
 
-nonisolated struct HerdrBinaryVersionWarning: Equatable, Sendable {
-    let testedVersion: String
-    let clientVersion: String
-    let serverVersion: String
-    let protocolVersion: Int
-
-    var message: String {
-        if clientVersion == serverVersion {
-            return "Herdr \(clientVersion) uses compatible protocol \(protocolVersion). VVTerm was tested with Herdr \(testedVersion)."
-        }
-        return "Herdr client \(clientVersion) and server \(serverVersion) use compatible protocol \(protocolVersion). VVTerm was tested with Herdr \(testedVersion)."
-    }
-}
-
 nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     case binaryMissing
     case runtimeUnavailable(sessionName: String)
@@ -110,7 +96,7 @@ nonisolated enum HerdrConnectionState: Equatable, Sendable {
     case idle
     case connecting
     case handshaking
-    case attached(versionWarning: HerdrBinaryVersionWarning?)
+    case attached
     case suspended(HerdrSuspensionReason)
     case reconnecting(attempt: Int)
     case failed(HerdrFailure)

@@ -9,7 +9,7 @@ struct HerdrPreflightTests {
 
         #expect(
             HerdrPreflightEvaluator().evaluate(stdout: json)
-                == .compatible(versionWarning: nil)
+                == .compatible
         )
     }
 
@@ -24,23 +24,16 @@ struct HerdrPreflightTests {
     }
 
     @Test
-    func acceptsBinaryVersionDriftWithSoftWarningWhenProtocolMatches() {
+    func acceptsBinaryVersionDriftSilentlyWhenProtocolMatches() {
         let status = HerdrPreflightStatus(
             client: .init(version: "0.7.5", protocolVersion: 16, binary: "herdr"),
             server: .init(running: true, version: "0.7.6", protocolVersion: 16, compatible: true)
         )
 
-        let warning = HerdrBinaryVersionWarning(
-            testedVersion: "0.7.4",
-            clientVersion: "0.7.5",
-            serverVersion: "0.7.6",
-            protocolVersion: 16
-        )
         #expect(
             HerdrPreflightEvaluator().evaluate(status: status)
-                == .compatible(versionWarning: warning)
+                == .compatible
         )
-        #expect(warning.message.contains("compatible protocol 16"))
     }
 
     @Test
@@ -63,15 +56,9 @@ struct HerdrPreflightTests {
             server: .init(running: true, version: "0.7.4", protocolVersion: 16, compatible: false)
         )
 
-        let warning = HerdrBinaryVersionWarning(
-            testedVersion: "0.7.4",
-            clientVersion: "0.7.5",
-            serverVersion: "0.7.4",
-            protocolVersion: 16
-        )
         #expect(
             HerdrPreflightEvaluator().evaluate(status: status)
-                == .compatible(versionWarning: warning)
+                == .compatible
         )
     }
 
@@ -156,6 +143,6 @@ struct HerdrPreflightTests {
             )
         }
 
-        #expect(result == .compatible(versionWarning: nil))
+        #expect(result == .compatible)
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum HerdrPreflightResult: Equatable, Sendable {
-    case compatible(versionWarning: HerdrBinaryVersionWarning?)
+    case compatible
     case binaryMissing
     case runtimeUnavailable
     case bridgeUnavailable
@@ -41,14 +41,9 @@ nonisolated struct HerdrPreflightStatus: Decodable, Equatable, Sendable {
 }
 
 nonisolated struct HerdrPreflightEvaluator: Sendable {
-    let expectedVersion: String
     let expectedProtocol: Int
 
-    init(
-        expectedVersion: String = HerdrPinnedContract.binaryVersion,
-        expectedProtocol: Int = HerdrPinnedContract.protocolVersion
-    ) {
-        self.expectedVersion = expectedVersion
+    init(expectedProtocol: Int = HerdrPinnedContract.protocolVersion) {
         self.expectedProtocol = expectedProtocol
     }
 
@@ -66,26 +61,12 @@ nonisolated struct HerdrPreflightEvaluator: Sendable {
         guard status.server.running else {
             return .runtimeUnavailable
         }
-        guard let serverVersion = status.server.version else {
-            return .invalidStatus
-        }
         guard let serverProtocol = status.server.protocolVersion else {
             return .invalidStatus
         }
         guard serverProtocol == expectedProtocol else {
             return .protocolMismatch(client: expectedProtocol, remote: serverProtocol)
         }
-        let versionWarning: HerdrBinaryVersionWarning?
-        if status.client.version != expectedVersion || serverVersion != expectedVersion {
-            versionWarning = HerdrBinaryVersionWarning(
-                testedVersion: expectedVersion,
-                clientVersion: status.client.version,
-                serverVersion: serverVersion,
-                protocolVersion: expectedProtocol
-            )
-        } else {
-            versionWarning = nil
-        }
-        return .compatible(versionWarning: versionWarning)
+        return .compatible
     }
 }

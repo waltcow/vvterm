@@ -56,7 +56,6 @@ struct HerdrWorkspaceConnectionTests {
             commandBuilder: HerdrRemoteCommandBuilder(sessionName: "vvterm")
         )
         let connection = try await transport.startWorkspaceConnection(cols: 80, rows: 24)
-        #expect(connection.versionWarning == nil)
 
         #expect(await fake.commands == [
             "exec 'herdr' '--session' 'vvterm' 'status' '--json'",

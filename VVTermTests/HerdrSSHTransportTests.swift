@@ -71,7 +71,7 @@ struct HerdrSSHTransportTests {
             commandBuilder: HerdrRemoteCommandBuilder(sessionName: "vvterm")
         )
 
-        #expect(try await transport.preflight() == .compatible(versionWarning: nil))
+        #expect(try await transport.preflight() == .compatible)
         #expect(await fake.executedCommands == [
             "exec 'herdr' '--session' 'vvterm' 'status' '--json'",
         ])

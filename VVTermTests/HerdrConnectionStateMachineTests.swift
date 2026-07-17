@@ -32,7 +32,7 @@ struct HerdrConnectionStateMachineTests {
         let reconnectStart = machine.begin(reconnectingAttempt: 1)
         let current = try #require(reconnectStart)
 
-        let staleTransition = machine.transition(to: .attached(versionWarning: nil), for: old)
+        let staleTransition = machine.transition(to: .attached, for: old)
         let staleFinish = machine.finish(old, as: .failed(.unknown("stale")))
         #expect(!staleTransition)
         #expect(!staleFinish)
@@ -40,10 +40,10 @@ struct HerdrConnectionStateMachineTests {
         #expect(machine.state == .reconnecting(attempt: 1))
 
         let didHandshake = machine.transition(to: .handshaking, for: current)
-        let didAttach = machine.transition(to: .attached(versionWarning: nil), for: current)
+        let didAttach = machine.transition(to: .attached, for: current)
         #expect(didHandshake)
         #expect(didAttach)
-        #expect(machine.state == .attached(versionWarning: nil))
+        #expect(machine.state == .attached)
     }
 
     @Test
@@ -56,7 +56,7 @@ struct HerdrConnectionStateMachineTests {
         #expect(invalidated == active)
         #expect(machine.activeConnectionID == nil)
         #expect(machine.state == .suspended(.background))
-        let staleTransition = machine.transition(to: .attached(versionWarning: nil), for: active)
+        let staleTransition = machine.transition(to: .attached, for: active)
         #expect(!staleTransition)
     }
 }

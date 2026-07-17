@@ -110,10 +110,8 @@ struct HerdrWorkspaceView: View {
         switch state {
         case .idle:
             progressCard(title: "Preparing Herdr…")
-        case .attached(let versionWarning):
-            if let versionWarning {
-                versionWarningBanner(versionWarning)
-            }
+        case .attached:
+            EmptyView()
         case .connecting:
             progressCard(title: "Connecting to Herdr…")
         case .handshaking:
@@ -161,25 +159,6 @@ struct HerdrWorkspaceView: View {
         .padding(.vertical, 14)
         .background(.regularMaterial, in: Capsule())
         .accessibilityIdentifier("herdr.connecting")
-    }
-
-    private func versionWarningBanner(_ warning: HerdrBinaryVersionWarning) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
-            Text(warning.message)
-                .font(.caption)
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.leading)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: 520)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding()
-        .allowsHitTesting(false)
-        .accessibilityIdentifier("herdr.versionWarning")
     }
 
     private var isAttached: Bool {
