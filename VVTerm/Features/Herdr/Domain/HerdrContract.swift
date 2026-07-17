@@ -43,12 +43,26 @@ nonisolated enum HerdrSuspensionReason: Equatable, Sendable {
     case offline
 }
 
+nonisolated struct HerdrBinaryVersionWarning: Equatable, Sendable {
+    let testedVersion: String
+    let clientVersion: String
+    let serverVersion: String
+    let protocolVersion: Int
+
+    var message: String {
+        if clientVersion == serverVersion {
+            return "Herdr \(clientVersion) uses compatible protocol \(protocolVersion). VVTerm was tested with Herdr \(testedVersion)."
+        }
+        return "Herdr client \(clientVersion) and server \(serverVersion) use compatible protocol \(protocolVersion). VVTerm was tested with Herdr \(testedVersion)."
+    }
+}
+
 nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     case binaryMissing
     case runtimeUnavailable(sessionName: String)
     case bridgeUnavailable
-    case versionMismatch(client: String, remote: String)
     case protocolMismatch(client: Int, remote: Int)
+    case runtimeIncompatible(clientVersion: String, serverVersion: String)
     case invalidStatus
     case authenticationFailed
     case hostKeyVerificationFailed
@@ -68,10 +82,10 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
             return "Start the named Herdr session '\(sessionName)' on the server, then retry."
         case .bridgeUnavailable:
             return "This Herdr installation does not provide the remote client bridge."
-        case .versionMismatch(let client, let remote):
-            return "Herdr version mismatch: VVTerm expects \(client), server has \(remote)."
         case .protocolMismatch(let client, let remote):
             return "Herdr protocol mismatch: VVTerm expects \(client), server has \(remote)."
+        case .runtimeIncompatible(let clientVersion, let serverVersion):
+            return "Herdr reports client \(clientVersion) and server \(serverVersion) are incompatible."
         case .invalidStatus:
             return "Herdr returned an invalid status response."
         case .authenticationFailed:
@@ -99,8 +113,15 @@ nonisolated enum HerdrConnectionState: Equatable, Sendable {
     case idle
     case connecting
     case handshaking
-    case attached
+    case attached(versionWarning: HerdrBinaryVersionWarning?)
     case suspended(HerdrSuspensionReason)
     case reconnecting(attempt: Int)
     case failed(HerdrFailure)
+
+    var isAttached: Bool {
+        if case .attached = self {
+            return true
+        }
+        return false
+    }
 }

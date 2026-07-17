@@ -1,12 +1,12 @@
 import Foundation
 
 nonisolated enum HerdrPreflightResult: Equatable, Sendable {
-    case compatible
+    case compatible(versionWarning: HerdrBinaryVersionWarning?)
     case binaryMissing
     case runtimeUnavailable
     case bridgeUnavailable
-    case versionMismatch(client: String, remote: String)
     case protocolMismatch(client: Int, remote: Int)
+    case runtimeIncompatible(clientVersion: String, serverVersion: String)
     case invalidStatus
 }
 
@@ -61,9 +61,6 @@ nonisolated struct HerdrPreflightEvaluator: Sendable {
     }
 
     func evaluate(status: HerdrPreflightStatus) -> HerdrPreflightResult {
-        guard status.client.version == expectedVersion else {
-            return .versionMismatch(client: expectedVersion, remote: status.client.version)
-        }
         guard status.client.protocolVersion == expectedProtocol else {
             return .protocolMismatch(client: expectedProtocol, remote: status.client.protocolVersion)
         }
@@ -73,9 +70,6 @@ nonisolated struct HerdrPreflightEvaluator: Sendable {
         guard let serverVersion = status.server.version else {
             return .invalidStatus
         }
-        guard serverVersion == expectedVersion else {
-            return .versionMismatch(client: expectedVersion, remote: serverVersion)
-        }
         guard let serverProtocol = status.server.protocolVersion else {
             return .invalidStatus
         }
@@ -83,8 +77,23 @@ nonisolated struct HerdrPreflightEvaluator: Sendable {
             return .protocolMismatch(client: expectedProtocol, remote: serverProtocol)
         }
         guard status.server.compatible != false else {
-            return .protocolMismatch(client: expectedProtocol, remote: serverProtocol)
+            return .runtimeIncompatible(
+                clientVersion: status.client.version,
+                serverVersion: serverVersion
+            )
         }
-        return .compatible
+
+        let versionWarning: HerdrBinaryVersionWarning?
+        if status.client.version != expectedVersion || serverVersion != expectedVersion {
+            versionWarning = HerdrBinaryVersionWarning(
+                testedVersion: expectedVersion,
+                clientVersion: status.client.version,
+                serverVersion: serverVersion,
+                protocolVersion: expectedProtocol
+            )
+        } else {
+            versionWarning = nil
+        }
+        return .compatible(versionWarning: versionWarning)
     }
 }

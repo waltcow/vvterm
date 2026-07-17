@@ -13,10 +13,13 @@ enum HerdrFailureClassifier {
                     return .runtimeUnavailable(sessionName: sessionName)
                 case .bridgeUnavailable:
                     return .bridgeUnavailable
-                case .versionMismatch(let client, let remote):
-                    return .versionMismatch(client: client, remote: remote)
                 case .protocolMismatch(let client, let remote):
                     return .protocolMismatch(client: client, remote: remote)
+                case .runtimeIncompatible(let clientVersion, let serverVersion):
+                    return .runtimeIncompatible(
+                        clientVersion: clientVersion,
+                        serverVersion: serverVersion
+                    )
                 case .invalidStatus:
                     return .invalidStatus
                 case .compatible:

@@ -6,6 +6,8 @@ nonisolated enum HerdrWorkspaceConnectionError: Error, Equatable, Sendable {
     case concurrentRead
 }
 actor HerdrWorkspaceConnection {
+    nonisolated let versionWarning: HerdrBinaryVersionWarning?
+
     private let ssh: any HerdrSSHExecuting
     private let handle: SSHExecStreamHandle
     private let adapter: HerdrClientKitAdapter
@@ -18,11 +20,13 @@ actor HerdrWorkspaceConnection {
     init(
         ssh: any HerdrSSHExecuting,
         handle: SSHExecStreamHandle,
-        adapter: HerdrClientKitAdapter
+        adapter: HerdrClientKitAdapter,
+        versionWarning: HerdrBinaryVersionWarning?
     ) {
         self.ssh = ssh
         self.handle = handle
         self.adapter = adapter
+        self.versionWarning = versionWarning
     }
 
     var id: UUID { handle.id }

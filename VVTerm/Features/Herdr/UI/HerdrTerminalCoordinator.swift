@@ -277,7 +277,10 @@ final class HerdrTerminalCoordinator {
                         publish(.handshaking, for: connectionID)
                     case .ansi(_, _, _, _, let bytes):
                         terminal.feedData(bytes)
-                        publish(.attached, for: connectionID)
+                        publish(
+                            .attached(versionWarning: connection.versionWarning),
+                            for: connectionID
+                        )
                     case .graphics:
                         continue
                     case .shutdown(let reason):
@@ -371,7 +374,7 @@ final class HerdrTerminalCoordinator {
 
     private func publish(_ state: HerdrConnectionState, for connectionID: UUID) {
         guard stateMachine.transition(to: state, for: connectionID) else { return }
-        if state == .attached {
+        if state.isAttached {
             reconnectBackoff.reset()
         }
         stateDelivery.enqueue(state)

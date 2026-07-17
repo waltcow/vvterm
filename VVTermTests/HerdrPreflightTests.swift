@@ -7,7 +7,10 @@ struct HerdrPreflightTests {
     func acceptsPinnedClientAndRunningServer() {
         let json = Data(#"{"client":{"version":"0.7.4","channel":"stable","protocol":16,"binary":"/opt/homebrew/bin/herdr","session":"vvterm"},"server":{"status":"running","running":true,"version":"0.7.4","protocol":16,"capabilities":{"live_handoff":true,"detached_server_daemon":true},"compatible":true,"socket":"/tmp/herdr.sock","session":"vvterm","restart_needed":false},"update":{"restart_needed":false}}"#.utf8)
 
-        #expect(HerdrPreflightEvaluator().evaluate(stdout: json) == .compatible)
+        #expect(
+            HerdrPreflightEvaluator().evaluate(stdout: json)
+                == .compatible(versionWarning: nil)
+        )
     }
 
     @Test
@@ -18,6 +21,52 @@ struct HerdrPreflightTests {
         )
 
         #expect(HerdrPreflightEvaluator().evaluate(status: status) == .protocolMismatch(client: 16, remote: 17))
+    }
+
+    @Test
+    func acceptsBinaryVersionDriftWithSoftWarningWhenProtocolMatches() {
+        let status = HerdrPreflightStatus(
+            client: .init(version: "0.7.5", protocolVersion: 16, binary: "herdr"),
+            server: .init(running: true, version: "0.7.6", protocolVersion: 16, compatible: true)
+        )
+
+        let warning = HerdrBinaryVersionWarning(
+            testedVersion: "0.7.4",
+            clientVersion: "0.7.5",
+            serverVersion: "0.7.6",
+            protocolVersion: 16
+        )
+        #expect(
+            HerdrPreflightEvaluator().evaluate(status: status)
+                == .compatible(versionWarning: warning)
+        )
+        #expect(warning.message.contains("compatible protocol 16"))
+    }
+
+    @Test
+    func rejectsServerProtocolMismatchDespiteBinaryVersionMatch() {
+        let status = HerdrPreflightStatus(
+            client: .init(version: "0.7.4", protocolVersion: 16, binary: "herdr"),
+            server: .init(running: true, version: "0.7.4", protocolVersion: 17, compatible: false)
+        )
+
+        #expect(
+            HerdrPreflightEvaluator().evaluate(status: status)
+                == .protocolMismatch(client: 16, remote: 17)
+        )
+    }
+
+    @Test
+    func rejectsRuntimeThatExplicitlyReportsIncompatible() {
+        let status = HerdrPreflightStatus(
+            client: .init(version: "0.7.5", protocolVersion: 16, binary: "herdr"),
+            server: .init(running: true, version: "0.7.4", protocolVersion: 16, compatible: false)
+        )
+
+        #expect(
+            HerdrPreflightEvaluator().evaluate(status: status)
+                == .runtimeIncompatible(clientVersion: "0.7.5", serverVersion: "0.7.4")
+        )
     }
 
     @Test
@@ -101,6 +150,6 @@ struct HerdrPreflightTests {
             )
         }
 
-        #expect(result == .compatible)
+        #expect(result == .compatible(versionWarning: nil))
     }
 }

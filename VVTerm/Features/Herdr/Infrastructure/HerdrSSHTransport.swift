@@ -48,12 +48,17 @@ nonisolated struct HerdrSSHTransport: Sendable {
             throw HerdrSSHTransportError.invalidDimensions
         }
         let preflightResult = try await preflight()
-        guard preflightResult == .compatible else {
+        guard case .compatible(let versionWarning) = preflightResult else {
             throw HerdrSSHTransportError.preflightFailed(preflightResult)
         }
         let adapter = try HerdrClientKitAdapter(cols: cols, rows: rows)
         let handle = try await startWorkspaceBridge()
-        let connection = HerdrWorkspaceConnection(ssh: ssh, handle: handle, adapter: adapter)
+        let connection = HerdrWorkspaceConnection(
+            ssh: ssh,
+            handle: handle,
+            adapter: adapter,
+            versionWarning: versionWarning
+        )
         do {
             try await connection.bootstrap()
             return connection
