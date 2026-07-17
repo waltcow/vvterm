@@ -62,7 +62,6 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
     case runtimeUnavailable(sessionName: String)
     case bridgeUnavailable
     case protocolMismatch(client: Int, remote: Int)
-    case runtimeIncompatible(clientVersion: String, serverVersion: String)
     case invalidStatus
     case authenticationFailed
     case hostKeyVerificationFailed
@@ -84,8 +83,6 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
             return "This Herdr installation does not provide the remote client bridge."
         case .protocolMismatch(let client, let remote):
             return "Herdr protocol mismatch: VVTerm expects \(client), server has \(remote)."
-        case .runtimeIncompatible(let clientVersion, let serverVersion):
-            return "Herdr reports client \(clientVersion) and server \(serverVersion) are incompatible."
         case .invalidStatus:
             return "Herdr returned an invalid status response."
         case .authenticationFailed:

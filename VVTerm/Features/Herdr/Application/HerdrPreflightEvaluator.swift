@@ -6,7 +6,6 @@ nonisolated enum HerdrPreflightResult: Equatable, Sendable {
     case runtimeUnavailable
     case bridgeUnavailable
     case protocolMismatch(client: Int, remote: Int)
-    case runtimeIncompatible(clientVersion: String, serverVersion: String)
     case invalidStatus
 }
 
@@ -76,13 +75,6 @@ nonisolated struct HerdrPreflightEvaluator: Sendable {
         guard serverProtocol == expectedProtocol else {
             return .protocolMismatch(client: expectedProtocol, remote: serverProtocol)
         }
-        guard status.server.compatible != false else {
-            return .runtimeIncompatible(
-                clientVersion: status.client.version,
-                serverVersion: serverVersion
-            )
-        }
-
         let versionWarning: HerdrBinaryVersionWarning?
         if status.client.version != expectedVersion || serverVersion != expectedVersion {
             versionWarning = HerdrBinaryVersionWarning(

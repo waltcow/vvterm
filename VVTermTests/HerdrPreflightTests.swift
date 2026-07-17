@@ -57,15 +57,21 @@ struct HerdrPreflightTests {
     }
 
     @Test
-    func rejectsRuntimeThatExplicitlyReportsIncompatible() {
+    func ignoresLegacyCompatibleFlagWhenProtocolsMatch() {
         let status = HerdrPreflightStatus(
             client: .init(version: "0.7.5", protocolVersion: 16, binary: "herdr"),
             server: .init(running: true, version: "0.7.4", protocolVersion: 16, compatible: false)
         )
 
+        let warning = HerdrBinaryVersionWarning(
+            testedVersion: "0.7.4",
+            clientVersion: "0.7.5",
+            serverVersion: "0.7.4",
+            protocolVersion: 16
+        )
         #expect(
             HerdrPreflightEvaluator().evaluate(status: status)
-                == .runtimeIncompatible(clientVersion: "0.7.5", serverVersion: "0.7.4")
+                == .compatible(versionWarning: warning)
         )
     }
 

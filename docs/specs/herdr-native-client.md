@@ -325,13 +325,12 @@ enum HerdrPreflightResult: Equatable {
     case runtimeUnavailable
     case bridgeUnavailable
     case protocolMismatch(client: Int, remote: Int)
-    case runtimeIncompatible(clientVersion: String, serverVersion: String)
 }
 ```
 
 实际命令和 JSON Schema 必须根据固定的 Herdr revision 验证。只要存在结构化结果，就不能解析面向人的文本输出。
 
-`startWorkspaceConnection` 必须在创建 ClientKit 或打开 private bridge 前执行预检，并且只允许 `.compatible` 继续。Binary Version 警告不得阻止连接；`.runtimeUnavailable`、协议不匹配、远端明确报告不兼容和无效状态必须直接返回确定性错误，不能退化为等待 bridge 的 socket timeout。
+`startWorkspaceConnection` 必须在创建 ClientKit 或打开 private bridge 前执行预检，并且只允许 `.compatible` 继续。Binary Version 警告不得阻止连接；`.runtimeUnavailable`、协议不匹配和无效状态必须直接返回确定性错误，不能退化为等待 bridge 的 socket timeout。`server.compatible` 是旧版 Herdr 对 binary 组合的汇总判断，不参与硬拒绝；只要 client/server protocol 都匹配，就继续连接并按 binary version 显示软提示。
 
 Session Name 还受远端 Unix socket 完整路径长度限制。测试 fixture 和自动生成的临时 session 必须使用短名称；不能直接把完整 UUID 拼接到长前缀后作为 session name，否则 macOS 可能在输出结构化 status 前返回 `sockaddr_un.sun_path` 超限错误。
 
@@ -465,7 +464,7 @@ Attachment 连接必须启用 SSH Keepalive 或应用层心跳，并定义明确
 
 - App 在前台时使用有上限的指数退避
 - 用户主动 detach 后停止重试
-- 协议不匹配或远端明确报告不兼容时停止并提示操作
+- client/server 协议不匹配时停止并提示操作
 - 避免无意创建两个可写 Controller
 - 取消旧 Stream Reader 和 Pending Write
 - 收到 Full Redraw 前不得把旧画面视为当前状态

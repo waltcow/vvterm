@@ -15,11 +15,6 @@ enum HerdrFailureClassifier {
                     return .bridgeUnavailable
                 case .protocolMismatch(let client, let remote):
                     return .protocolMismatch(client: client, remote: remote)
-                case .runtimeIncompatible(let clientVersion, let serverVersion):
-                    return .runtimeIncompatible(
-                        clientVersion: clientVersion,
-                        serverVersion: serverVersion
-                    )
                 case .invalidStatus:
                     return .invalidStatus
                 case .compatible:
