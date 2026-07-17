@@ -12,8 +12,18 @@ nonisolated enum HerdrPinnedContract {
 }
 
 nonisolated struct HerdrRuntimeReference: Hashable, Sendable {
+    static let defaultSessionName = "default"
+
     let serverId: UUID
     let sessionName: String
+
+    init(
+        serverId: UUID,
+        sessionName: String = Self.defaultSessionName
+    ) {
+        self.serverId = serverId
+        self.sessionName = sessionName
+    }
 }
 
 nonisolated enum HerdrAttachmentMode: Hashable, Sendable {
@@ -52,6 +62,9 @@ nonisolated enum HerdrFailure: Error, Equatable, Sendable {
         case .binaryMissing:
             return "Herdr 0.7.4 is not installed on this server."
         case .runtimeUnavailable(let sessionName):
+            if sessionName == HerdrRuntimeReference.defaultSessionName {
+                return "Start the default Herdr session on the server, then retry."
+            }
             return "Start the named Herdr session '\(sessionName)' on the server, then retry."
         case .bridgeUnavailable:
             return "This Herdr installation does not provide the remote client bridge."

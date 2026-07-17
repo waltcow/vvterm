@@ -43,7 +43,10 @@ nonisolated struct HerdrRemoteCommandBuilder: Sendable {
     }
 
     private func command(arguments: [String]) -> String {
-        let words = [executable, "--session", sessionName] + arguments
+        let sessionArguments = sessionName == HerdrRuntimeReference.defaultSessionName
+            ? []
+            : ["--session", sessionName]
+        let words = [executable] + sessionArguments + arguments
         return "exec " + words.map(Self.shellQuote).joined(separator: " ")
     }
 

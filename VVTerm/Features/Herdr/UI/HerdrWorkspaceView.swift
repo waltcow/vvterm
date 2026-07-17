@@ -28,7 +28,7 @@ struct HerdrWorkspaceView: View {
     init(
         server: Server,
         isVisible: Bool,
-        sessionName: String = "vvterm",
+        sessionName: String = HerdrRuntimeReference.defaultSessionName,
         networkMonitor: NetworkMonitor? = nil
     ) {
         self.server = server

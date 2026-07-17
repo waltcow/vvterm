@@ -56,6 +56,20 @@ struct HerdrPreflightTests {
     }
 
     @Test
+    func defaultRuntimeUsesCanonicalSessionWithoutNamedSessionFlag() {
+        let runtime = HerdrRuntimeReference(serverId: UUID())
+        let builder = HerdrRemoteCommandBuilder(sessionName: runtime.sessionName)
+
+        #expect(runtime.sessionName == "default")
+        #expect(builder.status() == "exec 'herdr' 'status' '--json'")
+        #expect(builder.workspaceBridge() == "exec 'herdr' 'remote-client-bridge'")
+        #expect(
+            HerdrFailure.runtimeUnavailable(sessionName: runtime.sessionName).message
+                == "Start the default Herdr session on the server, then retry."
+        )
+    }
+
+    @Test
     func serviceMapsShellCommandNotFoundWithoutParsingStderr() async throws {
         let service = HerdrPreflightService(
             commandBuilder: HerdrRemoteCommandBuilder(sessionName: "vvterm")
