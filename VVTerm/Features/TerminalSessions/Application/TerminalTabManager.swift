@@ -618,11 +618,7 @@ final class TerminalTabManager: ObservableObject {
 
     private func splitPane(tab: TerminalTab, paneId: UUID, placement: TerminalSplitPlacement) -> UUID? {
         guard StoreManager.shared.isPro else { return nil }
-        let newPaneId = createSplitPane(tab: tab, paneId: paneId, placement: placement)
-        if newPaneId != nil {
-            AnalyticsTracker.shared.trackSplitPaneCreated()
-        }
-        return newPaneId
+        return createSplitPane(tab: tab, paneId: paneId, placement: placement)
     }
 
     private func createSplitPane(tab: TerminalTab, paneId: UUID, placement: TerminalSplitPlacement) -> UUID? {
@@ -1237,10 +1233,7 @@ final class TerminalTabManager: ObservableObject {
             if let serverId {
                 refreshConnectedServerState(for: serverId)
             }
-            EngagementTracker.shared.recordSuccessfulConnection(
-                id: paneId,
-                transport: paneStates[paneId]?.activeTransport.rawValue ?? ShellTransport.ssh.rawValue
-            )
+            EngagementTracker.shared.recordSuccessfulConnection(id: paneId)
         case .idle:
             if let serverId {
                 refreshConnectedServerState(for: serverId)

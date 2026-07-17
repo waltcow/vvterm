@@ -291,7 +291,6 @@ struct ProUpgradeSheet: View {
         VStack(spacing: 5) {
             Button {
                 if let product = selectedProduct {
-                    storeManager.notePaywallCTATapped(product: product)
                     Task { await storeManager.purchase(product) }
                 }
             } label: {

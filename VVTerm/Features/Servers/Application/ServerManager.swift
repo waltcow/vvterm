@@ -35,7 +35,7 @@ final class ServerManager: ObservableObject {
     private init() {
         // Load local data first (fast)
         loadLocalData()
-        refreshFreePlanGeneration(persistCurrentIfNeeded: !isSyncEnabled, reason: "local_load")
+        refreshFreePlanGeneration(persistCurrentIfNeeded: !isSyncEnabled)
         // Then sync with CloudKit in background
         Task { await loadData() }
     }
@@ -121,16 +121,16 @@ final class ServerManager: ObservableObject {
         return FreePlanGeneration(rawValue: rawValue)
     }
 
-    private func refreshFreePlanGeneration(persistCurrentIfNeeded: Bool, reason: String) {
+    private func refreshFreePlanGeneration(persistCurrentIfNeeded: Bool) {
         if let storedGeneration = Self.loadStoredFreePlanGeneration() {
             freePlanGeneration = storedGeneration
             return
         }
 
         if hasLegacyFreePlanEvidence {
-            persistFreePlanGeneration(.legacyThreeServers, reason: reason)
+            persistFreePlanGeneration(.legacyThreeServers)
         } else if persistCurrentIfNeeded {
-            persistFreePlanGeneration(.currentOneServer, reason: reason)
+            persistFreePlanGeneration(.currentOneServer)
         } else {
             freePlanGeneration = .currentOneServer
         }
@@ -140,14 +140,9 @@ final class ServerManager: ObservableObject {
         servers.contains { $0.createdAt < FreeTierLimits.currentOneServerPlanCutoff }
     }
 
-    private func persistFreePlanGeneration(_ generation: FreePlanGeneration, reason: String) {
+    private func persistFreePlanGeneration(_ generation: FreePlanGeneration) {
         freePlanGeneration = generation
         UserDefaults.standard.set(generation.rawValue, forKey: FreeTierLimits.planGenerationStorageKey)
-        AnalyticsTracker.shared.trackFreePlanGenerationAssigned(
-            generation: generation.rawValue,
-            serverCount: servers.count,
-            reason: reason
-        )
     }
 
     private var pendingBootstrapWorkspaceID: UUID? {
@@ -455,7 +450,7 @@ final class ServerManager: ObservableObject {
 
         guard isSyncEnabled else {
             logger.info("iCloud sync disabled; using local data only")
-            refreshFreePlanGeneration(persistCurrentIfNeeded: true, reason: "local_only")
+            refreshFreePlanGeneration(persistCurrentIfNeeded: true)
             return
         }
 
@@ -482,7 +477,7 @@ final class ServerManager: ObservableObject {
 
             // Save merged data locally
             saveLocalData()
-            refreshFreePlanGeneration(persistCurrentIfNeeded: true, reason: "cloudkit_load")
+            refreshFreePlanGeneration(persistCurrentIfNeeded: true)
 
             logger.info("Loaded \(self.workspaces.count) workspaces and \(self.servers.count) servers from CloudKit")
         } catch {

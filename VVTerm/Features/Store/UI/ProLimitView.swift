@@ -126,36 +126,7 @@ struct LimitReachedAlert: ViewModifier {
             } message: {
                 Text(limitType.message(serverLimit: serverManager.freeServerLimit))
             }
-            .onChangeCompat(of: isPresented) { presented in
-                if presented {
-                    trackLimitHit()
-                }
-            }
             .proUpgradePresentation(isPresented: $showUpgrade, source: limitType.paywallSource)
-    }
-
-    private func trackLimitHit() {
-        let current: Int
-        let limit: Int
-
-        switch limitType {
-        case .servers:
-            current = serverManager.servers.count
-            limit = serverManager.freeServerLimit
-        case .workspaces:
-            current = serverManager.workspaces.count
-            limit = FreeTierLimits.maxWorkspaces
-        case .tabs, .fileTabs:
-            current = FreeTierLimits.maxTabs
-            limit = FreeTierLimits.maxTabs
-        }
-
-        AnalyticsTracker.shared.trackLimitHit(
-            source: limitType.paywallSource.rawValue,
-            generation: serverManager.freePlanGeneration.rawValue,
-            current: current,
-            limit: limit
-        )
     }
 }
 

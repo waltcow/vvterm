@@ -81,7 +81,6 @@ private struct WelcomeContent: View {
             VStack(spacing: 12) {
                 Button {
                     hasSeenWelcome = true
-                    AnalyticsTracker.shared.trackWelcomeCompleted()
                 } label: {
                     Text("Continue")
                         .frame(maxWidth: 420)

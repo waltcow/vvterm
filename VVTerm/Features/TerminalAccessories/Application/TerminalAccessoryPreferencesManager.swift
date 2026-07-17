@@ -136,7 +136,6 @@ final class TerminalAccessoryPreferencesManager: ObservableObject {
         applyProfileMutation(at: now) { nextProfile, _ in
             nextProfile.customActions.insert(action, at: 0)
         }
-        AnalyticsTracker.shared.trackCustomActionCreated(kind: kind.rawValue)
         return action
     }
 

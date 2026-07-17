@@ -1194,8 +1194,6 @@
 "Free plan allows %lld active connection. Disconnect another server or upgrade." = "Free plan allows %lld active connection. Disconnect another server or upgrade.";
 "From" = "From";
 "Group" = "Group";
-"Help Improve VVTerm" = "Help Improve VVTerm";
-"Help Improve VVTerm shares anonymous statistics about which features are used — never what you type, your servers, or anything that identifies you." = "Help Improve VVTerm shares anonymous statistics about which features are used — never what you type, your servers, or anything that identifies you.";
 "Hide Hidden Files" = "Hide Hidden Files";
 "Hide Sidebar" = "Hide Sidebar";
 "Hide search" = "Hide search";

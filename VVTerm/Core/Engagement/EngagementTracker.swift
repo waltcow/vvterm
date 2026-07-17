@@ -67,10 +67,9 @@ final class EngagementTracker: ObservableObject {
 
     /// Counts a session or pane that reached a connected state, once per launch per id,
     /// so reconnect cycles within a launch do not inflate the totals.
-    func recordSuccessfulConnection(id: UUID, transport: String) {
+    func recordSuccessfulConnection(id: UUID) {
         guard !connectionsCountedThisLaunch.contains(id) else { return }
         connectionsCountedThisLaunch.insert(id)
-        AnalyticsTracker.shared.trackConnectionSucceeded(transport: transport)
         defaults.set(successfulConnectionCount + 1, forKey: Keys.successfulConnectionCount)
 
         let today = Calendar.current.startOfDay(for: Date())
@@ -178,7 +177,6 @@ final class EngagementTracker: ObservableObject {
             return
         }
         defaults.set(Date(), forKey: Keys.lastReviewRequest)
-        AnalyticsTracker.shared.trackReviewPromptRequested()
         reviewRequestToken += 1
     }
 }
