@@ -79,13 +79,13 @@ VVTerm 负责：
 
 ## 第一版约束
 
-第一版面向版本完全受控的个人部署：
+第一版面向协议版本受控的个人部署：
 
-- VVTerm 内置客户端和远程 Herdr binary 来自约定的同一源码 revision。
+- VVTerm 内置客户端来自固定源码 revision，远程 Herdr binary 可以使用协议兼容的其他版本。
 - 远程服务器已经安装 Herdr。
 - 远程目标是可通过标准 SSH 连接的 POSIX Linux 或 macOS 主机。
 - Apple 目标只要求 arm64：iOS 真机、Apple Silicon iOS Simulator、macOS arm64。
-- 版本不一致时直接拒绝连接并显示明确错误，不进行协议协商。
+- Protocol Version 不一致时直接拒绝连接；Binary Version 不一致时显示非阻塞警告并继续握手。
 
 这些约束只缩小产品范围，不降低传输正确性和生命周期要求。
 
@@ -316,22 +316,22 @@ Bridge 必须：
 - Runtime/Server 是否可用
 - 是否支持目标 Bridge
 
-内置 Framework 同时暴露自身 Version 和 Protocol Version。第一版只接受严格匹配。
+内置 Framework 同时暴露自身 Version 和 Protocol Version。Protocol Version 必须严格匹配；Binary Version 只用于显示已测试版本与远端版本的非阻塞警告。
 
 ```swift
 enum HerdrPreflightResult: Equatable {
-    case compatible
+    case compatible(versionWarning: HerdrBinaryVersionWarning?)
     case binaryMissing
     case runtimeUnavailable
     case bridgeUnavailable
-    case versionMismatch(client: String, remote: String)
     case protocolMismatch(client: Int, remote: Int)
+    case runtimeIncompatible(clientVersion: String, serverVersion: String)
 }
 ```
 
 实际命令和 JSON Schema 必须根据固定的 Herdr revision 验证。只要存在结构化结果，就不能解析面向人的文本输出。
 
-`startWorkspaceConnection` 必须在创建 ClientKit 或打开 private bridge 前执行预检，并且只允许 `.compatible` 继续。`.runtimeUnavailable`、版本/协议不匹配和无效状态必须直接返回确定性错误，不能退化为等待 bridge 的 socket timeout。
+`startWorkspaceConnection` 必须在创建 ClientKit 或打开 private bridge 前执行预检，并且只允许 `.compatible` 继续。Binary Version 警告不得阻止连接；`.runtimeUnavailable`、协议不匹配、远端明确报告不兼容和无效状态必须直接返回确定性错误，不能退化为等待 bridge 的 socket timeout。
 
 Session Name 还受远端 Unix socket 完整路径长度限制。测试 fixture 和自动生成的临时 session 必须使用短名称；不能直接把完整 UUID 拼接到长前缀后作为 session name，否则 macOS 可能在输出结构化 status 前返回 `sockaddr_un.sun_path` 超限错误。
 
@@ -465,7 +465,7 @@ Attachment 连接必须启用 SSH Keepalive 或应用层心跳，并定义明确
 
 - App 在前台时使用有上限的指数退避
 - 用户主动 detach 后停止重试
-- 版本或协议不匹配时停止并提示操作
+- 协议不匹配或远端明确报告不兼容时停止并提示操作
 - 避免无意创建两个可写 Controller
 - 取消旧 Stream Reader 和 Pending Write
 - 收到 Full Redraw 前不得把旧画面视为当前状态

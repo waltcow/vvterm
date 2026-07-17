@@ -93,7 +93,7 @@ herdr --session <session> status --json
 - `server.running`、`server.version`、`server.protocol`、`server.compatible`；
 - 当前 session 和 server capabilities。
 
-第一版只接受 client version `0.7.4`、client protocol `16`、server running、server version `0.7.4`、server protocol `16`。Binary 缺失和命令失败由 Exec 退出状态映射，不解析面向人的 stderr。
+VVTerm ClientKit 的已测试 Binary Version 是 `0.7.4`，但 Binary Version 不参与硬拒绝。预检要求 client protocol `16`、server running、server protocol `16`，且 `server.compatible` 不得明确为 `false`；client 或 server Binary Version 偏离 `0.7.4` 时返回非阻塞警告并继续 Herdr 握手。Binary 缺失和命令失败由 Exec 退出状态映射，不解析面向人的 stderr。
 
 ## 授权记录
 
