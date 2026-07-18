@@ -49,7 +49,7 @@ private actor FakeHerdrWorkspaceSSH: HerdrSSHExecuting {
 
 struct HerdrWorkspaceConnectionTests {
     @Test
-    func pumpsHelloWelcomeAnsiInputResizeAndDetach() async throws {
+    func pumpsHelloWelcomeAnsiInputResizeScrollAndDetach() async throws {
         let fake = FakeHerdrWorkspaceSSH()
         let transport = HerdrSSHTransport(
             ssh: fake,
@@ -83,12 +83,14 @@ struct HerdrWorkspaceConnectionTests {
 
         try await connection.sendInput(Data([0, 0xFF]))
         try await connection.resize(cols: 120, rows: 40)
+        try await connection.scroll(direction: .down, lines: 3)
         try await connection.detach()
         try await connection.detach()
 
-        #expect(await fake.writes.suffix(3) == [
+        #expect(await fake.writes.suffix(4) == [
             Data([4, 0, 0, 0, 1, 2, 0, 0xFF]),
             Data([5, 0, 0, 0, 3, 120, 40, 0, 0]),
+            Data([7, 0, 0, 0, 6, 0, 1, 3, 0, 0, 0]),
             Data([1, 0, 0, 0, 4]),
         ])
         #expect(await fake.finishedInput)

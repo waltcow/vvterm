@@ -10,7 +10,7 @@ private workspace protocol. It is pinned to:
   configuration payload
 
 The crate owns protocol framing, the client handshake, sequence validation,
-bounded event buffering, and outbound input/resize/detach messages. It does not
+bounded event buffering, and outbound input/resize/scroll/detach messages. It does not
 own SSH, credentials, rendering, or application lifecycle.
 
 ## Build
@@ -65,5 +65,5 @@ cargo test installed_bridge_completes_real_handshake_and_full_redraw -- --ignore
 ```
 
 The test creates a unique named session, validates the real protocol 16
-Welcome and initial full ANSI redraw, sends resize/input/detach, and stops the
+Welcome and initial full ANSI redraw, sends resize/input/scroll/detach, and stops the
 temporary server before returning.

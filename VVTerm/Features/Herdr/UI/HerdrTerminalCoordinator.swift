@@ -83,6 +83,13 @@ final class HerdrTerminalCoordinator {
         return result
     }
 
+    func handleScroll(_ direction: HerdrScrollDirection, lines: UInt16 = 3) {
+        guard lines > 0 else { return }
+        Task { @MainActor [weak self] in
+            await self?.sendScroll(direction, lines: lines)
+        }
+    }
+
     func setVisible(_ isVisible: Bool) {
         self.isVisible = isVisible
         updateRenderingState()
@@ -311,6 +318,19 @@ final class HerdrTerminalCoordinator {
               let connection else { return }
         do {
             try await connection.sendInput(data)
+        } catch {
+            await handleConnectionFailure(
+                HerdrFailureClassifier.classify(error, sessionName: runtime.sessionName),
+                connectionID: connectionID
+            )
+        }
+    }
+
+    private func sendScroll(_ direction: HerdrScrollDirection, lines: UInt16) async {
+        guard let connectionID = stateMachine.activeConnectionID,
+              let connection else { return }
+        do {
+            try await connection.scroll(direction: direction, lines: lines)
         } catch {
             await handleConnectionFailure(
                 HerdrFailureClassifier.classify(error, sessionName: runtime.sessionName),

@@ -1,6 +1,6 @@
 use super::*;
 use crate::core::{ClientEvent, HerdrClientCore};
-use crate::protocol::{decode_client_message, ClientMessage};
+use crate::protocol::{decode_client_message, AttachScrollDirection, ClientMessage};
 
 #[cfg(target_os = "macos")]
 use std::io::{Read, Write};
@@ -96,7 +96,7 @@ fn fragmented_welcome_and_ansi_produce_typed_events() {
 }
 
 #[test]
-fn input_resize_and_detach_match_golden_bytes() {
+fn input_resize_scroll_and_detach_match_golden_bytes() {
     let mut client = HerdrClientCore::new(80, 24).expect("client");
     let _ = client.take_outbound();
     activate(&mut client);
@@ -113,6 +113,16 @@ fn input_resize_and_detach_match_golden_bytes() {
     assert_eq!(
         client.take_outbound().expect("resize"),
         vec![5, 0, 0, 0, 3, 120, 40, 0, 0]
+    );
+
+    assert!(client.scroll(AttachScrollDirection::Up, 0).is_err());
+    assert_eq!(client.take_outbound(), None);
+    client
+        .scroll(AttachScrollDirection::Up, 3)
+        .expect("scroll should encode");
+    assert_eq!(
+        client.take_outbound().expect("scroll"),
+        vec![7, 0, 0, 0, 6, 0, 0, 3, 0, 0, 0]
     );
 
     client.detach().expect("detach should encode");
@@ -201,6 +211,19 @@ fn c_abi_transfers_and_frees_owned_buffers() {
         assert_eq!(herdr_client_take_error(client, &mut error), HERDR_STATUS_OK);
         let error_text = String::from_utf8_lossy(slice::from_raw_parts(error.ptr, error.len));
         assert!(error_text.contains("greater than zero"));
+        herdr_buffer_free(&mut error);
+
+        assert_eq!(
+            herdr_client_scroll(client, HERDR_SCROLL_DOWN, 3),
+            HERDR_STATUS_OK
+        );
+        assert_eq!(
+            herdr_client_scroll(client, 99, 3),
+            HERDR_STATUS_INVALID_ARGUMENT
+        );
+        assert_eq!(herdr_client_take_error(client, &mut error), HERDR_STATUS_OK);
+        let error_text = String::from_utf8_lossy(slice::from_raw_parts(error.ptr, error.len));
+        assert!(error_text.contains("invalid scroll direction"));
         herdr_buffer_free(&mut error);
 
         herdr_client_free(client);
@@ -292,6 +315,7 @@ fn installed_bridge_completes_real_handshake_and_full_redraw() {
             }
             if saw_welcome && saw_full_redraw {
                 client.resize(100, 30)?;
+                client.scroll(AttachScrollDirection::Down, 3)?;
                 client.send_input(b"\x1b")?;
                 client.detach()?;
                 while let Some(outbound) = client.take_outbound() {

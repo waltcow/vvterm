@@ -58,6 +58,16 @@ actor HerdrClientKitAdapter {
         try check(herdr_client_resize(client, cols, rows))
     }
 
+    func scroll(direction: HerdrScrollDirection, lines: UInt16) throws {
+        let rawDirection = switch direction {
+        case .up:
+            UInt32(HERDR_SCROLL_UP)
+        case .down:
+            UInt32(HERDR_SCROLL_DOWN)
+        }
+        try check(herdr_client_scroll(client, rawDirection, lines))
+    }
+
     func detach() throws {
         try check(herdr_client_detach(client))
     }

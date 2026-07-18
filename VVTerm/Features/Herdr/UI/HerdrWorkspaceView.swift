@@ -49,6 +49,7 @@ struct HerdrWorkspaceView: View {
                 runtime: runtime,
                 state: $state,
                 isVisible: isVisible,
+                capturesVolumeButtons: !showingVoiceRecording,
                 retryNonce: retryNonce,
                 networkSnapshot: networkSnapshot,
                 appActivity: appActivity,

@@ -83,6 +83,12 @@ actor HerdrWorkspaceConnection {
         try await flushOutbound()
     }
 
+    func scroll(direction: HerdrScrollDirection, lines: UInt16) async throws {
+        try requireWritable()
+        try await adapter.scroll(direction: direction, lines: lines)
+        try await flushOutbound()
+    }
+
     func detach() async throws {
         guard !closed else {
             throw HerdrWorkspaceConnectionError.closed

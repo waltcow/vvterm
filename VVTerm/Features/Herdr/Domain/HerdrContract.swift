@@ -32,6 +32,11 @@ nonisolated enum HerdrAttachmentMode: Hashable, Sendable {
     case control(target: String, takeover: Bool)
 }
 
+nonisolated enum HerdrScrollDirection: Equatable, Sendable {
+    case up
+    case down
+}
+
 nonisolated struct HerdrAttachment: Identifiable, Hashable, Sendable {
     let id: UUID
     let runtime: HerdrRuntimeReference

@@ -39,6 +39,11 @@ enum {
     HERDR_EVENT_SHUTDOWN = 4,
 };
 
+enum {
+    HERDR_SCROLL_UP = 0,
+    HERDR_SCROLL_DOWN = 1,
+};
+
 uint32_t herdr_client_protocol_version(void);
 
 /* Returns NULL when dimensions are invalid or allocation panics. */
@@ -48,6 +53,7 @@ void herdr_client_free(herdr_client_t *client);
 int32_t herdr_client_feed(herdr_client_t *client, const uint8_t *bytes, size_t length);
 int32_t herdr_client_send_input(herdr_client_t *client, const uint8_t *bytes, size_t length);
 int32_t herdr_client_resize(herdr_client_t *client, uint16_t cols, uint16_t rows);
+int32_t herdr_client_scroll(herdr_client_t *client, uint32_t direction, uint16_t lines);
 int32_t herdr_client_detach(herdr_client_t *client);
 
 /*

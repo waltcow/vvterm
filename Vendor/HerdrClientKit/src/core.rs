@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
 
 use crate::protocol::{
-    decode_server_message, encode_framed, ClientKeybindings, ClientLaunchMode, ClientMessage,
-    RenderEncoding, ServerMessage, TerminalFrame, MAX_FRAME_SIZE, PROTOCOL_VERSION,
+    decode_server_message, encode_framed, AttachScrollDirection, AttachScrollSource,
+    ClientKeybindings, ClientLaunchMode, ClientMessage, RenderEncoding, ServerMessage,
+    TerminalFrame, MAX_FRAME_SIZE, PROTOCOL_VERSION,
 };
 
 const MAX_FEED_BYTES: usize = 256 * 1024;
@@ -138,6 +139,21 @@ impl HerdrClientCore {
             rows,
             cell_width_px: 0,
             cell_height_px: 0,
+        })
+    }
+
+    pub fn scroll(&mut self, direction: AttachScrollDirection, lines: u16) -> Result<(), String> {
+        self.require_active()?;
+        if lines == 0 {
+            return Err("scroll lines must be greater than zero".to_owned());
+        }
+        self.queue_outbound(ClientMessage::AttachScroll {
+            source: AttachScrollSource::Wheel,
+            direction,
+            lines,
+            column: None,
+            row: None,
+            modifiers: 0,
         })
     }
 

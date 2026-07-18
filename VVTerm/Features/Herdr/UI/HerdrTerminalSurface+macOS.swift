@@ -7,6 +7,7 @@ struct HerdrTerminalSurface: NSViewRepresentable {
     let runtime: HerdrRuntimeReference
     @Binding var state: HerdrConnectionState
     let isVisible: Bool
+    let capturesVolumeButtons: Bool
     let retryNonce: Int
     let networkSnapshot: HerdrNetworkSnapshot
     let appActivity: HerdrAppActivity

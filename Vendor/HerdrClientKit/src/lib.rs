@@ -6,7 +6,7 @@ use std::ptr;
 use std::slice;
 
 use crate::core::{ClientEvent, HerdrClientCore};
-use crate::protocol::PROTOCOL_VERSION;
+use crate::protocol::{AttachScrollDirection, PROTOCOL_VERSION};
 
 pub const HERDR_STATUS_OK: i32 = 0;
 pub const HERDR_STATUS_EMPTY: i32 = 1;
@@ -18,6 +18,9 @@ pub const HERDR_EVENT_WELCOME: u32 = 1;
 pub const HERDR_EVENT_ANSI: u32 = 2;
 pub const HERDR_EVENT_GRAPHICS: u32 = 3;
 pub const HERDR_EVENT_SHUTDOWN: u32 = 4;
+
+pub const HERDR_SCROLL_UP: u32 = 0;
+pub const HERDR_SCROLL_DOWN: u32 = 1;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -169,6 +172,22 @@ pub unsafe extern "C" fn herdr_client_resize(
     rows: u16,
 ) -> i32 {
     with_client(client, |client| client.resize(cols, rows))
+}
+
+#[no_mangle]
+/// # Safety
+/// `client` must be a live pointer returned by `herdr_client_new`.
+pub unsafe extern "C" fn herdr_client_scroll(
+    client: *mut HerdrClientCore,
+    direction: u32,
+    lines: u16,
+) -> i32 {
+    let direction = match direction {
+        HERDR_SCROLL_UP => AttachScrollDirection::Up,
+        HERDR_SCROLL_DOWN => AttachScrollDirection::Down,
+        _ => return record_argument_error(client, "invalid scroll direction"),
+    };
+    with_client(client, |client| client.scroll(direction, lines))
 }
 
 #[no_mangle]

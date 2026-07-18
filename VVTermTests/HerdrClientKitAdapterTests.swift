@@ -20,7 +20,7 @@ struct HerdrClientKitAdapterTests {
     }
 
     @Test
-    func emitsAnsiAndEncodesInputResizeAndDetach() async throws {
+    func emitsAnsiAndEncodesInputResizeScrollAndDetach() async throws {
         let adapter = try HerdrClientKitAdapter(cols: 80, rows: 24)
         _ = try await adapter.drainOutbound()
         try await adapter.feed(Data([4, 0, 0, 0, 0, 16, 1, 0]))
@@ -39,10 +39,12 @@ struct HerdrClientKitAdapterTests {
 
         try await adapter.sendInput(Data([0, 10, 13, 27, 255]))
         try await adapter.resize(cols: 120, rows: 40)
+        try await adapter.scroll(direction: .up, lines: 3)
         try await adapter.detach()
         #expect(try await adapter.drainOutbound() == [
             Data([7, 0, 0, 0, 1, 5, 0, 10, 13, 27, 255]),
             Data([5, 0, 0, 0, 3, 120, 40, 0, 0]),
+            Data([7, 0, 0, 0, 6, 0, 0, 3, 0, 0, 0]),
             Data([1, 0, 0, 0, 4]),
         ])
     }

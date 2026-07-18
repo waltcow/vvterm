@@ -2,11 +2,42 @@
 import SwiftUI
 import UIKit
 
+@MainActor
+final class HerdrTerminalSurfaceCoordinator {
+    let terminal: HerdrTerminalCoordinator
+    let volumeButtons: HerdrVolumeButtonScrollMonitor
+
+    init(
+        server: Server,
+        runtime: HerdrRuntimeReference,
+        initialRetryNonce: Int,
+        initialNetworkSnapshot: HerdrNetworkSnapshot,
+        initialAppActivity: HerdrAppActivity,
+        onStateChange: @escaping (HerdrConnectionState) -> Void
+    ) {
+        let terminal = HerdrTerminalCoordinator(
+            server: server,
+            runtime: runtime,
+            initialRetryNonce: initialRetryNonce,
+            initialNetworkSnapshot: initialNetworkSnapshot,
+            initialAppActivity: initialAppActivity,
+            onStateChange: onStateChange
+        )
+        let volumeButtons = HerdrVolumeButtonScrollMonitor()
+        volumeButtons.onScroll = { [weak terminal] direction in
+            terminal?.handleScroll(direction)
+        }
+        self.terminal = terminal
+        self.volumeButtons = volumeButtons
+    }
+}
+
 struct HerdrTerminalSurface: UIViewRepresentable {
     let server: Server
     let runtime: HerdrRuntimeReference
     @Binding var state: HerdrConnectionState
     let isVisible: Bool
+    let capturesVolumeButtons: Bool
     let retryNonce: Int
     let networkSnapshot: HerdrNetworkSnapshot
     let appActivity: HerdrAppActivity
@@ -16,8 +47,8 @@ struct HerdrTerminalSurface: UIViewRepresentable {
 
     @EnvironmentObject private var ghosttyApp: Ghostty.App
 
-    func makeCoordinator() -> HerdrTerminalCoordinator {
-        HerdrTerminalCoordinator(
+    func makeCoordinator() -> HerdrTerminalSurfaceCoordinator {
+        HerdrTerminalSurfaceCoordinator(
             server: server,
             runtime: runtime,
             initialRetryNonce: retryNonce,
@@ -39,28 +70,36 @@ struct HerdrTerminalSurface: UIViewRepresentable {
         )
         terminal.onReady = { [weak terminal, weak coordinator = context.coordinator] in
             guard let terminal, let coordinator else { return }
-            coordinator.bind(to: terminal)
-            coordinator.setVisible(isVisible)
+            coordinator.terminal.bind(to: terminal)
+            coordinator.terminal.setVisible(isVisible)
             onTerminalReady(terminal)
         }
         terminal.onZoomAction = { [weak coordinator = context.coordinator] action in
-            coordinator?.handleZoom(action)
+            coordinator?.terminal.handleZoom(action)
         }
         terminal.onKeyboardAccessoryHideRequested = onKeyboardHidden
         terminal.onVoiceButtonTapped = onVoiceInput
+        context.coordinator.volumeButtons.attach(to: terminal)
         return terminal
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        context.coordinator.update { state = $0 }
-        context.coordinator.setVisible(isVisible)
-        context.coordinator.observeRetryNonce(retryNonce)
-        context.coordinator.observeNetworkSnapshot(networkSnapshot)
-        context.coordinator.observeAppActivity(appActivity)
+        context.coordinator.terminal.update { state = $0 }
+        context.coordinator.terminal.setVisible(isVisible)
+        context.coordinator.terminal.observeRetryNonce(retryNonce)
+        context.coordinator.terminal.observeNetworkSnapshot(networkSnapshot)
+        context.coordinator.terminal.observeAppActivity(appActivity)
+        context.coordinator.volumeButtons.setEnabled(
+            capturesVolumeButtons
+                && isVisible
+                && state.isAttached
+                && appActivity == .foreground
+        )
     }
 
-    static func dismantleUIView(_ uiView: UIView, coordinator: HerdrTerminalCoordinator) {
-        coordinator.stop()
+    static func dismantleUIView(_ uiView: UIView, coordinator: HerdrTerminalSurfaceCoordinator) {
+        coordinator.volumeButtons.detach()
+        coordinator.terminal.stop()
         if let terminal = uiView as? GhosttyTerminalView {
             terminal.onZoomAction = nil
             terminal.onKeyboardAccessoryHideRequested = nil

@@ -111,11 +111,6 @@ nonisolated struct HerdrTerminalSessionDecoder: Sendable {
     }
 }
 
-nonisolated enum HerdrTerminalScrollDirection: String, Encodable, Sendable {
-    case up
-    case down
-}
-
 nonisolated enum HerdrTerminalScrollSource: String, Encodable, Sendable {
     case wheel
     case pageKey = "page_key"
@@ -124,7 +119,7 @@ nonisolated enum HerdrTerminalScrollSource: String, Encodable, Sendable {
 nonisolated enum HerdrTerminalControlCommand: Encodable, Equatable, Sendable {
     case input(Data)
     case resize(cols: UInt16, rows: UInt16, cellWidthPixels: UInt32 = 0, cellHeightPixels: UInt32 = 0)
-    case scroll(direction: HerdrTerminalScrollDirection, lines: UInt16, source: HerdrTerminalScrollSource = .wheel)
+    case scroll(direction: HerdrScrollDirection, lines: UInt16, source: HerdrTerminalScrollSource = .wheel)
     case release
 
     private enum CodingKeys: String, CodingKey {
@@ -153,7 +148,7 @@ nonisolated enum HerdrTerminalControlCommand: Encodable, Equatable, Sendable {
             try container.encode(cellHeightPixels, forKey: .cellHeightPixels)
         case let .scroll(direction, lines, source):
             try container.encode("terminal.scroll", forKey: .type)
-            try container.encode(direction, forKey: .direction)
+            try container.encode(direction == .up ? "up" : "down", forKey: .direction)
             try container.encode(lines, forKey: .lines)
             try container.encode(source, forKey: .source)
         case .release:
